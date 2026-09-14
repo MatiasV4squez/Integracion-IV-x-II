@@ -1,0 +1,13 @@
+# Dependencies and generated output in every microservice
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+*.log
+src/generated/prisma/
+
+# Local credentials; only the configuration template is versioned
+.env
+.env.*
+!.env.example
