@@ -1,0 +1,23 @@
+# Installed dependencies and generated output (all microservices)
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs and local tooling caches
+*.log
+.npm/
+.cache/
+.eslintcache
+
+# Operating system files
+.DS_Store
+Thumbs.db
