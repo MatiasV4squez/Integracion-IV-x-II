@@ -1,0 +1,69 @@
+// Agustin Addon
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Tabla de Usuarios
+model Usuario {
+  id_usuario           BigInt    @id @default(autoincrement())
+  nombre               String    @db.VarChar(150)
+  correo_institucional String    @unique @db.VarChar(255)
+  password_hash        String    @db.VarChar(255)
+  carrera              String?   @db.VarChar(150)
+  semestre_actual      Int?
+  biografia            String?   @db.Text
+  estado_cuenta        String    @db.VarChar(30)
+  correo_verificado    Boolean
+  fecha_registro       DateTime  @default(now()) @db.Timestamp()
+
+  // Relaciones con otras tablas
+  roles                UsuarioRol[]
+  verificaciones       VerificacionCorreo[]
+
+  @@map("usuario") // Para que la tabla en Postgres se llame exactamente "usuario" en minúsculas
+}
+
+// 2. Tabla de Roles
+model Rol {
+  id_rol Int    @id @default(autoincrement())
+  nombre String @unique @db.VarChar(50)
+
+  // Relaciones
+  usuarios UsuarioRol[]
+
+  @@map("rol")
+}
+
+// 3. Tabla Intermedia Usuario-Rol
+model UsuarioRol {
+  id_usuario BigInt
+  id_rol     Int
+
+  // Llaves foráneas
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+  rol     Rol     @relation(fields: [id_rol], references: [id_rol])
+
+  // Llave primaria compuesta
+  @@id([id_usuario, id_rol])
+  @@map("usuario_rol")
+}
+
+// 4. Tabla de Verificación de Correo
+model VerificacionCorreo {
+  id_verificacion   BigInt    @id @default(autoincrement())
+  id_usuario        BigInt
+  token             String    @unique @db.VarChar(255)
+  fecha_expiracion  DateTime  @db.Timestamp()
+  fecha_utilizacion DateTime? @db.Timestamp()
+
+  // Llave foránea
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("verificacion_correo")
+}
