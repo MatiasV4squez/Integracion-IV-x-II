@@ -40,6 +40,9 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.development.local
 .env.test.local
 .env.production.local
@@ -57,8 +60,3 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
-
-node_modules/
-.env   
-dist/

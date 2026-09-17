@@ -1,13 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-
-// Este parche le enseña a JSON cómo leer los BigInt de Prisma -Agusitn
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
+import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { serializeBigInt } from './config/json-serialization';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.set('json replacer', serializeBigInt);
+  app.enableShutdownHooks();
+  await app.listen(app.get(ConfigService).getOrThrow<number>('PORT'));
 }
 void bootstrap();
