@@ -1,0 +1,20 @@
+venv/
+# Dependencies and generated output, at every service level
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.npm-cache/
+
+# Local configuration and secrets; keep documented templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs and temporary files
+*.log
+.tmp/
+.temp/
