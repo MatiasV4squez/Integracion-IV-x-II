@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { createObserveModule } from '@nestjs/observe';
+import { createObserveModule } from '@nestJS/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { getDatabaseUrl } from './database/database.config';
 import { DatabaseModule } from './database/database.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -14,8 +15,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       load: [() => ({ databaseUrl: getDatabaseUrl(process.env) })],
     }),
     DatabaseModule,
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
+    SessionsModule,
     ...(process.env.NODE_ENV === 'test'
       ? []
       : [

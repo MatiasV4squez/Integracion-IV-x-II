@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
@@ -19,27 +19,56 @@ export class SessionsService {
   }
 
   async createSession(createSessionDto: CreateSessionDto) {
-    const pendingCount = await this.prisma.sesion.count({
-      where: {
-        id_tutee: createSessionDto.id_tutee,
-        estado: 'PENDIENTE',
-      },
-    });
+    const maxRetries = 3;
 
-    if (pendingCount >= 4) {
-      throw new BadRequestException(
-        'El estudiante ya posee el límite de 4 solicitudes pendientes.',
-      );
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const pendingCount = await tx.sesion.count({
+              where: {
+                id_tutee: createSessionDto.id_tutee,
+                estado_sesion: 'PENDIENTE' as any,
+              },
+            });
+
+            if (pendingCount >= 4) {
+              throw new BadRequestException(
+                'El estudiante ya posee el límite de 4 solicitudes pendientes.',
+              );
+            }
+
+            return await tx.sesion.create({
+              data: {
+                id_tutee: createSessionDto.id_tutee,
+                id_tutor: createSessionDto.id_tutor,
+                id_materia: createSessionDto.id_materia,
+                id_bloque: createSessionDto.id_bloque,
+                estado_sesion: 'PENDIENTE' as any,
+              },
+            });
+          },
+          {
+            isolationLevel: 'Serializable' as any,
+          },
+        );
+      } catch (error: any) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+
+        if (error?.code === 'P2034') {
+          if (attempt === maxRetries) {
+            throw new InternalServerErrorException(
+              'No se pudo procesar la solicitud debido a alta concurrencia. Intente nuevamente.',
+            );
+          }
+          await new Promise((res) => setTimeout(res, 50 * attempt));
+          continue;
+        }
+
+        throw error;
+      }
     }
-
-    return this.prisma.sesion.create({
-      data: {
-        id_tutee: createSessionDto.id_tutee,
-        id_tutor: createSessionDto.id_tutor,
-        id_materia: createSessionDto.id_materia,
-        id_bloque: createSessionDto.id_bloque,
-        estado: 'PENDIENTE',
-      },
-    });
   }
 }
