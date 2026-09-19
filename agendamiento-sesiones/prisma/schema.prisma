@@ -7,3 +7,42 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model bloque_horario {
+  id_bloque     String                            @id(map: "PK_ec6dc32412ccf07cd8b85847d56") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_tutor      String                            @db.Uuid
+  dia           DateTime                          @db.Date
+  hora_inicio   DateTime                          @db.Time(6)
+  hora_fin      DateTime                          @db.Time(6)
+  estado_bloque bloque_horario_estado_bloque_enum @default(DISPONIBLE)
+  created_at    DateTime                          @default(now()) @db.Timestamp(6)
+  updated_at    DateTime                          @default(now()) @db.Timestamp(6)
+  sesion        sesion[]
+}
+
+model sesion {
+  id_sesion           String                    @id(map: "PK_25f520935e8570102c469357dfc") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_tutee            String                    @db.Uuid
+  id_tutor            String                    @db.Uuid
+  id_materia          String                    @db.Uuid
+  id_bloque           String                    @db.Uuid
+  estado_sesion       sesion_estado_sesion_enum @default(PENDIENTE)
+  fecha_creacion      DateTime                  @default(now()) @db.Timestamp(6)
+  fecha_actualizacion DateTime                  @default(now()) @db.Timestamp(6)
+  bloque_horario      bloque_horario            @relation(fields: [id_bloque], references: [id_bloque], onUpdate: NoAction, map: "FK_b03e711cb8b8859b9579a67dd58")
+}
+
+enum bloque_horario_estado_bloque_enum {
+  DISPONIBLE
+  RESERVADO
+  INACTIVO
+}
+
+enum sesion_estado_sesion_enum {
+  PENDIENTE
+  CONFIRMADA
+  RECHAZADA
+  CANCELADA
+  COMPLETADA
+  EXPIRADA
+}
