@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
@@ -19,12 +19,22 @@ export class SessionsService {
   }
 
   async createSession(createSessionDto: CreateSessionDto) {
+    // 1. Obtener los detalles del bloque horario que se desea agendar
+    const targetBlock = await this.prisma.bloque_horario.findUnique({
+      where: { id_bloque: createSessionDto.id_bloque },
+    });
+
+    if (!targetBlock) {
+      throw new NotFoundException('El bloque horario especificado no existe.');
+    }
+
     const maxRetries = 3;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await this.prisma.$transaction(
           async (tx) => {
+            // 2. Validar límite de 4 solicitudes PENDIENTES
             const pendingCount = await tx.sesion.count({
               where: {
                 id_tutee: createSessionDto.id_tutee,
@@ -38,6 +48,28 @@ export class SessionsService {
               );
             }
 
+            // 3. Validar solapamiento de horarios con sesiones activas (PENDIENTE o ACEPTADA)
+            const overlappingSession = await tx.sesion.findFirst({
+              where: {
+                id_tutee: createSessionDto.id_tutee,
+                estado_sesion: {
+                  in: ['PENDIENTE', 'ACEPTADA'] as any[],
+                },
+                bloque_horario: {
+                  dia: targetBlock.dia,
+                  hora_inicio: { lt: targetBlock.hora_fin },
+                  hora_fin: { gt: targetBlock.hora_inicio },
+                },
+              },
+            });
+
+            if (overlappingSession) {
+              throw new BadRequestException(
+                'El estudiante ya tiene una sesión agendada o pendiente en un horario que se traslapa.',
+              );
+            }
+
+            // 4. Crear la sesión
             return await tx.sesion.create({
               data: {
                 id_tutee: createSessionDto.id_tutee,
@@ -53,7 +85,7 @@ export class SessionsService {
           },
         );
       } catch (error: any) {
-        if (error instanceof BadRequestException) {
+        if (error instanceof BadRequestException || error instanceof NotFoundException) {
           throw error;
         }
 
