@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { serializeBigInt } from '../src/config/json-serialization';
@@ -7,6 +8,7 @@ import { loginFixture } from './fixtures/login.fixture';
 
 describe('Login básico (HTTP con persistencia simulada)', () => {
   let app: NestExpressApplication;
+  let jwt: JwtService;
   const email = 'estudiante@alu.uct.cl';
   const usuarioExistente = {
     id_usuario: 1n,
@@ -27,6 +29,8 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     Object.assign(process.env, {
       DATABASE_URL: 'postgresql://test@localhost/usuarios_auth_test',
       PORT: '3000',
+      JWT_SECRET: 'secreto-jwt-de-prueba-con-al-menos-32-bytes',
+      JWT_ACCESS_TTL_SECONDS: '1800',
     });
     const { AppModule } =
       require('../src/app.module') as typeof import('../src/app.module');
@@ -37,6 +41,7 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     app = module.createNestApplication<NestExpressApplication>();
     app.set('json replacer', serializeBigInt);
     await app.init();
+    jwt = app.get(JwtService);
   });
 
   beforeEach(() => {
@@ -58,11 +63,11 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
       });
   }
 
-  it('valida un usuario existente, consulta sus roles y no expone el hash ni emite tokens', async () => {
+  it('emite un JWT firmado con la identidad mínima y no expone el hash', async () => {
     const respuesta = await login({
       correo_institucional: ' ESTUDIANTE@ALU.UCT.CL ',
     }).expect(200);
-    expect(respuesta.body).toEqual({
+    expect(respuesta.body).toMatchObject({
       usuario: {
         id_usuario: '1',
         nombre: 'Estudiante',
@@ -71,7 +76,10 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
         correo_verificado: true,
         roles: ['Tutor'],
       },
-      mensaje: 'Credenciales válidas.',
+      access_token: expect.any(String),
+      token_type: 'Bearer',
+      expires_in: 1800,
+      mensaje: 'Autenticación exitosa.',
     });
     expect(prisma.usuario.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -81,7 +89,20 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     expect(JSON.stringify(respuesta.body)).not.toContain(
       loginFixture.passwordHash,
     );
-    expect(respuesta.body).not.toHaveProperty('access_token');
+    const payload = await jwt.verifyAsync(respuesta.body.access_token, {
+      issuer: 'stp-usuarios-auth',
+      audience: 'stp-clients',
+    });
+    expect(payload).toMatchObject({
+      sub: '1',
+      correo_institucional: email,
+      roles: ['Tutor'],
+      iss: 'stp-usuarios-auth',
+      aud: 'stp-clients',
+    });
+    expect(payload.exp - payload.iat).toBe(1800);
+    expect(payload).not.toHaveProperty('password_hash');
+    expect(payload).not.toHaveProperty('nombre');
   });
 
   it('responde igual para un usuario inexistente y una contraseña incorrecta', async () => {
@@ -89,7 +110,12 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     const desconocido = await login().expect(401);
     const incorrecta = await login({ password: 'otra contraseña' }).expect(401);
     expect(desconocido.body).toEqual(incorrecta.body);
-    expect(incorrecta.body.message).toBe('Correo o contraseña incorrectos.');
+    expect(incorrecta.body).toMatchObject({
+      statusCode: 401,
+      code: 'AUTH_INVALID_CREDENTIALS',
+      message: 'Correo o contraseña incorrectos.',
+    });
+    expect(incorrecta.body).not.toHaveProperty('access_token');
   });
 
   it('rechaza un hash inválido sin producir un error interno', async () => {
@@ -106,7 +132,13 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     { correo_institucional: 'inválido' },
     { roles: ['Administrador'] },
   ])('rechaza datos inválidos de login: %j', async (overrides) => {
-    await login(overrides).expect(400);
+    const respuesta = await login(overrides).expect(400);
+    expect(respuesta.body).toMatchObject({
+      statusCode: 400,
+      code: 'AUTH_INVALID_REQUEST',
+      message: 'Los datos de autenticación no son válidos.',
+      details: expect.any(Array),
+    });
     expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
   });
 
