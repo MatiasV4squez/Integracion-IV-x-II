@@ -7,3 +7,11 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Materia {
+  idMateria BigInt @id @default(autoincrement()) @map("id_materia")
+  codigo    String @unique @db.VarChar(50)
+  nombre    String @db.VarChar(150)
+
+  @@map("materia")
+}

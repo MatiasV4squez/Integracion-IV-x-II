@@ -22,7 +22,21 @@ Antes de arrancar, copia `.env.example` a `.env` si aún no existe y completa `D
 
 La base de datos debe existir y PostgreSQL debe estar accesible. El `.env` local se entrega sin credenciales: hasta completar `DATABASE_URL`, el servicio rechazará el arranque con un mensaje de configuración. NestJS carga `.env` automáticamente y valida `DATABASE_URL` y `PORT` (3000 por defecto).
 
-`GET /` devuelve `Hello World!` como comprobación inicial de funcionamiento.
+La aplicación expone `GET /materias`, que devuelve el catálogo ordenado por código. La ruta raíz `GET /` conserva `Hello World!` como comprobación inicial de funcionamiento.
+
+## Catálogo de materias
+
+El catálogo implementa RF05 del SRS. Cada materia tiene un identificador interno, un código académico único y un nombre. La API pública devuelve solamente `codigo` y `nombre`.
+
+```sh
+# Crear y aplicar una migración durante el desarrollo
+npm run prisma:migrate -- --name nombre_del_cambio
+
+# Cargar o actualizar las materias iniciales sin duplicarlas
+npm run prisma:seed
+```
+
+La semilla usa el código de cada materia para actualizar registros existentes o crear los que falten. Después de cambiar `prisma/schema.prisma`, ejecuta `npm run prisma:generate`.
 
 ## Verificación
 
@@ -42,15 +56,18 @@ npm run test:e2e
 - `src/app.service.ts`: servicio inicial, separado del controlador.
 - `src/config/environment.ts`: validación de configuración al arrancar.
 - `src/database/`: módulo que exporta una instancia de `PrismaService`, con conexión al iniciar y desconexión al cerrar.
-- `prisma/schema.prisma`: proveedor PostgreSQL y futuros modelos del dominio.
+- `src/materias/`: módulo HTTP del catálogo de materias, con controlador, servicio y DTO de respuesta.
+- `prisma/schema.prisma`: proveedor PostgreSQL y modelo `Materia`.
+- `prisma/migrations/`: historial versionado de cambios de esquema.
+- `prisma/seed.ts`: datos iniciales idempotentes del catálogo.
 - `prisma.config.ts`: configuración de Prisma CLI y carga de `.env`.
 - `test/`: pruebas de extremo a extremo.
 
 El proyecto tiene sus propias dependencias y compilación. Según el SRS, se integrará mediante HTTP/REST con el API Gateway y gestionará su propio esquema o base de datos PostgreSQL, sin acceso directo a las bases de otros servicios.
 
-La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos deben importar `DatabaseModule` e inyectar `PrismaService`. El catálogo, las postulaciones, la validación administrativa, la búsqueda de tutores, los modelos y la integración con otros servicios quedan pendientes.
+La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos deben importar `DatabaseModule` e inyectar `PrismaService`. El catálogo de materias ya está implementado; las postulaciones, la validación administrativa, la búsqueda de tutores y la integración con otros servicios quedan pendientes.
 
-No se crean tablas al arrancar. Cuando se incorporen modelos, `npm run prisma:migrate -- --name nombre_del_cambio` permitirá crear y aplicar una migración en desarrollo. `npm run prisma:deploy` aplicará migraciones existentes en el entorno de despliegue. No se han ejecutado migraciones en esta entrega.
+No se crean tablas al arrancar. Las migraciones crean y aplican los cambios de esquema en desarrollo. `npm run prisma:deploy` aplica migraciones existentes en el entorno de despliegue.
 
 `npm ci` genera automáticamente el cliente Prisma; tras modificar el esquema, ejecuta `npm run prisma:generate`. Las pruebas unitarias y e2e usan sustitutos de la conexión y no requieren PostgreSQL; no demuestran que las credenciales locales sean válidas.
 

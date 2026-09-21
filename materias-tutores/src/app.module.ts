@@ -4,11 +4,13 @@ import { validateEnvironment } from './config/environment.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { MateriasModule } from './materias/materias.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ validate: validateEnvironment }),
     DatabaseModule,
+    MateriasModule,
   ],
   controllers: [AppController],
   providers: [AppService],
