@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
+import { Prisma, sesion_estado_sesion_enum } from '../generated/prisma/client';
 
 @Injectable()
 export class SessionsService {
@@ -38,7 +44,7 @@ export class SessionsService {
             const pendingCount = await tx.sesion.count({
               where: {
                 id_tutee: createSessionDto.id_tutee,
-                estado_sesion: 'PENDIENTE' as any,
+                estado_sesion: sesion_estado_sesion_enum.PENDIENTE,
               },
             });
 
@@ -48,12 +54,15 @@ export class SessionsService {
               );
             }
 
-            // 3. Validar solapamiento de horarios con sesiones activas (PENDIENTE o ACEPTADA)
+            // 3. Validar solapamiento de horarios con sesiones activas (PENDIENTE o CONFIRMADA)
             const overlappingSession = await tx.sesion.findFirst({
               where: {
                 id_tutee: createSessionDto.id_tutee,
                 estado_sesion: {
-                  in: ['PENDIENTE', 'ACEPTADA'] as any[],
+                  in: [
+                    sesion_estado_sesion_enum.PENDIENTE,
+                    sesion_estado_sesion_enum.CONFIRMADA,
+                  ],
                 },
                 bloque_horario: {
                   dia: targetBlock.dia,
@@ -76,26 +85,32 @@ export class SessionsService {
                 id_tutor: createSessionDto.id_tutor,
                 id_materia: createSessionDto.id_materia,
                 id_bloque: createSessionDto.id_bloque,
-                estado_sesion: 'PENDIENTE' as any,
+                estado_sesion: sesion_estado_sesion_enum.PENDIENTE,
               },
             });
           },
           {
-            isolationLevel: 'Serializable' as any,
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           },
         );
-      } catch (error: any) {
-        if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      } catch (error: unknown) {
+        if (
+          error instanceof BadRequestException ||
+          error instanceof NotFoundException
+        ) {
           throw error;
         }
 
-        if (error?.code === 'P2034') {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2034'
+        ) {
           if (attempt === maxRetries) {
             throw new InternalServerErrorException(
               'No se pudo procesar la solicitud debido a alta concurrencia. Intente nuevamente.',
             );
           }
-          await new Promise((res) => setTimeout(res, 50 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
           continue;
         }
 

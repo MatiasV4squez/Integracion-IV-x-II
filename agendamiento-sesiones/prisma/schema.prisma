@@ -28,7 +28,7 @@ model sesion {
   id_bloque           String                    @db.Uuid
   estado_sesion       sesion_estado_sesion_enum @default(PENDIENTE)
   fecha_creacion      DateTime                  @default(now()) @db.Timestamp(6)
-  fecha_actualizacion DateTime                  @default(now()) @db.Timestamp(6)
+  fecha_actualizacion DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
   bloque_horario      bloque_horario            @relation(fields: [id_bloque], references: [id_bloque], onUpdate: NoAction, map: "FK_b03e711cb8b8859b9579a67dd58")
 }
 
@@ -42,7 +42,11 @@ enum sesion_estado_sesion_enum {
   PENDIENTE
   CONFIRMADA
   RECHAZADA
-  CANCELADA
-  COMPLETADA
   EXPIRADA
+  CANCELADA
+  PENDIENTE_CIERRE
+  COMPLETADA
+  NO_REALIZADA
+  INASISTENCIA
+  EN_CONFLICTO
 }
