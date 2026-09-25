@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,6 +15,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       load: [() => ({ databaseUrl: getDatabaseUrl(process.env) })],
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     SessionsModule,
     ...(process.env.NODE_ENV === 'test'

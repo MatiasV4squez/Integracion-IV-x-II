@@ -1,16 +1,13 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
-import { Prisma, sesion_estado_sesion_enum } from '../generated/prisma/client';
 
 @Injectable()
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async createBlock(createBlockDto: CreateBlockDto) {
@@ -25,7 +22,6 @@ export class SessionsService {
   }
 
   async createSession(createSessionDto: CreateSessionDto) {
-    // 1. Obtener los detalles del bloque horario que se desea agendar
     const targetBlock = await this.prisma.bloque_horario.findUnique({
       where: { id_bloque: createSessionDto.id_bloque },
     });
@@ -40,11 +36,10 @@ export class SessionsService {
       try {
         return await this.prisma.$transaction(
           async (tx) => {
-            // 2. Validar límite de 4 solicitudes PENDIENTES
             const pendingCount = await tx.sesion.count({
               where: {
                 id_tutee: createSessionDto.id_tutee,
-                estado_sesion: sesion_estado_sesion_enum.PENDIENTE,
+                estado_sesion: 'PENDIENTE' as any,
               },
             });
 
@@ -54,15 +49,11 @@ export class SessionsService {
               );
             }
 
-            // 3. Validar solapamiento de horarios con sesiones activas (PENDIENTE o CONFIRMADA)
             const overlappingSession = await tx.sesion.findFirst({
               where: {
                 id_tutee: createSessionDto.id_tutee,
                 estado_sesion: {
-                  in: [
-                    sesion_estado_sesion_enum.PENDIENTE,
-                    sesion_estado_sesion_enum.CONFIRMADA,
-                  ],
+                  in: ['PENDIENTE', 'ACEPTADA'] as any[],
                 },
                 bloque_horario: {
                   dia: targetBlock.dia,
@@ -78,44 +69,58 @@ export class SessionsService {
               );
             }
 
-            // 4. Crear la sesión
             return await tx.sesion.create({
               data: {
                 id_tutee: createSessionDto.id_tutee,
                 id_tutor: createSessionDto.id_tutor,
                 id_materia: createSessionDto.id_materia,
                 id_bloque: createSessionDto.id_bloque,
-                estado_sesion: sesion_estado_sesion_enum.PENDIENTE,
+                estado_sesion: 'PENDIENTE' as any,
               },
             });
           },
           {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            isolationLevel: 'Serializable' as any,
           },
         );
-      } catch (error: unknown) {
-        if (
-          error instanceof BadRequestException ||
-          error instanceof NotFoundException
-        ) {
+      } catch (error: any) {
+        if (error instanceof BadRequestException || error instanceof NotFoundException) {
           throw error;
         }
 
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2034'
-        ) {
+        if (error?.code === 'P2034') {
           if (attempt === maxRetries) {
             throw new InternalServerErrorException(
               'No se pudo procesar la solicitud debido a alta concurrencia. Intente nuevamente.',
             );
           }
-          await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+          await new Promise((res) => setTimeout(res, 50 * attempt));
           continue;
         }
 
         throw error;
       }
+    }
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleExpiredSessions() {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const result = await this.prisma.sesion.updateMany({
+      where: {
+        estado_sesion: 'PENDIENTE' as any,
+        created_at: {
+          lt: twentyFourHoursAgo,
+        },
+      },
+      data: {
+        estado_sesion: 'EXPIRADA' as any,
+      },
+    });
+
+    if (result.count > 0) {
+      this.logger.log(`Se actualizaron ${result.count} solicitudes pendientes a estado EXPIRADA.`);
     }
   }
 }
