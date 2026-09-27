@@ -11,7 +11,17 @@ function mensajesDeValidacion(errors: ValidationError[]): string[] {
   ]);
 }
 
-export function createValidationPipe(): ValidationPipe {
+interface ValidationErrorResponse {
+  code: string;
+  message: string;
+}
+
+export function createValidationPipe(
+  response: ValidationErrorResponse = {
+    code: 'AUTH_INVALID_REQUEST',
+    message: 'Los datos de autenticación no son válidos.',
+  },
+): ValidationPipe {
   return new ValidationPipe({
     transform: true,
     whitelist: true,
@@ -21,8 +31,8 @@ export function createValidationPipe(): ValidationPipe {
     exceptionFactory: (errors) =>
       new BadRequestException({
         statusCode: 400,
-        code: 'AUTH_INVALID_REQUEST',
-        message: 'Los datos de autenticación no son válidos.',
+        code: response.code,
+        message: response.message,
         details: mensajesDeValidacion(errors),
       }),
   });

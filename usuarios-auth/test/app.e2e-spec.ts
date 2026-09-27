@@ -1,9 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { JwtService } from '@nestjs/jwt';
+import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { serializeBigInt } from '../src/config/json-serialization';
+import { EMAIL_VERIFICATION_SENDER } from '../src/verificacion-correo/ports/email-verification.sender';
 import { loginFixture } from './fixtures/login.fixture';
 
 describe('Login básico (HTTP con persistencia simulada)', () => {
@@ -20,10 +22,25 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     roles: [{ rol: { nombre: 'Tutor' } }],
   };
   const prisma = {
-    usuario: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    usuario: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
     rol: { create: jest.fn(), findMany: jest.fn() },
     usuarioRol: { create: jest.fn(), findMany: jest.fn() },
+    verificacionCorreo: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+    },
+    $transaction: jest.fn(),
   };
+  const correoSender = { enviar: jest.fn() };
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -31,12 +48,24 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
       PORT: '3000',
       JWT_SECRET: 'secreto-jwt-de-prueba-con-al-menos-32-bytes',
       JWT_ACCESS_TTL_SECONDS: '1800',
+      SMTP_HOST: 'smtp.example.test',
+      SMTP_PORT: '587',
+      SMTP_SECURE: 'false',
+      SMTP_USER: 'usuario-smtp',
+      SMTP_PASSWORD: 'secreto-smtp',
+      SMTP_FROM: 'STP <no-reply@example.test>',
+      EMAIL_VERIFICATION_URL: 'https://app.example.test/verificar-correo',
+      EMAIL_VERIFICATION_SECRET:
+        'secreto-de-verificacion-con-al-menos-32-bytes',
+      EMAIL_VERIFICATION_TTL_MINUTES: '30',
     });
     const { AppModule } =
       require('../src/app.module') as typeof import('../src/app.module');
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
       .useValue(prisma)
+      .overrideProvider(EMAIL_VERIFICATION_SENDER)
+      .useValue(correoSender)
       .compile();
     app = module.createNestApplication<NestExpressApplication>();
     app.set('json replacer', serializeBigInt);
@@ -47,6 +76,17 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     prisma.usuario.findUnique.mockResolvedValue(usuarioExistente);
+    prisma.verificacionCorreo.create.mockResolvedValue({
+      id_verificacion: 10n,
+    });
+    prisma.verificacionCorreo.updateMany.mockResolvedValue({ count: 1 });
+    prisma.usuario.update.mockResolvedValue({});
+    prisma.usuario.updateMany.mockResolvedValue({ count: 1 });
+    prisma.$transaction.mockImplementation(
+      async (callback: (client: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
+    correoSender.enviar.mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -152,12 +192,117 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
   });
 
-  it.each([
-    '/auth/registro',
-    '/auth/verificar-correo',
-    '/auth/reenviar-verificacion',
-  ])('no expone la ruta fuera de alcance %s', async (path) => {
-    await request(app.getHttpServer()).post(path).send({}).expect(404);
+  it.each(['/auth/registro'])(
+    'no expone la ruta fuera de alcance %s',
+    async (path) => {
+      await request(app.getHttpServer()).post(path).send({}).expect(404);
+    },
+  );
+
+  it('reenvía un enlace sin exponer ni almacenar el token original', async () => {
+    prisma.usuario.findUnique.mockResolvedValueOnce({
+      id_usuario: 1n,
+      correo_institucional: email,
+      correo_verificado: false,
+    });
+
+    const respuesta = await request(app.getHttpServer())
+      .post('/auth/reenviar-verificacion')
+      .send({ correo_institucional: ` ${email.toUpperCase()} ` })
+      .expect(202);
+    expect(respuesta.body).toEqual({
+      mensaje:
+        'Si la cuenta existe y requiere verificación, se enviará un correo.',
+    });
+    const enlace = correoSender.enviar.mock.calls[0][1] as string;
+    const token = new URL(enlace).searchParams.get('token') as string;
+    expect(token).toHaveLength(64);
+    expect(prisma.verificacionCorreo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id_usuario: 1n,
+          token: createHmac(
+            'sha256',
+            process.env.EMAIL_VERIFICATION_SECRET as string,
+          )
+            .update(token)
+            .digest('hex'),
+        }),
+      }),
+    );
+    expect(correoSender.enviar).toHaveBeenCalledWith(email, enlace);
+  });
+
+  it('no revela si el correo de reenvío existe o ya fue verificado', async () => {
+    prisma.usuario.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id_usuario: 1n,
+        correo_institucional: email,
+        correo_verificado: true,
+      });
+
+    const inexistente = await request(app.getHttpServer())
+      .post('/auth/reenviar-verificacion')
+      .send({ correo_institucional: 'desconocido@alu.uct.cl' })
+      .expect(202);
+    const verificado = await request(app.getHttpServer())
+      .post('/auth/reenviar-verificacion')
+      .send({ correo_institucional: email })
+      .expect(202);
+    expect(inexistente.body).toEqual(verificado.body);
+    expect(correoSender.enviar).not.toHaveBeenCalled();
+  });
+
+  it('confirma un token vigente y activa una cuenta INACTIVA', async () => {
+    const token = 'a'.repeat(64);
+    prisma.verificacionCorreo.findUnique.mockResolvedValueOnce({
+      id_verificacion: 10n,
+      id_usuario: 1n,
+      fecha_expiracion: new Date(Date.now() + 60_000),
+      fecha_utilizacion: null,
+      usuario: { correo_verificado: false },
+    });
+
+    await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token })
+      .expect(200, { mensaje: 'Correo verificado correctamente.' });
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id_usuario: 1n },
+      data: { correo_verificado: true },
+    });
+    expect(prisma.usuario.updateMany).toHaveBeenCalledWith({
+      where: { id_usuario: 1n, estado_cuenta: 'INACTIVO' },
+      data: { estado_cuenta: 'ACTIVO' },
+    });
+  });
+
+  it('rechaza un token inexistente con un error controlado', async () => {
+    prisma.verificacionCorreo.findUnique.mockResolvedValueOnce(null);
+
+    const respuesta = await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token: 'a'.repeat(64) })
+      .expect(400);
+    expect(respuesta.body).toMatchObject({
+      statusCode: 400,
+      code: 'EMAIL_VERIFICATION_TOKEN_INVALID',
+      message: 'El enlace de verificación no es válido.',
+    });
+  });
+
+  it('valida el formato de las solicitudes de verificación', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token: 'corto' })
+      .expect(400);
+    expect(respuesta.body).toMatchObject({
+      statusCode: 400,
+      code: 'EMAIL_VERIFICATION_INVALID_REQUEST',
+      message: 'Los datos de verificación no son válidos.',
+    });
+    expect(prisma.verificacionCorreo.findUnique).not.toHaveBeenCalled();
   });
 
   it('restaura el POST y GET originales de usuarios sin aplicar las reglas nuevas del login', async () => {
