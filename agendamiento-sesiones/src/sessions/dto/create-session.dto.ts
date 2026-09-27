@@ -1,11 +1,15 @@
-import { IsNotEmpty, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID, Matches } from 'class-validator';
 
 export class CreateSessionDto {
-  @IsUUID('4', { message: 'id_tutee debe ser un UUID valido' })
+  @Matches(/^[1-9][0-9]{0,18}$/, {
+    message: 'id_tutee debe ser un entero positivo enviado como texto, de hasta 19 dígitos',
+  })
   @IsNotEmpty({ message: 'id_tutee no debe estar vacio' })
   id_tutee: string;
 
-  @IsUUID('4', { message: 'id_tutor debe ser un UUID valido' })
+  @Matches(/^[1-9][0-9]{0,18}$/, {
+    message: 'id_tutor debe ser un entero positivo enviado como texto, de hasta 19 dígitos',
+  })
   @IsNotEmpty({ message: 'id_tutor no debe estar vacio' })
   id_tutor: string;
 

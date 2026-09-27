@@ -44,10 +44,13 @@ Los módulos que necesiten persistencia deben importar `DatabaseModule` e inyect
 `PrismaService`. La configuración de la aplicación y de la CLI de Prisma comparte
 la misma resolución de credenciales.
 
-El esquema está en `prisma/schema.prisma`. Por ahora no contiene modelos porque
-todavía no se han definido entidades en este microservicio. Esta integración no
-crea ni modifica tablas automáticamente; `DB_SYNCHRONIZE` ya no se utiliza.
-Cuando se incorporen modelos, las migraciones deben gestionarse explícitamente.
+El esquema está en `prisma/schema.prisma` y contiene bloques horarios y sesiones.
+Los identificadores de sesión y bloque son UUID; las referencias de usuarios son
+BIGINT y se envían como texto en JSON. Las migraciones se aplican explícitamente;
+`DB_SYNCHRONIZE` ya no se utiliza.
+
+La configuración JWT, las rutas de aceptar/rechazar/cancelar y las pruebas de
+concurrencia se describen en [docs/solicitudes.md](docs/solicitudes.md).
 
 ```bash
 npm run prisma:validate

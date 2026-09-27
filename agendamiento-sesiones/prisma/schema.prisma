@@ -10,7 +10,7 @@ datasource db {
 
 model bloque_horario {
   id_bloque     String                            @id(map: "PK_ec6dc32412ccf07cd8b85847d56") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  id_tutor      String                            @db.Uuid
+  id_tutor      BigInt
   dia           DateTime                          @db.Date
   hora_inicio   DateTime                          @db.Time(6)
   hora_fin      DateTime                          @db.Time(6)
@@ -21,9 +21,9 @@ model bloque_horario {
 }
 
 model sesion {
-  id_sesion           String                    @id(map: "PK_25f520935e8570102c469357dfc") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  id_tutee            String                    @db.Uuid
-  id_tutor            String                    @db.Uuid
+  id_sesion String @id(map: "PK_25f520935e8570102c469357dfc") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id_tutee            BigInt
+  id_tutor            BigInt
   id_materia          String                    @db.Uuid
   id_bloque           String                    @db.Uuid
   estado_sesion       sesion_estado_sesion_enum @default(PENDIENTE)
