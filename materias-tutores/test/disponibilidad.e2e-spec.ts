@@ -109,6 +109,46 @@ describe('DisponibilidadController (e2e)', () => {
     });
   });
 
+  it('permite a un estudiante consultar los bloques libres de otro tutor', async () => {
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([bloqueDisponible]);
+
+    await request(app.getHttpServer())
+      .get('/disponibilidad/tutores/10')
+      .set('Authorization', `Bearer ${token(['TUTEE'])}`)
+      .expect(200)
+      .expect([
+        {
+          idBloque: '1',
+          dia: '2026-10-01',
+          horaInicio: '09:00',
+          horaFin: '10:00',
+          estadoBloque: 'DISPONIBLE',
+        },
+      ]);
+
+    expect(prismaMock.bloqueHorario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          idTutor: 10n,
+          estadoBloque: 'DISPONIBLE',
+        }),
+      }),
+    );
+  });
+
+  it('protege la consulta y rechaza identificadores inválidos', async () => {
+    await request(app.getHttpServer())
+      .get('/disponibilidad/tutores/10')
+      .expect(401);
+    for (const id of ['0', 'abc', '9223372036854775808']) {
+      await request(app.getHttpServer())
+        .get(`/disponibilidad/tutores/${id}`)
+        .set('Authorization', `Bearer ${token(['TUTEE'])}`)
+        .expect(400);
+    }
+    expect(prismaMock.bloqueHorario.findMany).not.toHaveBeenCalled();
+  });
+
   it('actualiza un bloque propio', async () => {
     prismaMock.bloqueHorario.findUnique.mockResolvedValue(bloqueDisponible);
     prismaMock.bloqueHorario.update.mockResolvedValue({

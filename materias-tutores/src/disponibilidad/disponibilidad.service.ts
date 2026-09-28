@@ -10,6 +10,17 @@ import type { CrearBloqueDisponibilidadDto } from './dto/crear-bloque-disponibil
 import type { BloqueDisponibilidadResponseDto } from './dto/bloque-disponibilidad.response.dto.js';
 import type { ActualizarBloqueDisponibilidadDto } from './dto/actualizar-bloque-disponibilidad.dto.js';
 
+const ZONA_HORARIA = 'America/Santiago';
+const FORMATO_HORARIO = new Intl.DateTimeFormat('en-GB', {
+  timeZone: ZONA_HORARIA,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
 @Injectable()
 export class DisponibilidadService {
   constructor(private readonly prisma: PrismaService) {}
@@ -93,6 +104,35 @@ export class DisponibilidadService {
     const bloques = await this.prisma.bloqueHorario.findMany({
       where: { idTutor },
       orderBy: [{ dia: 'asc' }, { horaInicio: 'asc' }],
+    });
+
+    return bloques.map((bloque) => this.mapearBloque(bloque));
+  }
+
+  async consultarDisponibilidadTutor(
+    idTutor: bigint,
+  ): Promise<BloqueDisponibilidadResponseDto[]> {
+    const partes = FORMATO_HORARIO.formatToParts(new Date());
+    const valor = (tipo: string): string =>
+      partes.find((parte) => parte.type === tipo)!.value;
+    const diaActual = this.convertirFecha(
+      `${valor('year')}-${valor('month')}-${valor('day')}`,
+    );
+    const horaActual = this.convertirHora(
+      `${valor('hour')}:${valor('minute')}`,
+      'horaActual',
+    );
+
+    const bloques = await this.prisma.bloqueHorario.findMany({
+      where: {
+        idTutor,
+        estadoBloque: 'DISPONIBLE',
+        OR: [
+          { dia: { gt: diaActual } },
+          { dia: diaActual, horaInicio: { gt: horaActual } },
+        ],
+      },
+      orderBy: [{ dia: 'asc' }, { horaInicio: 'asc' }, { idBloque: 'asc' }],
     });
 
     return bloques.map((bloque) => this.mapearBloque(bloque));

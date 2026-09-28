@@ -31,6 +31,10 @@ describe('DisponibilidadService', () => {
     service = module.get<DisponibilidadService>(DisponibilidadService);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('deberia crear un bloque de disponibilidad correctamente', async () => {
     const bloqueCreado = {
       idBloque: 1n,
@@ -178,6 +182,67 @@ describe('DisponibilidadService', () => {
         estadoBloque: 'DISPONIBLE',
       },
     ]);
+  });
+
+  it('consulta solo los bloques libres que aún no comienzan en horario de Santiago', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-01T12:30:00.000Z'));
+    const bloque = {
+      idBloque: 3n,
+      idTutor: 10n,
+      dia: new Date('2026-10-01T00:00:00.000Z'),
+      horaInicio: new Date('1970-01-01T10:00:00.000Z'),
+      horaFin: new Date('1970-01-01T11:00:00.000Z'),
+      estadoBloque: 'DISPONIBLE',
+    };
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([bloque]);
+
+    await expect(service.consultarDisponibilidadTutor(10n)).resolves.toEqual([
+      {
+        idBloque: '3',
+        dia: '2026-10-01',
+        horaInicio: '10:00',
+        horaFin: '11:00',
+        estadoBloque: 'DISPONIBLE',
+      },
+    ]);
+    expect(prismaMock.bloqueHorario.findMany).toHaveBeenCalledWith({
+      where: {
+        idTutor: 10n,
+        estadoBloque: 'DISPONIBLE',
+        OR: [
+          { dia: { gt: new Date('2026-10-01T00:00:00.000Z') } },
+          {
+            dia: new Date('2026-10-01T00:00:00.000Z'),
+            horaInicio: { gt: new Date('1970-01-01T09:30:00.000Z') },
+          },
+        ],
+      },
+      orderBy: [{ dia: 'asc' }, { horaInicio: 'asc' }, { idBloque: 'asc' }],
+    });
+  });
+
+  it('usa el cambio estacional de Santiago para excluir horarios iniciados', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:30:00.000Z'));
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([]);
+
+    await expect(service.consultarDisponibilidadTutor(10n)).resolves.toEqual(
+      [],
+    );
+    expect(prismaMock.bloqueHorario.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { dia: { gt: new Date('2026-06-01T00:00:00.000Z') } },
+            {
+              dia: new Date('2026-06-01T00:00:00.000Z'),
+              horaInicio: { gt: new Date('1970-01-01T08:30:00.000Z') },
+            },
+          ],
+        }),
+      }),
+    );
   });
 
   it('actualiza solo la hora de fin y conserva los demás datos', async () => {

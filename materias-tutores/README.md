@@ -42,16 +42,24 @@ La semilla usa el código de cada materia para actualizar registros existentes o
 
 Las rutas requieren `Authorization: Bearer <access_token>` con un JWT firmado por `usuarios-auth`. Se verifican firma HS256, vencimiento, emisor `stp-usuarios-auth`, audiencia `stp-clients`, el identificador numérico `sub` y el rol `TUTOR` (sin distinguir mayúsculas). `idTutor` siempre se obtiene de `sub`; no se recibe en el cuerpo ni en la URL.
 
-| Método y ruta | Acción | Respuesta |
-| --- | --- | --- |
-| `POST /disponibilidad/bloques` | Crear bloque con `dia`, `horaInicio`, `horaFin` | `201`, bloque creado |
-| `GET /disponibilidad/bloques` | Listar los bloques del tutor autenticado | `200`, arreglo de bloques |
-| `PATCH /disponibilidad/bloques/:idBloque` | Cambiar uno o más de `dia`, `horaInicio`, `horaFin` | `200`, bloque actualizado |
-| `DELETE /disponibilidad/bloques/:idBloque` | Cambiar el estado a `INACTIVO`; conserva la fila | `200`, bloque inactivo |
+| Método y ruta                              | Acción                                              | Respuesta                 |
+| ------------------------------------------ | --------------------------------------------------- | ------------------------- |
+| `POST /disponibilidad/bloques`             | Crear bloque con `dia`, `horaInicio`, `horaFin`     | `201`, bloque creado      |
+| `GET /disponibilidad/bloques`              | Listar los bloques del tutor autenticado            | `200`, arreglo de bloques |
+| `PATCH /disponibilidad/bloques/:idBloque`  | Cambiar uno o más de `dia`, `horaInicio`, `horaFin` | `200`, bloque actualizado |
+| `DELETE /disponibilidad/bloques/:idBloque` | Cambiar el estado a `INACTIVO`; conserva la fila    | `200`, bloque inactivo    |
 
 `dia` usa `YYYY-MM-DD` y las horas `HH:mm`, con inicio anterior al fin. Los identificadores se devuelven como texto para conservar la precisión de `BIGINT`. La creación inicia en `DISPONIBLE`; un bloque `RESERVADO` o `INACTIVO` no se puede editar ni desactivar. Entradas inválidas devuelven `400`, ausencia de token `401`, rol distinto de tutor `403`, bloque ajeno o inexistente `404` y conflicto de estado `409`.
 
 La validación local del JWT no conoce revocaciones ni inactividad registradas por `usuarios-auth`; eso requiere una integración posterior con ese servicio. Agendamiento todavía debe conectar la reserva y liberación de bloques para completar la aplicación de BR12 y la visibilidad pública de BR13.
+
+### Consulta de disponibilidad para estudiantes
+
+`GET /disponibilidad/tutores/:idTutor` devuelve los bloques de un tutor cuyo estado es `DISPONIBLE` y cuyo inicio todavía no ha llegado. Requiere un JWT válido de `usuarios-auth`; acepta usuarios autenticados con cualquier rol, incluidos los estudiantes. `idTutor` debe ser un entero positivo dentro del rango `BIGINT` de PostgreSQL. Un identificador inválido devuelve `400` y la ausencia o invalidez del token devuelve `401`. Si no hay bloques libres, devuelve `200` con `[]`.
+
+La respuesta es un arreglo de objetos con `idBloque`, `dia`, `horaInicio`, `horaFin` y `estadoBloque`; `idBloque` se representa como texto. Se ordena por día y hora de inicio. Los horarios ya iniciados se excluyen usando la zona `America/Santiago`, incluidos sus cambios estacionales. Esta ruta no modifica bloques ni incluye datos de postulaciones, materias o reputación, que corresponden a otras tareas.
+
+La consulta refleja los estados almacenados en `materias-tutores`. Para ocultar las solicitudes pendientes y sesiones confirmadas en la aplicación integrada, Agendamiento debe actualizar el estado de los bloques al reservarlos y liberarlos; esa integración sigue pendiente.
 
 ## Verificación
 
@@ -72,7 +80,7 @@ npm run test:e2e
 - `src/config/environment.ts`: validación de configuración al arrancar.
 - `src/database/`: módulo que exporta una instancia de `PrismaService`, con conexión al iniciar y desconexión al cerrar.
 - `src/materias/`: módulo HTTP del catálogo de materias, con controlador, servicio y DTO de respuesta.
-- `src/disponibilidad/`: gestión HTTP de bloques del tutor autenticado.
+- `src/disponibilidad/`: gestión HTTP de bloques propios y consulta de horarios disponibles de un tutor.
 - `src/auth/`: verificación local del JWT y lectura segura del ID del tutor.
 - `prisma/schema.prisma`: proveedor PostgreSQL y modelos `Materia` y `BloqueHorario`.
 - `prisma/migrations/`: historial versionado de cambios de esquema.
