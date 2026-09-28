@@ -20,35 +20,10 @@ model sesion {
   fin                 DateTime                  @db.Timestamptz(3)
   fecha_creacion      DateTime                  @default(now()) @db.Timestamp(6)
   fecha_actualizacion DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
-  id_reserva          String                    @unique @db.Uuid
-  reserva             reserva_bloque            @relation(fields: [id_reserva], references: [id])
 
   @@index([id_tutee, estado_sesion])
   @@index([id_tutor, inicio, fin])
   @@index([estado_sesion, fecha_creacion])
-}
-
-// Diario local de integración; no es un catálogo ni una tabla de disponibilidad.
-model reserva_bloque {
-  id                  String        @id @db.Uuid
-  id_bloque           BigInt
-  id_tutor            BigInt
-  id_materia          BigInt
-  estado              estado_reserva @default(PREPARADA)
-  fecha_creacion      DateTime      @default(now()) @db.Timestamptz(3)
-  fecha_actualizacion DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
-  proximo_intento     DateTime      @default(now()) @db.Timestamptz(3)
-  intentos            Int           @default(0)
-  sesion              sesion?
-
-  @@index([estado, proximo_intento])
-}
-
-enum estado_reserva {
-  PREPARADA
-  ASOCIADA
-  LIBERAR
-  LIBERADA
 }
 
 enum sesion_estado_sesion_enum {

@@ -1,15 +1,13 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializable } from '../database/serializable-transaction';
-import { BlockReservationsService } from '../integrations/materias-tutores/block-reservations.service';
-import { type ReservedSchedule } from '../integrations/materias-tutores/blocks.gateway';
 import {
   type Prisma,
   type sesion,
@@ -29,48 +27,18 @@ import {
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly reservations: BlockReservationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createSession(dto: CreateSessionDto) {
-    const ids = {
-      id_tutor: parseIdentifier(dto.id_tutor, 'id_tutor'),
-      id_tutee: parseIdentifier(dto.id_tutee, 'id_tutee'),
-      id_materia: parseIdentifier(dto.id_materia, 'id_materia'),
-      id_bloque: parseIdentifier(dto.id_bloque, 'id_bloque'),
-    };
-    const reservation = await this.reservations.prepare({
-      id_tutor: ids.id_tutor,
-      id_materia: ids.id_materia,
-      id_bloque: ids.id_bloque,
-    });
-    try {
-      // HTTP fuera de la transacción. El diario permite compensar tras una caída.
-      const schedule = await this.reservations.reserve(reservation);
-      const session = await runSerializable(this.prisma, async (tx) => {
-        await this.reservations.associate(tx, reservation.id);
-        await this.ensurePendingLimit(tx, ids.id_tutee);
-        await this.ensureNoOverlap(tx, schedule, {
-          OR: [{ id_tutor: ids.id_tutor }, { id_tutee: ids.id_tutee }],
-        });
-        return tx.sesion.create({
-          data: { ...ids, ...schedule, id_reserva: reservation.id },
-        });
-      });
-      return this.response(session);
-    } catch (error: unknown) {
-      try {
-        await this.reservations.compensate(reservation.id);
-      } catch {
-        // El diario persistente permite recuperar incluso una caída de PostgreSQL.
-        this.logger.error(
-          `Compensación pendiente de la reserva ${reservation.id}.`,
-        );
-      }
-      throw error;
-    }
+  createSession(dto: CreateSessionDto) {
+    parseIdentifier(dto.id_tutor, 'id_tutor');
+    parseIdentifier(dto.id_tutee, 'id_tutee');
+    parseIdentifier(dto.id_materia, 'id_materia');
+    parseIdentifier(dto.id_bloque, 'id_bloque');
+    // Pendiente del equipo: obtener el horario y comprobar la reserva del bloque.
+    // No persistir solicitudes con horarios inventados o disponibilidad sin validar.
+    throw new ServiceUnavailableException(
+      'La creación de solicitudes está pendiente de la conexión con bloques horarios.',
+    );
   }
 
   async acceptSession(idSesion: string, idUsuario: string) {
@@ -84,10 +52,9 @@ export class SessionsService {
         id_sesion: { not: id },
         OR: [{ id_tutor: session.id_tutor }, { id_tutee: session.id_tutee }],
       });
-      // El contrato conserva la reserva y su horario hasta una liberación explícita.
       return this.transitionSession(tx, session, 'CONFIRMADA');
     });
-    return this.response(updated);
+    return toSessionResponse(updated);
   }
 
   async rejectSession(idSesion: string, idUsuario: string) {
@@ -98,10 +65,9 @@ export class SessionsService {
       validateTutor(session, userId);
       validateState(session, 'PENDIENTE');
       const result = await this.transitionSession(tx, session, 'RECHAZADA');
-      await this.reservations.scheduleRelease(tx, session.id_reserva);
       return result;
     });
-    return this.releaseAndRespond(updated);
+    return toSessionResponse(updated);
   }
 
   async cancelSession(idSesion: string, idUsuario: string) {
@@ -113,10 +79,9 @@ export class SessionsService {
       validateState(session, 'CONFIRMADA');
       await this.ensureBeforeStart(tx, session.inicio);
       const result = await this.transitionSession(tx, session, 'CANCELADA');
-      await this.reservations.scheduleRelease(tx, session.id_reserva);
       return result;
     });
-    return this.releaseAndRespond(updated);
+    return toSessionResponse(updated);
   }
 
   @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
@@ -127,7 +92,7 @@ export class SessionsService {
     });
     for (const session of pending) {
       try {
-        const expired = await runSerializable(this.prisma, async (tx) => {
+        await runSerializable(this.prisma, async (tx) => {
           const result = await tx.sesion.updateMany({
             where: {
               id_sesion: session.id_sesion,
@@ -136,11 +101,8 @@ export class SessionsService {
             },
             data: { estado_sesion: 'EXPIRADA' },
           });
-          if (result.count)
-            await this.reservations.scheduleRelease(tx, session.id_reserva);
           return result.count;
         });
-        if (expired) await this.reservations.tryRelease(session.id_reserva);
       } catch {
         this.logger.error(
           `No se pudo completar la expiración de ${session.id_sesion}; se reintentará.`,
@@ -155,19 +117,9 @@ export class SessionsService {
     return session;
   }
 
-  private async ensurePendingLimit(tx: Prisma.TransactionClient, id: bigint) {
-    const pending = await tx.sesion.count({
-      where: { id_tutee: id, estado_sesion: 'PENDIENTE' },
-    });
-    if (pending >= 4)
-      throw new BadRequestException(
-        'El estudiante ya posee el límite de 4 solicitudes pendientes.',
-      );
-  }
-
   private async ensureNoOverlap(
     tx: Prisma.TransactionClient,
-    schedule: ReservedSchedule,
+    schedule: Pick<sesion, 'inicio' | 'fin'>,
     filter: Prisma.sesionWhereInput,
   ) {
     const overlap = await tx.sesion.findFirst({
@@ -212,33 +164,5 @@ export class SessionsService {
     return tx.sesion.findUniqueOrThrow({
       where: { id_sesion: session.id_sesion },
     });
-  }
-
-  private async releaseAndRespond(session: sesion) {
-    try {
-      await this.reservations.tryRelease(session.id_reserva);
-    } catch {
-      this.logger.error(
-        `Liberación pendiente de la reserva ${session.id_reserva}.`,
-      );
-    }
-    return this.response(session);
-  }
-
-  private async response(session: sesion) {
-    const reservation = await this.prisma.reserva_bloque.findUniqueOrThrow({
-      where: { id: session.id_reserva },
-      select: { estado: true },
-    });
-    const states = {
-      ASOCIADA: 'RESERVADA',
-      LIBERADA: 'LIBERADA',
-      LIBERAR: 'LIBERACION_PENDIENTE',
-      PREPARADA: 'LIBERACION_PENDIENTE',
-    } as const;
-    return {
-      ...toSessionResponse(session),
-      estado_reserva: states[reservation.estado],
-    };
   }
 }

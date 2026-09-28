@@ -18,28 +18,21 @@ import {
 } from '../src/generated/prisma/client';
 import { SessionsModule } from '../src/sessions/sessions.module';
 import { SessionsService } from '../src/sessions/sessions.service';
-import { BlockReservationsService } from '../src/integrations/materias-tutores/block-reservations.service';
-import { HttpBlocksGateway } from '../src/integrations/materias-tutores/http-blocks.gateway';
-import { MateriasTutoresStub } from './support/materias-tutores.stub';
 
-// PostgreSQL real en esquema aislado y HTTP real contra un proveedor simulado.
-describe('Sesiones y contrato de materias-tutores', () => {
+// Pruebas de sesiones y JWT con PostgreSQL real en un esquema aislado.
+describe('Aceptar, rechazar y cancelar sesiones', () => {
   let app: INestApplication;
   let prisma: PrismaClient;
   let admin: Client;
   let service: SessionsService;
-  let reservations: BlockReservationsService;
   const schema = `test_sessions_${randomUUID().replaceAll('-', '')}`;
   const secret = randomBytes(32).toString('hex');
-  const internalToken = randomBytes(32).toString('hex');
-  const remote = new MateriasTutoresStub(internalToken);
   const jwt = new JwtService({ secret });
   const tutor = '9007199254740993';
   const tutee = '9007199254740995';
   const outsider = '9007199254740997';
   const materia = '9007199254740999';
   let publicBefore: unknown;
-  let baseUrl: string;
 
   function token(
     sub = tutor,
@@ -105,7 +98,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
       adapter: new PrismaPg({ connectionString }, { schema }),
     });
     await prisma.$connect();
-    baseUrl = await remote.start();
     const module = await Test.createTestingModule({ imports: [SessionsModule] })
       .overrideProvider(PrismaService)
       .useValue(prisma)
@@ -113,9 +105,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
       .useValue(
         new ConfigService({
           JWT_SECRET: secret,
-          MATERIAS_TUTORES_URL: baseUrl,
-          MATERIAS_TUTORES_TOKEN: internalToken,
-          MATERIAS_TUTORES_TIMEOUT_MS: 500,
         }),
       )
       .compile();
@@ -129,18 +118,14 @@ describe('Sesiones y contrato de materias-tutores', () => {
     );
     await app.init();
     service = app.get(SessionsService);
-    reservations = app.get(BlockReservationsService);
   }, 30000);
   beforeEach(async () => {
     await prisma.sesion.deleteMany();
-    await prisma.reserva_bloque.deleteMany();
-    remote.reset();
   });
   afterEach(() => jest.restoreAllMocks());
   afterAll(async () => {
     try {
       await app?.close();
-      await remote.close();
       await prisma?.$disconnect();
       if (admin) {
         await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
@@ -155,30 +140,15 @@ describe('Sesiones y contrato de materias-tutores', () => {
     state: sesion_estado_sesion_enum = 'PENDIENTE',
     day = '2099-06-20',
   ) {
-    const block = remote.addBlock(tutor, materia, day);
-    const reservation = await prisma.reserva_bloque.create({
-      data: {
-        id: randomUUID(),
-        id_bloque: BigInt(block.id_bloque),
-        id_tutor: BigInt(tutor),
-        id_materia: BigInt(materia),
-        estado: 'ASOCIADA',
-      },
-    });
-    remote.reservations.set(reservation.id, {
-      id_bloque: block.id_bloque,
-      estado: 'RESERVADA',
-    });
     return prisma.sesion.create({
       data: {
         id_tutor: BigInt(tutor),
         id_tutee: BigInt(tutee),
         id_materia: BigInt(materia),
-        id_bloque: BigInt(block.id_bloque),
-        id_reserva: reservation.id,
+        id_bloque: 9007199254741000n,
         estado_sesion: state,
-        inicio: new Date(block.inicio),
-        fin: new Date(block.fin),
+        inicio: new Date(`${day}T10:00:00.000Z`),
+        fin: new Date(`${day}T11:00:00.000Z`),
         fecha_actualizacion: new Date('2020-01-01T00:00:00Z'),
       },
     });
@@ -186,7 +156,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
   function stateOf(id: bigint | string) {
     return prisma.sesion.findUniqueOrThrow({
       where: { id_sesion: BigInt(id) },
-      include: { reserva: true },
     });
   }
 
@@ -234,35 +203,8 @@ describe('Sesiones y contrato de materias-tutores', () => {
       .set('Authorization', `Bearer ${token(tutor, claims, signingSecret)}`)
       .expect(401);
   });
-  it('crea por HTTP, acepta y cancela con identificadores sin pérdida de precisión', async () => {
-    const block = remote.addBlock(tutor, materia);
-    const response = await create(block.id_bloque).expect(201);
-    expect(response.body).toMatchObject({
-      id_tutor: tutor,
-      id_tutee: tutee,
-      id_materia: materia,
-      id_bloque: block.id_bloque,
-      estado_sesion: 'PENDIENTE',
-      estado_reserva: 'RESERVADA',
-    });
-    expect(typeof response.body.id_sesion).toBe('string');
-    await act(response.body.id_sesion, 'accept').expect(200);
-    const cancelled = await act(
-      response.body.id_sesion,
-      'cancel',
-      tutee,
-    ).expect(200);
-    expect(cancelled.body).toMatchObject({
-      estado_sesion: 'CANCELADA',
-      estado_reserva: 'LIBERADA',
-    });
-    expect(remote.calls.map((call) => call.state)).toEqual([
-      'RESERVADA',
-      'LIBERADA',
-    ]);
-  });
   it.each(['id_tutor', 'id_tutee', 'id_materia', 'id_bloque'])(
-    'valida %s antes de llamar al proveedor',
+    'valida el identificador %s',
     async (field) => {
       for (const invalid of [
         2,
@@ -282,7 +224,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
           })
           .expect(400);
       }
-      expect(remote.calls).toHaveLength(0);
     },
   );
   it.each(['accept', 'reject'])(
@@ -334,11 +275,10 @@ describe('Sesiones y contrato de materias-tutores', () => {
       );
     },
   );
-  it('impide cancelar a terceros o después del inicio; usa el instante UTC de la reserva', async () => {
+  it('impide cancelar a terceros o después del inicio; usa el instante UTC de la sesión', async () => {
     const session = await fixture('CONFIRMADA', '2020-01-01');
     await act(session.id_sesion, 'cancel', outsider).expect(403);
     await act(session.id_sesion, 'cancel').expect(409);
-    expect(remote.calls).toHaveLength(0);
   });
   it('actualiza fecha_actualizacion y excluye la propia solicitud al aceptar', async () => {
     const session = await fixture();
@@ -375,9 +315,8 @@ describe('Sesiones y contrato de materias-tutores', () => {
       act(session.id_sesion, 'reject'),
     ]);
     expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
-    const saved = await stateOf(session.id_sesion);
-    expect(remote.reservations.get(saved.id_reserva)?.estado).toBe(
-      saved.estado_sesion === 'CONFIRMADA' ? 'RESERVADA' : 'LIBERADA',
+    expect(['CONFIRMADA', 'RECHAZADA']).toContain(
+      (await stateOf(session.id_sesion)).estado_sesion,
     );
   });
   it('dos cancelaciones simultáneas permiten una sola transición', async () => {
@@ -388,7 +327,7 @@ describe('Sesiones y contrato de materias-tutores', () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
-  it('expira y libera; repetir no altera el resultado', async () => {
+  it('expira; repetir no altera el resultado', async () => {
     const session = await fixture();
     await prisma.sesion.update({
       where: { id_sesion: session.id_sesion },
@@ -397,7 +336,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
     await service.handleExpiredSessions();
     const saved = await stateOf(session.id_sesion);
     expect(saved.estado_sesion).toBe('EXPIRADA');
-    expect(saved.reserva.estado).toBe('LIBERADA');
     await service.handleExpiredSessions();
     expect(await stateOf(session.id_sesion)).toEqual(saved);
   });
@@ -416,124 +354,6 @@ describe('Sesiones y contrato de materias-tutores', () => {
     expect(result.status).toBe(
       saved.estado_sesion === 'CONFIRMADA' ? 200 : 409,
     );
-  });
-  it('con tres pendientes y dos solicitudes simultáneas solo crea la cuarta y compensa la otra', async () => {
-    for (const day of ['2099-06-20', '2099-06-21', '2099-06-22'])
-      await fixture('PENDIENTE', day);
-    const blocks = ['2099-06-23', '2099-06-24'].map((day) =>
-      remote.addBlock(tutor, materia, day),
-    );
-    const results = await Promise.all(
-      blocks.map((block) => create(block.id_bloque)),
-    );
-    expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
-    expect(await prisma.sesion.count()).toBe(4);
-    expect(
-      [...remote.reservations.values()].filter((r) => r.estado === 'LIBERADA'),
-    ).toHaveLength(1);
-  });
-  it('impide crear solicitudes superpuestas simultáneas y compensa la perdedora', async () => {
-    const a = remote.addBlock(tutor, materia);
-    const b = remote.addBlock(tutor, materia, '2099-06-20', '10:30', '11:30');
-    const results = await Promise.all([
-      create(a.id_bloque),
-      create(b.id_bloque, outsider),
-    ]);
-    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
-    expect(await prisma.sesion.count()).toBe(1);
-  });
-  it.each([404, 409, 500])(
-    'maneja error remoto %s sin crear sesiones',
-    async (status) => {
-      remote.reserveStatus = status;
-      await create(remote.addBlock(tutor, materia).id_bloque).expect(
-        status === 500 ? 503 : status,
-      );
-      expect(await prisma.sesion.count()).toBe(0);
-    },
-  );
-  it('compensa una reserva con respuesta inválida', async () => {
-    remote.invalidSchedule = true;
-    await create(remote.addBlock(tutor, materia).id_bloque).expect(502);
-    expect(await prisma.sesion.count()).toBe(0);
-    expect([...remote.reservations.values()][0].estado).toBe('LIBERADA');
-  });
-  it('compensa cuando el proveedor reservó pero se perdió la respuesta', async () => {
-    remote.loseReserveResponse = true;
-    await create(remote.addBlock(tutor, materia).id_bloque).expect(503);
-    expect(await prisma.sesion.count()).toBe(0);
-    expect([...remote.reservations.values()][0].estado).toBe('LIBERADA');
-  });
-  it('no libera una reserva ajena al fallar por bloque ocupado', async () => {
-    const session = await fixture();
-    await create(session.id_bloque.toString(), outsider).expect(409);
-    expect(remote.reservations.get(session.id_reserva)?.estado).toBe(
-      'RESERVADA',
-    );
-  });
-  it('persiste la liberación durante una caída y un nuevo worker la reintenta', async () => {
-    const session = await fixture('CONFIRMADA');
-    remote.releaseStatus = 503;
-    const response = await act(session.id_sesion, 'cancel').expect(200);
-    expect(response.body.estado_reserva).toBe('LIBERACION_PENDIENTE');
-    expect((await stateOf(session.id_sesion)).reserva.intentos).toBe(1);
-    remote.releaseStatus = 204;
-    await prisma.reserva_bloque.update({
-      where: { id: session.id_reserva },
-      data: { proximo_intento: new Date(0) },
-    });
-    const restarted = new BlockReservationsService(
-      prisma as PrismaService,
-      new HttpBlocksGateway(
-        new ConfigService({
-          MATERIAS_TUTORES_URL: baseUrl,
-          MATERIAS_TUTORES_TOKEN: internalToken,
-        }),
-      ),
-    );
-    await restarted.retryPendingReleases();
-    expect((await stateOf(session.id_sesion)).reserva.estado).toBe('LIBERADA');
-  });
-  it('un 404 al liberar no confirma la liberación', async () => {
-    const session = await fixture();
-    remote.releaseStatus = 404;
-    await act(session.id_sesion, 'reject').expect(200);
-    expect((await stateOf(session.id_sesion)).reserva.estado).toBe('LIBERAR');
-  });
-  it('recupera reservas huérfanas después de una caída sin tocar las asociadas', async () => {
-    const associated = await fixture();
-    const prepared = await reservations.prepare({
-      id_bloque: 42n,
-      id_tutor: BigInt(tutor),
-      id_materia: BigInt(materia),
-    });
-    remote.reservations.set(prepared.id, {
-      id_bloque: '42',
-      estado: 'RESERVADA',
-    });
-    await prisma.reserva_bloque.updateMany({
-      data: { fecha_creacion: new Date(0) },
-    });
-    await reservations.retryPendingReleases();
-    expect(remote.reservations.get(prepared.id)?.estado).toBe('LIBERADA');
-    expect(remote.reservations.get(associated.id_reserva)?.estado).toBe(
-      'RESERVADA',
-    );
-  });
-  it('la compensación no libera si el commit ya asoció la reserva', async () => {
-    const session = await fixture();
-    await reservations.compensate(session.id_reserva);
-    expect(remote.reservations.get(session.id_reserva)?.estado).toBe(
-      'RESERVADA',
-    );
-    expect(remote.calls).toHaveLength(0);
-  });
-  it('la liberación preventiva impide reservar después de un timeout', async () => {
-    remote.delayedReserveMs = 700;
-    await create(remote.addBlock(tutor, materia).id_bloque).expect(503);
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    expect(await prisma.sesion.count()).toBe(0);
-    expect([...remote.reservations.values()][0].estado).toBe('LIBERADA');
   });
   it('limita reintentos de conflictos serializables', async () => {
     const session = await fixture();
@@ -557,17 +377,30 @@ describe('Sesiones y contrato de materias-tutores', () => {
     await act(session.id_sesion, 'accept').expect(200);
     expect(spy).toHaveBeenCalledTimes(2);
   });
-  it('sin configuración falla antes de escribir una reserva', async () => {
-    const unconfigured = new BlockReservationsService(
-      prisma as PrismaService,
-      new HttpBlocksGateway(new ConfigService({})),
-    );
-    await expect(
-      unconfigured.prepare({ id_bloque: 1n, id_tutor: 2n, id_materia: 3n }),
-    ).rejects.toMatchObject({ status: 503 });
-    expect(await prisma.reserva_bloque.count()).toBe(0);
+
+  it('mantiene pendiente la creación sin inventar un horario de bloque', async () => {
+    await create('4').expect(503);
+    expect(await prisma.sesion.count()).toBe(0);
   });
-  it('la migración se detiene sin borrar bloques antiguos con datos', async () => {
+  it('devuelve únicamente los datos de la sesión con BigInt como texto', async () => {
+    const session = await fixture();
+    const result = await act(session.id_sesion, 'accept').expect(200);
+    expect(result.body).toMatchObject({
+      id_sesion: session.id_sesion.toString(),
+      id_tutor: tutor,
+      id_tutee: tutee,
+      id_materia: materia,
+      id_bloque: '9007199254741000',
+      estado_sesion: 'CONFIRMADA',
+    });
+    expect(result.body.estado_reserva).toBeUndefined();
+  });
+  it('rechaza una solicitud pendiente como tutor', async () => {
+    const session = await fixture();
+    await act(session.id_sesion, 'reject').expect(200);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('RECHAZADA');
+  });
+  it('detiene el retiro del registro de reservas si hay datos', async () => {
     const guarded = `${schema}_guard`;
     const migrations = join(__dirname, '../prisma/migrations');
     const directories = readdirSync(migrations)
@@ -580,8 +413,10 @@ describe('Sesiones y contrato de materias-tutores', () => {
         await admin.query(
           readFileSync(join(migrations, directory, 'migration.sql'), 'utf8'),
         );
-      await admin.query(`INSERT INTO bloque_horario(id_tutor, dia, hora_inicio, hora_fin)
-        VALUES (2, '2099-06-20', '10:00', '11:00')`);
+      await admin.query(
+        'INSERT INTO reserva_bloque(id, id_bloque, id_tutor, id_materia) VALUES ($1, 1, 2, 3)',
+        [randomUUID()],
+      );
       await expect(
         admin.query(
           readFileSync(
@@ -589,10 +424,10 @@ describe('Sesiones y contrato de materias-tutores', () => {
             'utf8',
           ),
         ),
-      ).rejects.toThrow('Migración detenida');
+      ).rejects.toThrow('Retiro detenido');
       await admin.query('ROLLBACK');
       expect(
-        (await admin.query('SELECT count(*)::int AS count FROM bloque_horario'))
+        (await admin.query('SELECT count(*)::int AS count FROM reserva_bloque'))
           .rows[0].count,
       ).toBe(1);
     } finally {
@@ -600,66 +435,5 @@ describe('Sesiones y contrato de materias-tutores', () => {
       await admin.query(`SET search_path TO "${schema}", public`);
       await admin.query(`DROP SCHEMA "${guarded}" CASCADE`);
     }
-  });
-  it('si falla el commit local, compensa la reserva remota sin crear una sesión', async () => {
-    jest
-      .spyOn(prisma, '$transaction')
-      .mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('conflict', {
-          code: 'P2034',
-          clientVersion: '7',
-        }),
-      );
-    await create(remote.addBlock(tutor, materia).id_bloque).expect(409);
-    expect(await prisma.sesion.count()).toBe(0);
-    expect([...remote.reservations.values()][0].estado).toBe('LIBERADA');
-  });
-  it('revierte el rechazo si no puede guardar la liberación durable', async () => {
-    const session = await fixture();
-    await admin.query(
-      `ALTER TABLE "${schema}".reserva_bloque ADD CONSTRAINT prevent_release CHECK (estado <> 'LIBERAR') NOT VALID`,
-    );
-    try {
-      await expect(
-        service.rejectSession(session.id_sesion.toString(), tutor),
-      ).rejects.toThrow();
-      expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
-        'PENDIENTE',
-      );
-      expect(remote.calls).toHaveLength(0);
-    } finally {
-      await admin.query(
-        `ALTER TABLE "${schema}".reserva_bloque DROP CONSTRAINT prevent_release`,
-      );
-    }
-  });
-  it('dos workers pueden liberar la misma operación sin liberar otra reserva del bloque', async () => {
-    const session = await fixture();
-    await prisma.reserva_bloque.update({
-      where: { id: session.id_reserva },
-      data: { estado: 'LIBERAR' },
-    });
-    await Promise.all([
-      reservations.tryRelease(session.id_reserva),
-      reservations.tryRelease(session.id_reserva),
-    ]);
-    const newId = randomUUID();
-    remote.reservations.set(newId, {
-      id_bloque: session.id_bloque.toString(),
-      estado: 'RESERVADA',
-    });
-    const gateway = new HttpBlocksGateway(
-      new ConfigService({
-        MATERIAS_TUTORES_URL: baseUrl,
-        MATERIAS_TUTORES_TOKEN: internalToken,
-      }),
-    );
-    await gateway.release({
-      id: session.id_reserva,
-      id_bloque: session.id_bloque,
-      id_tutor: session.id_tutor,
-      id_materia: session.id_materia,
-    });
-    expect(remote.reservations.get(newId)?.estado).toBe('RESERVADA');
   });
 });

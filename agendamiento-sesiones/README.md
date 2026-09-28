@@ -38,7 +38,7 @@ puede ejecutarse con Node.js 22.12 o superior en la rama 22 LTS.
 3. Completa `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` y `DB_DATABASE`.
    También puedes definir `DATABASE_URL`, que tiene prioridad sobre las variables `DB_*`.
 4. Aplica las migraciones con `npm run prisma:deploy` y genera el cliente con `npm run prisma:generate`.
-5. Configura `JWT_SECRET` y la integración de bloques según los documentos enlazados abajo.
+5. Configura `JWT_SECRET` según `docs/solicitudes.md`.
 6. Inicia el servicio con `npm run start:dev`.
 
 NestJS abre la conexión al iniciar y la cierra al apagar el servicio.
@@ -46,21 +46,17 @@ Los módulos que necesiten persistencia deben importar `DatabaseModule` e inyect
 `PrismaService`. La configuración de la aplicación y de la CLI de Prisma comparte
 la misma resolución de credenciales.
 
-El esquema está en `prisma/schema.prisma` y contiene sesiones y un diario de
-reservas externas (`reserva_bloque`). No contiene el catálogo `bloque_horario`.
-Sesión, usuario, materia y bloque usan BIGINT, enviados como texto en JSON.
-Los UUID se usan únicamente para identificar operaciones de reserva idempotentes.
-Las migraciones se aplican explícitamente; `DB_SYNCHRONIZE` ya no se utiliza.
-La migración de separación se detiene si encuentra datos antiguos: requiere
-un mapeo acordado de UUID a BigInt; nunca convierte ni borra registros automáticamente.
+El esquema está en `prisma/schema.prisma` y contiene únicamente sesiones.
+Los identificadores de sesión, usuario, materia y bloque son BIGINT y se envían
+como texto en JSON. No hay modelo de bloques ni cliente de otro microservicio.
+Las migraciones se aplican explícitamente; `DB_SYNCHRONIZE` no se utiliza.
+Las migraciones que retiran tablas se detienen si encuentran datos que requieren
+revisión; no convierten ni borran registros automáticamente.
 
-La configuración JWT, las rutas de aceptar/rechazar/cancelar y las pruebas de
-concurrencia se describen en [docs/solicitudes.md](docs/solicitudes.md).
-El contrato propuesto para Víctor está en
-[docs/contrato-materias-tutores.md](docs/contrato-materias-tutores.md), con su
-[OpenAPI](docs/materias-tutores.openapi.yaml). El proveedor de bloques aún no está
-implementado: sin URL/token, crear una solicitud devuelve 503. La aplicación
-puede arrancar para continuar el desarrollo y ejecutar las pruebas con el proveedor simulado.
+Las rutas de aceptar, rechazar y cancelar y sus pruebas se describen en
+[docs/solicitudes.md](docs/solicitudes.md). La creación devuelve 503 hasta conectar
+la obtención del horario y la disponibilidad del bloque. La reserva y liberación
+de bloques quedan pendientes del trabajo de conexión entre microservicios.
 
 ```bash
 npm run prisma:validate
