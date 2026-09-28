@@ -2,3 +2,4 @@
 process.env.DATABASE_URL =
   'postgresql://test:test@localhost:5432/materias_test';
 process.env.PORT = '3000';
+process.env.JWT_SECRET = 'clave-ficticia-exclusiva-para-pruebas-0123456789';

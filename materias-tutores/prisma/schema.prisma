@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
   moduleFormat = "esm"
 }
 
@@ -14,4 +14,16 @@ model Materia {
   nombre    String @db.VarChar(150)
 
   @@map("materia")
+}
+
+model BloqueHorario {
+  idBloque     BigInt   @id @default(autoincrement()) @map("id_bloque")
+  idTutor      BigInt   @map("id_tutor")
+  dia          DateTime @db.Date
+  horaInicio   DateTime @map("hora_inicio") @db.Time(0)
+  horaFin      DateTime @map("hora_fin") @db.Time(0)
+  estadoBloque String   @default("DISPONIBLE") @map("estado_bloque") @db.VarChar(30)
+
+  @@index([idTutor, dia])
+  @@map("bloque_horario")
 }

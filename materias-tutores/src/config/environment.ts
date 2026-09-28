@@ -28,5 +28,18 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error('PORT debe ser un entero entre 1 y 65535.');
   }
 
-  return { ...config, DATABASE_URL: databaseUrl, PORT: port };
+  const jwtSecret = config.JWT_SECRET;
+  if (
+    typeof jwtSecret !== 'string' ||
+    Buffer.byteLength(jwtSecret, 'utf8') < 32
+  ) {
+    throw new Error('JWT_SECRET debe contener al menos 32 bytes.');
+  }
+
+  return {
+    ...config,
+    DATABASE_URL: databaseUrl,
+    PORT: port,
+    JWT_SECRET: jwtSecret,
+  };
 }
