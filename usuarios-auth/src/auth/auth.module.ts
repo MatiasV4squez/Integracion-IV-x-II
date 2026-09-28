@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
@@ -6,7 +6,11 @@ import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
 import { UsuariosModule } from '../usuarios/usuarios.module';
+import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { SessionService } from './session.service';
 
+@Global()
 @Module({
   imports: [
     UsuariosModule,
@@ -18,13 +22,20 @@ import { UsuariosModule } from '../usuarios/usuarios.module';
         signOptions: {
           algorithm: 'HS256',
           expiresIn: config.getOrThrow<number>('JWT_ACCESS_TTL_SECONDS'),
-          issuer: 'stp-usuarios-auth',
-          audience: 'stp-clients',
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
         },
       }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, TokenService],
+  providers: [
+    AuthService,
+    PasswordService,
+    TokenService,
+    SessionService,
+    JwtAuthGuard,
+  ],
+  exports: [JwtModule, JwtAuthGuard, SessionService],
 })
 export class AuthModule {}

@@ -25,6 +25,7 @@ model Usuario {
   // Relaciones con otras tablas
   roles                UsuarioRol[]
   verificaciones       VerificacionCorreo[]
+  sesiones             Sesion[]
 
   @@map("usuario") // Para que la tabla en Postgres se llame exactamente "usuario" en minúsculas
 }
@@ -66,4 +67,18 @@ model VerificacionCorreo {
   usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
 
   @@map("verificacion_correo")
+}
+
+model Sesion {
+  id_sesion         BigInt    @id @default(autoincrement())
+  jti               String    @unique @db.VarChar(64)
+  id_usuario        BigInt
+  fecha_expiracion  DateTime  @db.Timestamp(6)
+  ultima_actividad  DateTime  @default(now()) @db.Timestamp(6)
+  fecha_revocacion  DateTime? @db.Timestamp(6)
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@index([id_usuario, fecha_expiracion])
+  @@map("sesion")
 }

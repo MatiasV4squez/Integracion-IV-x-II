@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VerificacionCorreoController } from './verificacion-correo.controller';
 import { VerificacionCorreoService } from './verificacion-correo.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 describe('VerificacionCorreoController', () => {
   let controller: VerificacionCorreoController;
@@ -10,7 +11,10 @@ describe('VerificacionCorreoController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VerificacionCorreoController],
       providers: [VerificacionCorreoService, { provide: PrismaService, useValue: {} }],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<VerificacionCorreoController>(VerificacionCorreoController);
   });

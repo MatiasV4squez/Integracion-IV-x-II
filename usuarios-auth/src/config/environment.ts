@@ -63,6 +63,13 @@ export function validateEnvironment(config: Record<string, unknown>) {
     60,
     86400,
   );
+  const jwtIdleTimeoutSeconds = integerInRange(
+    config.JWT_IDLE_TIMEOUT_SECONDS,
+    'JWT_IDLE_TIMEOUT_SECONDS',
+    1800,
+    60,
+    86400,
+  );
   const smtpHost = required(config, 'SMTP_HOST');
   const smtpPort = integerInRange(config.SMTP_PORT, 'SMTP_PORT', 587, 1, 65535);
   const smtpSecure = booleanValue(config.SMTP_SECURE, 'SMTP_SECURE', false);
@@ -89,6 +96,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     PORT: port,
     JWT_SECRET: jwtSecret,
     JWT_ACCESS_TTL_SECONDS: jwtAccessTtlSeconds,
+    JWT_IDLE_TIMEOUT_SECONDS: jwtIdleTimeoutSeconds,
     SMTP_HOST: smtpHost,
     SMTP_PORT: smtpPort,
     SMTP_SECURE: smtpSecure,

@@ -8,9 +8,18 @@ import { serializeBigInt } from '../src/config/json-serialization';
 import { EMAIL_VERIFICATION_SENDER } from '../src/verificacion-correo/ports/email-verification.sender';
 import { loginFixture } from './fixtures/login.fixture';
 
-describe('Login básico (HTTP con persistencia simulada)', () => {
+interface SesionSimulada {
+  id_usuario: bigint;
+  jti: string;
+  fecha_expiracion: Date;
+  ultima_actividad: Date;
+  fecha_revocacion: Date | null;
+}
+
+describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
   let app: NestExpressApplication;
   let jwt: JwtService;
+  const sesiones = new Map<string, SesionSimulada>();
   const email = 'estudiante@alu.uct.cl';
   const usuarioExistente = {
     id_usuario: 1n,
@@ -31,6 +40,7 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     },
     rol: { create: jest.fn(), findMany: jest.fn() },
     usuarioRol: { create: jest.fn(), findMany: jest.fn() },
+    sesion: { create: jest.fn(), updateMany: jest.fn() },
     verificacionCorreo: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -48,6 +58,7 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
       PORT: '3000',
       JWT_SECRET: 'secreto-jwt-de-prueba-con-al-menos-32-bytes',
       JWT_ACCESS_TTL_SECONDS: '1800',
+      JWT_IDLE_TIMEOUT_SECONDS: '1800',
       SMTP_HOST: 'smtp.example.test',
       SMTP_PORT: '587',
       SMTP_SECURE: 'false',
@@ -75,6 +86,52 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    sesiones.clear();
+    prisma.sesion.create.mockImplementation(
+      async ({
+        data,
+      }: {
+        data: Omit<SesionSimulada, 'ultima_actividad' | 'fecha_revocacion'>;
+      }) => {
+        const sesion = {
+          ...data,
+          ultima_actividad: new Date(),
+          fecha_revocacion: null,
+        };
+        sesiones.set(data.jti, sesion);
+        return sesion;
+      },
+    );
+    prisma.sesion.updateMany.mockImplementation(
+      async ({
+        where,
+        data,
+      }: {
+        where: {
+          id_usuario: bigint;
+          jti: string;
+          fecha_revocacion: null;
+          fecha_expiracion?: { gt: Date };
+          ultima_actividad?: { gt: Date };
+        };
+        data: Partial<SesionSimulada>;
+      }) => {
+        const sesion = sesiones.get(where.jti);
+        if (
+          !sesion ||
+          sesion.id_usuario !== where.id_usuario ||
+          sesion.fecha_revocacion !== where.fecha_revocacion ||
+          (where.fecha_expiracion &&
+            sesion.fecha_expiracion <= where.fecha_expiracion.gt) ||
+          (where.ultima_actividad &&
+            sesion.ultima_actividad <= where.ultima_actividad.gt)
+        ) {
+          return { count: 0 };
+        }
+        Object.assign(sesion, data);
+        return { count: 1 };
+      },
+    );
     prisma.usuario.findUnique.mockResolvedValue(usuarioExistente);
     prisma.verificacionCorreo.create.mockResolvedValue({
       id_verificacion: 10n,
@@ -135,6 +192,7 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     });
     expect(payload).toMatchObject({
       sub: '1',
+      jti: expect.any(String),
       correo_institucional: email,
       roles: ['Tutor'],
       iss: 'stp-usuarios-auth',
@@ -143,6 +201,10 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     expect(payload.exp - payload.iat).toBe(1800);
     expect(payload).not.toHaveProperty('password_hash');
     expect(payload).not.toHaveProperty('nombre');
+    expect(sesiones.get(payload.jti)).toMatchObject({
+      id_usuario: 1n,
+      fecha_revocacion: null,
+    });
   });
 
   it('responde igual para un usuario inexistente y una contraseña incorrecta', async () => {
@@ -305,7 +367,141 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     expect(prisma.verificacionCorreo.findUnique).not.toHaveBeenCalled();
   });
 
+  it.each(['/usuarios', '/roles', '/usuario-rol', '/verificacion-correo'])(
+    'rechaza GET y POST sin sesión en %s',
+    async (path) => {
+      for (const method of ['get', 'post'] as const) {
+        const respuesta = await request(app.getHttpServer())
+          [method](path)
+          .expect(401);
+        expect(respuesta.body.code).toBe('AUTH_SESSION_INVALID');
+      }
+      expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('cierra solo la sesión actual y rechaza la reutilización de su JWT', async () => {
+    const primera = (await login().expect(200)).body.access_token as string;
+    const segunda = (await login().expect(200)).body.access_token as string;
+    prisma.usuario.findMany.mockResolvedValue([]);
+    await request(app.getHttpServer())
+      .get('/usuarios')
+      .auth(primera, { type: 'bearer' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .auth(primera, { type: 'bearer' })
+      .expect(204);
+    await request(app.getHttpServer())
+      .get('/usuarios')
+      .auth(primera, { type: 'bearer' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .auth(primera, { type: 'bearer' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/usuarios')
+      .auth(segunda, { type: 'bearer' })
+      .expect(200);
+    const { jti } = jwt.decode<{ jti: string }>(primera);
+    expect(sesiones.get(jti)?.fecha_revocacion).toBeInstanceOf(Date);
+  });
+
+  it('rechaza el cierre de sesión sin un token', async () => {
+    await request(app.getHttpServer()).post('/auth/logout').expect(401);
+    expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('permite consultar las verificaciones previas con una sesión activa', async () => {
+    const { body } = await login().expect(200);
+    prisma.verificacionCorreo.findMany.mockResolvedValue([]);
+    await request(app.getHttpServer())
+      .get('/verificacion-correo')
+      .auth(body.access_token, { type: 'bearer' })
+      .expect(200, []);
+  });
+
+  it('actualiza la actividad de una sesión vigente', async () => {
+    const { body } = await login().expect(200);
+    const { jti } = jwt.decode<{ jti: string }>(body.access_token);
+    const sesion = sesiones.get(jti)!;
+    const anterior = new Date(Date.now() - 60_000);
+    sesion.ultima_actividad = anterior;
+    prisma.usuario.findMany.mockResolvedValue([]);
+    await request(app.getHttpServer())
+      .get('/usuarios')
+      .auth(body.access_token, { type: 'bearer' })
+      .expect(200);
+    expect(sesion.ultima_actividad.getTime()).toBeGreaterThan(
+      anterior.getTime(),
+    );
+  });
+
+  it.each(['inactiva', 'expirada', 'inexistente'])(
+    'rechaza un JWT vigente cuya sesión está %s',
+    async (estado) => {
+      const { body } = await login().expect(200);
+      const { jti } = jwt.decode<{ jti: string }>(body.access_token);
+      const sesion = sesiones.get(jti)!;
+      if (estado === 'inactiva')
+        sesion.ultima_actividad = new Date(Date.now() - 1800_000);
+      if (estado === 'expirada')
+        sesion.fecha_expiracion = new Date(Date.now() - 1000);
+      if (estado === 'inexistente') sesiones.delete(jti);
+      const anterior = sesion.ultima_actividad;
+      const respuesta = await request(app.getHttpServer())
+        .get('/usuarios')
+        .auth(body.access_token, { type: 'bearer' })
+        .expect(401);
+      expect(respuesta.body.code).toBe('AUTH_SESSION_INVALID');
+      expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+      expect(sesion.ultima_actividad).toEqual(anterior);
+    },
+  );
+
+  it.each([
+    { secret: 'firma-incorrecta-con-al-menos-32-bytes' },
+    { expiresIn: -1 },
+    { issuer: 'otro-emisor' },
+    { audience: 'otro-cliente' },
+    { algorithm: 'HS384' as const },
+  ])('rechaza un JWT con firma o metadatos inválidos: %j', async (options) => {
+    const token = await jwt.signAsync(
+      {
+        sub: '1',
+        jti: 'sesion-de-prueba',
+        correo_institucional: email,
+        roles: ['Tutor'],
+      },
+      options,
+    );
+    await request(app.getHttpServer())
+      .get('/usuarios')
+      .auth(token, { type: 'bearer' })
+      .expect(401);
+    expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['no-numerico', '0', '9223372036854775808'])(
+    'rechaza un identificador de usuario inválido sin producir un 500: %s',
+    async (sub) => {
+      const token = await jwt.signAsync({
+        sub,
+        jti: 'sesion-de-prueba',
+        correo_institucional: email,
+        roles: ['Tutor'],
+      });
+      await request(app.getHttpServer())
+        .get('/usuarios')
+        .auth(token, { type: 'bearer' })
+        .expect(401);
+      expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
   it('restaura el POST y GET originales de usuarios sin aplicar las reglas nuevas del login', async () => {
+    const { body } = await login().expect(200);
     const dto = {
       nombre: 'Usuario previo',
       correo_institucional: email,
@@ -322,6 +518,7 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
 
     const respuesta = await request(app.getHttpServer())
       .post('/usuarios')
+      .auth(body.access_token, { type: 'bearer' })
       .send(dto)
       .expect(201);
     expect(respuesta.body.id_usuario).toBe('9007199254740993');
@@ -330,26 +527,33 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
     });
     const listado = await request(app.getHttpServer())
       .get('/usuarios')
+      .auth(body.access_token, { type: 'bearer' })
       .expect(200);
     expect(listado.body).toEqual([respuesta.body]);
   });
 
   it('vuelve a conectar el POST y GET originales de roles', async () => {
+    const { body } = await login().expect(200);
     const rol = { id_rol: 1, nombre: 'Tutor' };
     prisma.rol.create.mockResolvedValue(rol);
     prisma.rol.findMany.mockResolvedValue([rol]);
 
     await request(app.getHttpServer())
       .post('/roles')
+      .auth(body.access_token, { type: 'bearer' })
       .send({ nombre: 'Tutor' })
       .expect(201, rol);
     expect(prisma.rol.create).toHaveBeenCalledWith({
       data: { nombre: 'Tutor' },
     });
-    await request(app.getHttpServer()).get('/roles').expect(200, [rol]);
+    await request(app.getHttpServer())
+      .get('/roles')
+      .auth(body.access_token, { type: 'bearer' })
+      .expect(200, [rol]);
   });
 
   it('vuelve a conectar el POST y GET originales de usuario-rol y serializa BigInt', async () => {
+    const { body } = await login().expect(200);
     const relacion = { id_usuario: 1n, id_rol: 1 };
     prisma.usuarioRol.create.mockResolvedValue(relacion);
     prisma.usuarioRol.findMany.mockResolvedValue([relacion]);
@@ -357,11 +561,13 @@ describe('Login básico (HTTP con persistencia simulada)', () => {
 
     await request(app.getHttpServer())
       .post('/usuario-rol')
+      .auth(body.access_token, { type: 'bearer' })
       .send({ id_usuario: 1, id_rol: 1 })
       .expect(201, esperado);
     expect(prisma.usuarioRol.create).toHaveBeenCalledWith({ data: relacion });
     await request(app.getHttpServer())
       .get('/usuario-rol')
+      .auth(body.access_token, { type: 'bearer' })
       .expect(200, [esperado]);
   });
 });
