@@ -5,24 +5,21 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
-import { isTransactionConflict } from '../database/transaction-conflict';
+import { runSerializable } from '../database/serializable-transaction';
+import { BlockReservationsService } from '../integrations/materias-tutores/block-reservations.service';
+import { type ReservedSchedule } from '../integrations/materias-tutores/blocks.gateway';
 import {
-  Prisma,
-  type bloque_horario,
+  type Prisma,
   type sesion,
   type sesion_estado_sesion_enum,
 } from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
-import { CreateBlockDto } from './dto/create-block.dto';
 import {
   OCCUPYING_STATES,
-  parseBlockTime,
-  parseUserId,
+  parseIdentifier,
   toSessionResponse,
-  validateBlock,
   validateParticipant,
   validateState,
   validateTutor,
@@ -31,162 +28,136 @@ import {
 @Injectable()
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
-  private readonly timeZone: string;
 
   constructor(
     private readonly prisma: PrismaService,
-    config: ConfigService,
-  ) {
-    this.timeZone =
-      config.get<string>('SESSION_TIME_ZONE') ?? 'America/Santiago';
-    // Fallar al iniciar si la zona está mal configurada.
-    new Intl.DateTimeFormat('en', { timeZone: this.timeZone }).format();
-  }
-
-  async createBlock(dto: CreateBlockDto) {
-    const start = parseBlockTime(dto.hora_inicio);
-    const end = parseBlockTime(dto.hora_fin);
-    if (end <= start) {
-      throw new BadRequestException(
-        'hora_fin debe ser posterior a hora_inicio en el mismo día.',
-      );
-    }
-    const block = await this.prisma.bloque_horario.create({
-      data: {
-        id_tutor: parseUserId(dto.id_tutor, 'id_tutor'),
-        dia: new Date(`${dto.dia}T00:00:00.000Z`),
-        hora_inicio: start,
-        hora_fin: end,
-      },
-    });
-    return { ...block, id_tutor: block.id_tutor.toString() };
-  }
+    private readonly reservations: BlockReservationsService,
+  ) {}
 
   async createSession(dto: CreateSessionDto) {
-    const tutorId = parseUserId(dto.id_tutor, 'id_tutor');
-    const tuteeId = parseUserId(dto.id_tutee, 'id_tutee');
-    return this.runSerializableTransaction(async (tx) => {
-      const block = await tx.bloque_horario.findUnique({
-        where: { id_bloque: dto.id_bloque },
-      });
-      if (!block)
-        throw new NotFoundException(
-          'El bloque horario especificado no existe.',
-        );
-      validateBlock(block, tutorId);
-      if (block.estado_bloque !== 'DISPONIBLE') {
-        throw new ConflictException('El bloque horario no está disponible.');
-      }
-      await this.ensurePendingLimit(tx, tuteeId);
-      await this.ensureNoOverlap(tx, block, {
-        OR: [{ id_tutor: tutorId }, { id_tutee: tuteeId }],
-      });
-      const session = await tx.sesion.create({
-        data: {
-          ...dto,
-          id_tutor: tutorId,
-          id_tutee: tuteeId,
-          estado_sesion: 'PENDIENTE',
-        },
-      });
-      await this.reserveBlock(tx, block.id_bloque);
-      return toSessionResponse(session);
+    const ids = {
+      id_tutor: parseIdentifier(dto.id_tutor, 'id_tutor'),
+      id_tutee: parseIdentifier(dto.id_tutee, 'id_tutee'),
+      id_materia: parseIdentifier(dto.id_materia, 'id_materia'),
+      id_bloque: parseIdentifier(dto.id_bloque, 'id_bloque'),
+    };
+    const reservation = await this.reservations.prepare({
+      id_tutor: ids.id_tutor,
+      id_materia: ids.id_materia,
+      id_bloque: ids.id_bloque,
     });
+    try {
+      // HTTP fuera de la transacción. El diario permite compensar tras una caída.
+      const schedule = await this.reservations.reserve(reservation);
+      const session = await runSerializable(this.prisma, async (tx) => {
+        await this.reservations.associate(tx, reservation.id);
+        await this.ensurePendingLimit(tx, ids.id_tutee);
+        await this.ensureNoOverlap(tx, schedule, {
+          OR: [{ id_tutor: ids.id_tutor }, { id_tutee: ids.id_tutee }],
+        });
+        return tx.sesion.create({
+          data: { ...ids, ...schedule, id_reserva: reservation.id },
+        });
+      });
+      return this.response(session);
+    } catch (error: unknown) {
+      try {
+        await this.reservations.compensate(reservation.id);
+      } catch {
+        // El diario persistente permite recuperar incluso una caída de PostgreSQL.
+        this.logger.error(
+          `Compensación pendiente de la reserva ${reservation.id}.`,
+        );
+      }
+      throw error;
+    }
   }
 
   async acceptSession(idSesion: string, idUsuario: string) {
-    const userId = parseUserId(idUsuario, 'id_usuario');
-    return this.runSerializableTransaction(async (tx) => {
-      const session = await this.findSessionOrFail(tx, idSesion);
+    const id = parseIdentifier(idSesion, 'id_sesion');
+    const userId = parseIdentifier(idUsuario, 'id_usuario');
+    const updated = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
       validateTutor(session, userId);
       validateState(session, 'PENDIENTE');
-      validateBlock(session.bloque_horario, session.id_tutor);
-      await this.ensureNoOverlap(tx, session.bloque_horario, {
-        id_sesion: { not: idSesion },
-        id_tutor: session.id_tutor,
+      await this.ensureNoOverlap(tx, session, {
+        id_sesion: { not: id },
+        OR: [{ id_tutor: session.id_tutor }, { id_tutee: session.id_tutee }],
       });
-      const updated = await this.transitionSession(tx, session, 'CONFIRMADA');
-      await this.reserveBlock(tx, session.id_bloque);
-      return toSessionResponse(updated);
+      // El contrato conserva la reserva y su horario hasta una liberación explícita.
+      return this.transitionSession(tx, session, 'CONFIRMADA');
     });
+    return this.response(updated);
   }
 
   async rejectSession(idSesion: string, idUsuario: string) {
-    const userId = parseUserId(idUsuario, 'id_usuario');
-    return this.runSerializableTransaction(async (tx) => {
-      const session = await this.findSessionOrFail(tx, idSesion);
+    const id = parseIdentifier(idSesion, 'id_sesion');
+    const userId = parseIdentifier(idUsuario, 'id_usuario');
+    const updated = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
       validateTutor(session, userId);
       validateState(session, 'PENDIENTE');
-      const updated = await this.transitionSession(tx, session, 'RECHAZADA');
-      await this.releaseBlockIfUnused(tx, session.id_bloque);
-      return toSessionResponse(updated);
+      const result = await this.transitionSession(tx, session, 'RECHAZADA');
+      await this.reservations.scheduleRelease(tx, session.id_reserva);
+      return result;
     });
+    return this.releaseAndRespond(updated);
   }
 
   async cancelSession(idSesion: string, idUsuario: string) {
-    const userId = parseUserId(idUsuario, 'id_usuario');
-    return this.runSerializableTransaction(async (tx) => {
-      const session = await this.findSessionOrFail(tx, idSesion);
+    const id = parseIdentifier(idSesion, 'id_sesion');
+    const userId = parseIdentifier(idUsuario, 'id_usuario');
+    const updated = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
       validateParticipant(session, userId);
       validateState(session, 'CONFIRMADA');
-      await this.ensureBeforeStart(tx, session.bloque_horario);
-      const updated = await this.transitionSession(tx, session, 'CANCELADA');
-      await this.releaseBlockIfUnused(tx, session.id_bloque);
-      return toSessionResponse(updated);
+      await this.ensureBeforeStart(tx, session.inicio);
+      const result = await this.transitionSession(tx, session, 'CANCELADA');
+      await this.reservations.scheduleRelease(tx, session.id_reserva);
+      return result;
     });
+    return this.releaseAndRespond(updated);
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
   async handleExpiredSessions() {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const pending = await this.prisma.sesion.findMany({
       where: { estado_sesion: 'PENDIENTE', fecha_creacion: { lte: cutoff } },
-      select: { id_sesion: true, id_bloque: true },
     });
-    let expired = 0;
     for (const session of pending) {
-      expired += await this.expireSession(session, cutoff);
+      try {
+        const expired = await runSerializable(this.prisma, async (tx) => {
+          const result = await tx.sesion.updateMany({
+            where: {
+              id_sesion: session.id_sesion,
+              estado_sesion: 'PENDIENTE',
+              fecha_creacion: { lte: cutoff },
+            },
+            data: { estado_sesion: 'EXPIRADA' },
+          });
+          if (result.count)
+            await this.reservations.scheduleRelease(tx, session.id_reserva);
+          return result.count;
+        });
+        if (expired) await this.reservations.tryRelease(session.id_reserva);
+      } catch {
+        this.logger.error(
+          `No se pudo completar la expiración de ${session.id_sesion}; se reintentará.`,
+        );
+      }
     }
-    if (expired > 0)
-      this.logger.log(`Se actualizaron ${expired} solicitudes a EXPIRADA.`);
   }
 
-  private async expireSession(
-    session: Pick<sesion, 'id_sesion' | 'id_bloque'>,
-    cutoff: Date,
-  ) {
-    return this.runSerializableTransaction(async (tx) => {
-      const result = await tx.sesion.updateMany({
-        where: {
-          id_sesion: session.id_sesion,
-          estado_sesion: 'PENDIENTE',
-          fecha_creacion: { lte: cutoff },
-        },
-        data: { estado_sesion: 'EXPIRADA' },
-      });
-      if (result.count) await this.releaseBlockIfUnused(tx, session.id_bloque);
-      return result.count;
-    });
-  }
-
-  private async findSessionOrFail(
-    tx: Prisma.TransactionClient,
-    idSesion: string,
-  ) {
-    const session = await tx.sesion.findUnique({
-      where: { id_sesion: idSesion },
-      include: { bloque_horario: true },
-    });
+  private async findSessionOrFail(tx: Prisma.TransactionClient, id: bigint) {
+    const session = await tx.sesion.findUnique({ where: { id_sesion: id } });
     if (!session) throw new NotFoundException('La sesión no existe.');
     return session;
   }
 
-  private async ensurePendingLimit(
-    tx: Prisma.TransactionClient,
-    tuteeId: bigint,
-  ) {
+  private async ensurePendingLimit(tx: Prisma.TransactionClient, id: bigint) {
     const pending = await tx.sesion.count({
-      where: { id_tutee: tuteeId, estado_sesion: 'PENDIENTE' },
+      where: { id_tutee: id, estado_sesion: 'PENDIENTE' },
     });
     if (pending >= 4)
       throw new BadRequestException(
@@ -196,18 +167,15 @@ export class SessionsService {
 
   private async ensureNoOverlap(
     tx: Prisma.TransactionClient,
-    block: bloque_horario,
+    schedule: ReservedSchedule,
     filter: Prisma.sesionWhereInput,
   ) {
     const overlap = await tx.sesion.findFirst({
       where: {
         ...filter,
         estado_sesion: { in: OCCUPYING_STATES },
-        bloque_horario: {
-          dia: block.dia,
-          hora_inicio: { lt: block.hora_fin },
-          hora_fin: { gt: block.hora_inicio },
-        },
+        inicio: { lt: schedule.fin },
+        fin: { gt: schedule.inicio },
       },
       select: { id_sesion: true },
     });
@@ -215,16 +183,9 @@ export class SessionsService {
       throw new ConflictException('Otra solicitud o sesión ocupa ese horario.');
   }
 
-  private async ensureBeforeStart(
-    tx: Prisma.TransactionClient,
-    block: bloque_horario,
-  ) {
-    const day = block.dia.toISOString().slice(0, 10);
-    const time = block.hora_inicio.toISOString().slice(11, 23);
-    // PostgreSQL resuelve la zona IANA y los cambios estacionales; no depende del TZ de Node.
+  private async ensureBeforeStart(tx: Prisma.TransactionClient, start: Date) {
     const [result] = await tx.$queryRaw<Array<{ started: boolean }>>`
-      SELECT clock_timestamp() >=
-        ((${day}::date + ${time}::time) AT TIME ZONE ${this.timeZone}) AS started
+      SELECT clock_timestamp() >= ${start}::timestamptz AS started
     `;
     if (result.started)
       throw new ConflictException(
@@ -253,47 +214,31 @@ export class SessionsService {
     });
   }
 
-  private async reserveBlock(tx: Prisma.TransactionClient, idBloque: string) {
-    await tx.bloque_horario.update({
-      where: { id_bloque: idBloque },
-      data: { estado_bloque: 'RESERVADO', updated_at: new Date() },
-    });
+  private async releaseAndRespond(session: sesion) {
+    try {
+      await this.reservations.tryRelease(session.id_reserva);
+    } catch {
+      this.logger.error(
+        `Liberación pendiente de la reserva ${session.id_reserva}.`,
+      );
+    }
+    return this.response(session);
   }
 
-  private async releaseBlockIfUnused(
-    tx: Prisma.TransactionClient,
-    idBloque: string,
-  ) {
-    const occupied = await tx.sesion.count({
-      where: { id_bloque: idBloque, estado_sesion: { in: OCCUPYING_STATES } },
+  private async response(session: sesion) {
+    const reservation = await this.prisma.reserva_bloque.findUniqueOrThrow({
+      where: { id: session.id_reserva },
+      select: { estado: true },
     });
-    if (occupied === 0) {
-      await tx.bloque_horario.updateMany({
-        where: { id_bloque: idBloque, estado_bloque: 'RESERVADO' },
-        data: { estado_bloque: 'DISPONIBLE', updated_at: new Date() },
-      });
-    }
-  }
-
-  private async runSerializableTransaction<T>(
-    operation: (tx: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T> {
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await this.prisma.$transaction(operation, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
-      } catch (error: unknown) {
-        if (!isTransactionConflict(error)) throw error;
-        if (attempt < maxAttempts)
-          await new Promise<void>((resolve) =>
-            setTimeout(resolve, 50 * attempt),
-          );
-      }
-    }
-    throw new ConflictException(
-      'Otra operación modificó los datos. Intenta nuevamente.',
-    );
+    const states = {
+      ASOCIADA: 'RESERVADA',
+      LIBERADA: 'LIBERADA',
+      LIBERAR: 'LIBERACION_PENDIENTE',
+      PREPARADA: 'LIBERACION_PENDIENTE',
+    } as const;
+    return {
+      ...toSessionResponse(session),
+      estado_reserva: states[reservation.estado],
+    };
   }
 }

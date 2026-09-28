@@ -37,20 +37,30 @@ puede ejecutarse con Node.js 22.12 o superior en la rama 22 LTS.
 2. Copia `.env.example` a `.env` si todavía no tienes configuración local.
 3. Completa `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` y `DB_DATABASE`.
    También puedes definir `DATABASE_URL`, que tiene prioridad sobre las variables `DB_*`.
-4. Inicia el servicio con `npm run start:dev`.
+4. Aplica las migraciones con `npm run prisma:deploy` y genera el cliente con `npm run prisma:generate`.
+5. Configura `JWT_SECRET` y la integración de bloques según los documentos enlazados abajo.
+6. Inicia el servicio con `npm run start:dev`.
 
 NestJS abre la conexión al iniciar y la cierra al apagar el servicio.
 Los módulos que necesiten persistencia deben importar `DatabaseModule` e inyectar
 `PrismaService`. La configuración de la aplicación y de la CLI de Prisma comparte
 la misma resolución de credenciales.
 
-El esquema está en `prisma/schema.prisma` y contiene bloques horarios y sesiones.
-Los identificadores de sesión y bloque son UUID; las referencias de usuarios son
-BIGINT y se envían como texto en JSON. Las migraciones se aplican explícitamente;
-`DB_SYNCHRONIZE` ya no se utiliza.
+El esquema está en `prisma/schema.prisma` y contiene sesiones y un diario de
+reservas externas (`reserva_bloque`). No contiene el catálogo `bloque_horario`.
+Sesión, usuario, materia y bloque usan BIGINT, enviados como texto en JSON.
+Los UUID se usan únicamente para identificar operaciones de reserva idempotentes.
+Las migraciones se aplican explícitamente; `DB_SYNCHRONIZE` ya no se utiliza.
+La migración de separación se detiene si encuentra datos antiguos: requiere
+un mapeo acordado de UUID a BigInt; nunca convierte ni borra registros automáticamente.
 
 La configuración JWT, las rutas de aceptar/rechazar/cancelar y las pruebas de
 concurrencia se describen en [docs/solicitudes.md](docs/solicitudes.md).
+El contrato propuesto para Víctor está en
+[docs/contrato-materias-tutores.md](docs/contrato-materias-tutores.md), con su
+[OpenAPI](docs/materias-tutores.openapi.yaml). El proveedor de bloques aún no está
+implementado: sin URL/token, crear una solicitud devuelve 503. La aplicación
+puede arrancar para continuar el desarrollo y ejecutar las pruebas con el proveedor simulado.
 
 ```bash
 npm run prisma:validate
