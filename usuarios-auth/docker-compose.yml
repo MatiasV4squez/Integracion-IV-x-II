@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: admin_usuarios
+      POSTGRES_USER: admin
       POSTGRES_PASSWORD: root123
       POSTGRES_DB: usuarios_auth_db
     volumes:
