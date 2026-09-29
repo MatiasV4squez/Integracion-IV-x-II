@@ -10,6 +10,7 @@ import {
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
+import { UpdateSessionStatusDto } from './dto/update-session-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/autenticacion-request';
 
@@ -30,6 +31,7 @@ export class SessionsController {
   ) {
     return this.sessionsService.acceptSession(idSesion, request.user.idUsuario);
   }
+
   @Patch(':id/reject')
   @UseGuards(JwtAuthGuard)
   rejectSession(
@@ -38,6 +40,7 @@ export class SessionsController {
   ) {
     return this.sessionsService.rejectSession(idSesion, request.user.idUsuario);
   }
+
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard)
   cancelSession(
@@ -45,6 +48,15 @@ export class SessionsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.sessionsService.cancelSession(idSesion, request.user.idUsuario);
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard)
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateSessionStatusDto,
+  ) {
+    return this.sessionsService.updateSessionStatusByTutor(id, updateStatusDto);
   }
 
   @Post(':id/closure-declarations')

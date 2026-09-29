@@ -16,6 +16,7 @@ import {
 } from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
+import { UpdateSessionStatusDto } from './dto/update-session-status.dto'; // Asegúrate de ajustar la ruta de este DTO según la estructura de tus carpetas
 import {
   OCCUPYING_STATES,
   parseIdentifier,
@@ -151,6 +152,22 @@ export class SessionsService {
       sesion: toSessionResponse(result.session),
       declaracion: toDeclarationResponse(result.declaration),
     };
+  }
+
+  async updateSessionStatusByTutor(
+    id_sesion: string,
+    updateStatusDto: UpdateSessionStatusDto,
+  ) {
+    const id = parseIdentifier(id_sesion, 'id_sesion');
+    const tutorId = parseIdentifier(updateStatusDto.id_tutor, 'id_tutor');
+
+    const updated = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
+      validateTutor(session, tutorId);
+      return this.transitionSession(tx, session, updateStatusDto.estado as sesion_estado_sesion_enum);
+    });
+
+    return toSessionResponse(updated);
   }
 
   @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
