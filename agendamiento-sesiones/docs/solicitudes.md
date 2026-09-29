@@ -36,6 +36,27 @@ permiten una transición. Los estados incompatibles devuelven 409; entrada invá
 Se conserva el cron horario que cambia a EXPIRADA las solicitudes PENDIENTE de
 24 horas. La actualización condicionada evita sobrescribir una aceptación.
 
+## Cierre de sesiones
+
+Una tarea programada cada minuto pasa de `CONFIRMADA` a `PENDIENTE_CIERRE`
+cuando termina `fin`. Cada participante envía una declaración autenticada con
+`POST /sessions/:id/closure-declarations` y un body como
+`{"resultado_declarado":"COMPLETADA"}`. Los resultados válidos son `COMPLETADA`,
+`NO_REALIZADA` e `INASISTENCIA`. En el último caso también se exige
+`id_usuario_inasistente`, el identificador BigInt en texto de uno de los dos
+participantes. Cada persona puede declarar una sola vez por sesión.
+
+La primera declaración deja la sesión en `PENDIENTE_CIERRE`. Si ambas coinciden
+en resultado y persona inasistente, se adopta ese resultado; si discrepan,
+la sesión queda `EN_CONFLICTO`. Una tarea cada minuto adopta la primera
+declaración si transcurren 48 horas sin respuesta, y marca
+`resultado_provisional: true` en la sesión. La transición y el registro de
+declaraciones usan transacciones serializables para evitar resultados dobles
+ante peticiones concurrentes.
+
+La resolución administrativa de `EN_CONFLICTO` y los avisos al administrador
+requieren acordar permisos y eventos con los microservicios responsables.
+
 ## Pendiente de conexión entre microservicios
 
 La creación necesita obtener un horario real y verificar la disponibilidad del
@@ -51,12 +72,12 @@ restablecer la creación real de solicitudes.
 
 La autenticación actual comprueba firma y vencimiento; la revocación y las
 suspensiones requieren el servicio de usuarios. La creación autenticada, API
-Gateway, notificaciones y cierre de sesiones corresponden a sus tareas respectivas.
+Gateway y notificaciones corresponden a sus tareas respectivas.
 
 ## Esquema y migraciones
 
-El esquema actual contiene únicamente `sesion`, sin relaciones Prisma hacia otros
-microservicios. Se conservan los identificadores BigInt y los horarios de sesión.
+El esquema contiene `sesion` y `declaracion_cierre`, sin relaciones Prisma hacia
+otros microservicios. Se conservan los identificadores BigInt y los horarios de sesión.
 La migración `20260927130000_retirar_integracion_bloques` retira el registro de
 reservas añadido fuera de alcance. Si encuentra registros, se detiene sin borrar
 nada. Las migraciones anteriores se conservan porque ya fueron aplicadas y publicadas.
@@ -71,7 +92,7 @@ npm run test:e2e -- --runInBand
 ```
 
 Las pruebas usan Node.js 24.9 o superior y PostgreSQL real. Crean un esquema
-`test_sessions_<uuid>`, aplican las migraciones, insertan exclusivamente sesiones
+`test_sessions_<uuid>`, aplican las migraciones, insertan sesiones y declaraciones
 de prueba y lo eliminan al terminar. Comprueban que las tablas públicas no cambian.
 No hay proveedor simulado ni llamadas a materias-tutores. La conexión se toma de
 `TEST_DATABASE_URL` o de `DATABASE_URL` / `DB_*`.

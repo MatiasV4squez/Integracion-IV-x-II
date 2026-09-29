@@ -55,6 +55,16 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       .patch(`/sessions/${id}/${action}`)
       .set('Authorization', `Bearer ${token(user)}`);
   }
+  function declare(
+    id: string | bigint,
+    body: Record<string, unknown>,
+    user = tutor,
+  ) {
+    return request(app.getHttpServer())
+      .post(`/sessions/${id}/closure-declarations`)
+      .set('Authorization', `Bearer ${token(user)}`)
+      .send(body);
+  }
   function create(blockId: string, student = tutee, owner = tutor) {
     return request(app.getHttpServer()).post('/sessions').send({
       id_tutee: student,
@@ -65,7 +75,12 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
   }
   async function publicSnapshot() {
     const result: Record<string, unknown> = {};
-    for (const table of ['sesion', 'bloque_horario', 'reserva_bloque']) {
+    for (const table of [
+      'sesion',
+      'bloque_horario',
+      'reserva_bloque',
+      'declaracion_cierre',
+    ]) {
       const found = await admin.query('SELECT to_regclass($1) AS name', [
         `public.${table}`,
       ]);
@@ -120,6 +135,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     service = app.get(SessionsService);
   }, 30000);
   beforeEach(async () => {
+    await prisma.declaracion_cierre.deleteMany();
     await prisma.sesion.deleteMany();
   });
   afterEach(() => jest.restoreAllMocks());
@@ -327,6 +343,200 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
+  it('pasa a pendiente de cierre una sesión confirmada cuyo horario terminó', async () => {
+    const session = await fixture('CONFIRMADA', '2020-01-01');
+
+    await service.handleFinishedSessions();
+
+    const updated = await stateOf(session.id_sesion);
+    expect(updated.estado_sesion).toBe('PENDIENTE_CIERRE');
+    expect(updated.fecha_actualizacion.getTime()).toBeGreaterThan(
+      session.fecha_actualizacion.getTime(),
+    );
+  });
+  it('mantiene confirmada una sesión cuyo horario aún no termina', async () => {
+    const session = await fixture('CONFIRMADA');
+
+    await service.handleFinishedSessions();
+
+    expect(await stateOf(session.id_sesion)).toEqual(session);
+  });
+  it.each(['CANCELADA', 'PENDIENTE'] as const)(
+    'no cambia una sesión %s aunque su horario haya terminado',
+    async (state) => {
+      const session = await fixture(state, '2020-01-01');
+
+      await service.handleFinishedSessions();
+
+      expect(await stateOf(session.id_sesion)).toEqual(session);
+    },
+  );
+  it('repetir el cierre no vuelve a modificar la sesión', async () => {
+    const session = await fixture('CONFIRMADA', '2020-01-01');
+
+    await service.handleFinishedSessions();
+    const closed = await stateOf(session.id_sesion);
+    await service.handleFinishedSessions();
+
+    expect(await stateOf(session.id_sesion)).toEqual(closed);
+  });
+  it('guarda una declaración por participante y conserva PENDIENTE_CIERRE hasta la segunda', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    const response = await declare(session.id_sesion, {
+      resultado_declarado: 'COMPLETADA',
+    }).expect(201);
+    expect(response.body.sesion).toMatchObject({
+      id_sesion: session.id_sesion.toString(),
+      estado_sesion: 'PENDIENTE_CIERRE',
+      resultado_provisional: false,
+    });
+    expect(response.body.declaracion).toMatchObject({
+      id_usuario: tutor,
+      resultado_declarado: 'COMPLETADA',
+      id_usuario_inasistente: null,
+    });
+    await declare(session.id_sesion, {
+      resultado_declarado: 'NO_REALIZADA',
+    }).expect(409);
+    expect(await prisma.declaracion_cierre.count()).toBe(1);
+  });
+  it.each(['COMPLETADA', 'NO_REALIZADA'] as const)(
+    'dos declaraciones %s coincidentes cierran la sesión',
+    async (outcome) => {
+      const session = await fixture('PENDIENTE_CIERRE');
+      await declare(session.id_sesion, { resultado_declarado: outcome }).expect(
+        201,
+      );
+      const response = await declare(
+        session.id_sesion,
+        { resultado_declarado: outcome },
+        tutee,
+      ).expect(201);
+      expect(response.body.sesion.estado_sesion).toBe(outcome);
+      expect((await stateOf(session.id_sesion)).resultado_provisional).toBe(
+        false,
+      );
+    },
+  );
+  it('solo cierra por inasistencia cuando ambas partes señalan a la misma persona', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    const body = {
+      resultado_declarado: 'INASISTENCIA',
+      id_usuario_inasistente: tutee,
+    };
+    await declare(session.id_sesion, body).expect(201);
+    await declare(session.id_sesion, body, tutee).expect(201);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      'INASISTENCIA',
+    );
+  });
+  it('declaraciones diferentes dejan la sesión EN_CONFLICTO', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    await declare(session.id_sesion, {
+      resultado_declarado: 'COMPLETADA',
+    }).expect(201);
+    await declare(
+      session.id_sesion,
+      { resultado_declarado: 'NO_REALIZADA' },
+      tutee,
+    ).expect(201);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      'EN_CONFLICTO',
+    );
+    expect(await prisma.declaracion_cierre.count()).toBe(2);
+  });
+  it('dos declaraciones de inasistencia que acusan a personas distintas generan conflicto', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    await declare(session.id_sesion, {
+      resultado_declarado: 'INASISTENCIA',
+      id_usuario_inasistente: tutee,
+    }).expect(201);
+    await declare(
+      session.id_sesion,
+      { resultado_declarado: 'INASISTENCIA', id_usuario_inasistente: tutor },
+      tutee,
+    ).expect(201);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      'EN_CONFLICTO',
+    );
+  });
+  it('rechaza declaraciones sin permiso, datos inválidos y estados ajenos al cierre', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    await request(app.getHttpServer())
+      .post(`/sessions/${session.id_sesion}/closure-declarations`)
+      .send({ resultado_declarado: 'COMPLETADA' })
+      .expect(401);
+    await declare(
+      session.id_sesion,
+      { resultado_declarado: 'COMPLETADA' },
+      outsider,
+    ).expect(403);
+    for (const body of [
+      {},
+      { resultado_declarado: 'OTRA' },
+      { resultado_declarado: 'COMPLETADA', id_usuario_inasistente: tutor },
+      { resultado_declarado: 'INASISTENCIA' },
+      { resultado_declarado: 'INASISTENCIA', id_usuario_inasistente: outsider },
+      {
+        resultado_declarado: 'INASISTENCIA',
+        id_usuario_inasistente: '9223372036854775808',
+      },
+      { resultado_declarado: 'COMPLETADA', extra: true },
+    ])
+      await declare(session.id_sesion, body).expect(400);
+    expect(await prisma.declaracion_cierre.count()).toBe(0);
+    await declare((await fixture('CONFIRMADA')).id_sesion, {
+      resultado_declarado: 'COMPLETADA',
+    }).expect(409);
+    await declare('9223372036854775807', {
+      resultado_declarado: 'COMPLETADA',
+    }).expect(404);
+  });
+  it('acepta provisionalmente el primer resultado tras 48 horas sin respuesta', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    await declare(session.id_sesion, {
+      resultado_declarado: 'NO_REALIZADA',
+    }).expect(201);
+    await prisma.declaracion_cierre.updateMany({
+      where: { id_sesion: session.id_sesion },
+      data: { fecha_declaracion: new Date('2020-01-01') },
+    });
+    await service.resolverDeclaracionesVencidas();
+    const closed = await stateOf(session.id_sesion);
+    expect(closed.estado_sesion).toBe('NO_REALIZADA');
+    expect(closed.resultado_provisional).toBe(true);
+    await service.resolverDeclaracionesVencidas();
+    expect(await stateOf(session.id_sesion)).toEqual(closed);
+    await declare(
+      session.id_sesion,
+      { resultado_declarado: 'COMPLETADA' },
+      tutee,
+    ).expect(409);
+  });
+  it('no resuelve provisionalmente antes de 48 horas ni sin declaración', async () => {
+    const recent = await fixture('PENDIENTE_CIERRE');
+    const empty = await fixture('PENDIENTE_CIERRE');
+    await declare(recent.id_sesion, {
+      resultado_declarado: 'COMPLETADA',
+    }).expect(201);
+    await service.resolverDeclaracionesVencidas();
+    expect((await stateOf(recent.id_sesion)).estado_sesion).toBe(
+      'PENDIENTE_CIERRE',
+    );
+    expect((await stateOf(empty.id_sesion)).estado_sesion).toBe(
+      'PENDIENTE_CIERRE',
+    );
+  });
+  it('dos participantes concurrentes dejan exactamente dos declaraciones y un resultado', async () => {
+    const session = await fixture('PENDIENTE_CIERRE');
+    const results = await Promise.all([
+      declare(session.id_sesion, { resultado_declarado: 'COMPLETADA' }),
+      declare(session.id_sesion, { resultado_declarado: 'COMPLETADA' }, tutee),
+    ]);
+    expect(results.map((result) => result.status)).toEqual([201, 201]);
+    expect(await prisma.declaracion_cierre.count()).toBe(2);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('COMPLETADA');
+  });
   it('expira; repetir no altera el resultado', async () => {
     const session = await fixture();
     await prisma.sesion.update({
@@ -409,7 +619,11 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     await admin.query(`CREATE SCHEMA "${guarded}"`);
     try {
       await admin.query(`SET search_path TO "${guarded}", public`);
-      for (const directory of directories.slice(0, -1))
+      const removalIndex = directories.findIndex((directory) =>
+        directory.endsWith('_retirar_integracion_bloques'),
+      );
+      expect(removalIndex).toBeGreaterThan(0);
+      for (const directory of directories.slice(0, removalIndex))
         await admin.query(
           readFileSync(join(migrations, directory, 'migration.sql'), 'utf8'),
         );
@@ -420,7 +634,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       await expect(
         admin.query(
           readFileSync(
-            join(migrations, directories.at(-1)!, 'migration.sql'),
+            join(migrations, directories[removalIndex], 'migration.sql'),
             'utf8',
           ),
         ),

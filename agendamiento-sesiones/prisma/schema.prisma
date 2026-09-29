@@ -10,20 +10,41 @@ datasource db {
 
 // Referencias externas: sin relaciones hacia tablas de otros microservicios.
 model sesion {
-  id_sesion           BigInt                    @id @default(autoincrement())
-  id_tutee            BigInt
-  id_tutor            BigInt
-  id_materia          BigInt
-  id_bloque           BigInt
-  estado_sesion       sesion_estado_sesion_enum @default(PENDIENTE)
-  inicio              DateTime                  @db.Timestamptz(3)
-  fin                 DateTime                  @db.Timestamptz(3)
-  fecha_creacion      DateTime                  @default(now()) @db.Timestamp(6)
-  fecha_actualizacion DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
+  id_sesion             BigInt                    @id @default(autoincrement())
+  id_tutee              BigInt
+  id_tutor              BigInt
+  id_materia            BigInt
+  id_bloque             BigInt
+  estado_sesion         sesion_estado_sesion_enum @default(PENDIENTE)
+  inicio                DateTime                  @db.Timestamptz(3)
+  fin                   DateTime                  @db.Timestamptz(3)
+  fecha_creacion        DateTime                  @default(now()) @db.Timestamp(6)
+  fecha_actualizacion   DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
+  resultado_provisional Boolean                   @default(false)
+  declaraciones         declaracion_cierre[]
 
   @@index([id_tutee, estado_sesion])
   @@index([id_tutor, inicio, fin])
   @@index([estado_sesion, fecha_creacion])
+}
+
+model declaracion_cierre {
+  id_declaracion         BigInt                @id @default(autoincrement())
+  id_sesion              BigInt
+  id_usuario             BigInt
+  resultado_declarado    resultado_cierre_enum
+  id_usuario_inasistente BigInt?
+  fecha_declaracion      DateTime              @default(now()) @db.Timestamptz(3)
+  sesion                 sesion                @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@unique([id_sesion, id_usuario])
+  @@index([id_sesion, fecha_declaracion])
+}
+
+enum resultado_cierre_enum {
+  COMPLETADA
+  NO_REALIZADA
+  INASISTENCIA
 }
 
 enum sesion_estado_sesion_enum {

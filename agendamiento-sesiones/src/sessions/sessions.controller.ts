@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { DeclararCierreDto } from './dto/declarar-cierre.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/autenticacion-request';
 
@@ -44,5 +45,19 @@ export class SessionsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.sessionsService.cancelSession(idSesion, request.user.idUsuario);
+  }
+
+  @Post(':id/closure-declarations')
+  @UseGuards(JwtAuthGuard)
+  declararCierre(
+    @Param('id') idSesion: string,
+    @Body() declaracion: DeclararCierreDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.sessionsService.declararCierre(
+      idSesion,
+      request.user.idUsuario,
+      declaracion,
+    );
   }
 }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -14,10 +15,13 @@ import {
   type sesion_estado_sesion_enum,
 } from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { DeclararCierreDto } from './dto/declarar-cierre.dto';
 import {
   OCCUPYING_STATES,
   parseIdentifier,
+  toDeclarationResponse,
   toSessionResponse,
+  ValidateTransition,
   validateParticipant,
   validateState,
   validateTutor,
@@ -84,6 +88,71 @@ export class SessionsService {
     return toSessionResponse(updated);
   }
 
+  async declararCierre(
+    idSesion: string,
+    idUsuario: string,
+    dto: DeclararCierreDto,
+  ) {
+    const id = parseIdentifier(idSesion, 'id_sesion');
+    const userId = parseIdentifier(idUsuario, 'id_usuario');
+    const absentId = this.validateAbsence(dto);
+
+    const result = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
+      validateParticipant(session, userId);
+      validateState(session, 'PENDIENTE_CIERRE');
+      if (
+        absentId !== null &&
+        absentId !== session.id_tutor &&
+        absentId !== session.id_tutee
+      ) {
+        throw new BadRequestException(
+          'El usuario inasistente debe participar en la sesión.',
+        );
+      }
+
+      const inserted = await tx.declaracion_cierre.createMany({
+        data: [
+          {
+            id_sesion: id,
+            id_usuario: userId,
+            resultado_declarado: dto.resultado_declarado,
+            id_usuario_inasistente: absentId,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (inserted.count !== 1) {
+        throw new ConflictException(
+          'Ya registraste una declaración para esta sesión.',
+        );
+      }
+
+      const declarations = await tx.declaracion_cierre.findMany({
+        where: { id_sesion: id },
+        orderBy: { fecha_declaracion: 'asc' },
+      });
+      const own = declarations.find(
+        (declaration) => declaration.id_usuario === userId,
+      )!;
+      if (declarations.length === 1) return { session, declaration: own };
+
+      const sameResult =
+        declarations[0].resultado_declarado ===
+          declarations[1].resultado_declarado &&
+        declarations[0].id_usuario_inasistente ===
+          declarations[1].id_usuario_inasistente;
+      const next = sameResult ? dto.resultado_declarado : 'EN_CONFLICTO';
+      const updated = await this.transitionSession(tx, session, next);
+      return { session: updated, declaration: own };
+    });
+
+    return {
+      sesion: toSessionResponse(result.session),
+      declaracion: toDeclarationResponse(result.declaration),
+    };
+  }
+
   @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
   async handleExpiredSessions() {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -93,6 +162,7 @@ export class SessionsService {
     for (const session of pending) {
       try {
         await runSerializable(this.prisma, async (tx) => {
+          ValidateTransition(session.estado_sesion, 'EXPIRADA');
           const result = await tx.sesion.updateMany({
             where: {
               id_sesion: session.id_sesion,
@@ -106,6 +176,58 @@ export class SessionsService {
       } catch {
         this.logger.error(
           `No se pudo completar la expiración de ${session.id_sesion}; se reintentará.`,
+        );
+      }
+    }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE, { waitForCompletion: true })
+  async handleFinishedSessions(): Promise<void> {
+    ValidateTransition('CONFIRMADA', 'PENDIENTE_CIERRE');
+    await this.prisma.sesion.updateMany({
+      where: {
+        estado_sesion: 'CONFIRMADA',
+        fin: { lte: new Date() },
+      },
+      data: { estado_sesion: 'PENDIENTE_CIERRE' },
+    });
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE, { waitForCompletion: true })
+  async resolverDeclaracionesVencidas(): Promise<void> {
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const pending = await this.prisma.sesion.findMany({
+      where: {
+        estado_sesion: 'PENDIENTE_CIERRE',
+        declaraciones: { some: { fecha_declaracion: { lte: cutoff } } },
+      },
+      select: { id_sesion: true },
+    });
+    for (const candidate of pending) {
+      try {
+        await runSerializable(this.prisma, async (tx) => {
+          const session = await tx.sesion.findUnique({
+            where: { id_sesion: candidate.id_sesion },
+            include: { declaraciones: true },
+          });
+          if (
+            !session ||
+            session.estado_sesion !== 'PENDIENTE_CIERRE' ||
+            session.declaraciones.length !== 1 ||
+            session.declaraciones[0].fecha_declaracion > cutoff
+          )
+            return;
+
+          await this.transitionSession(
+            tx,
+            session,
+            session.declaraciones[0].resultado_declarado,
+            true,
+          );
+        });
+      } catch {
+        this.logger.error(
+          `No se pudo resolver provisionalmente la sesión ${candidate.id_sesion}.`,
         );
       }
     }
@@ -145,17 +267,42 @@ export class SessionsService {
       );
   }
 
+  private validateAbsence(dto: DeclararCierreDto): bigint | null {
+    if (dto.resultado_declarado === 'INASISTENCIA') {
+      if (
+        dto.id_usuario_inasistente === undefined ||
+        dto.id_usuario_inasistente === null
+      ) {
+        throw new BadRequestException(
+          'Debes indicar qué participante no asistió.',
+        );
+      }
+      return parseIdentifier(
+        dto.id_usuario_inasistente,
+        'id_usuario_inasistente',
+      );
+    }
+    if (dto.id_usuario_inasistente !== undefined) {
+      throw new BadRequestException(
+        'Solo la inasistencia admite id_usuario_inasistente.',
+      );
+    }
+    return null;
+  }
+
   private async transitionSession(
     tx: Prisma.TransactionClient,
     session: sesion,
     next: sesion_estado_sesion_enum,
+    provisional = false,
   ) {
+    ValidateTransition(session.estado_sesion, next);
     const result = await tx.sesion.updateMany({
       where: {
         id_sesion: session.id_sesion,
         estado_sesion: session.estado_sesion,
       },
-      data: { estado_sesion: next },
+      data: { estado_sesion: next, resultado_provisional: provisional },
     });
     if (result.count !== 1)
       throw new ConflictException(
