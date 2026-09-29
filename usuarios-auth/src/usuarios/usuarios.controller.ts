@@ -1,24 +1,34 @@
 // Agustin Addon
 
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdatePerfilDto } from './dto/update-perfil.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('usuarios')
-@UseGuards(JwtAuthGuard)
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
-  // Esta ruta escucha peticiones POST en http://localhost:3000/usuarios
+  // Ruta PÚBLICA: No exige token para permitir el registro
   @Post()
   create(@Body() createUsuarioDto: CreateUsuarioDto) {
     return this.usuariosService.create(createUsuarioDto);
   }
 
-  // Esta ruta escucha peticiones GET en http://localhost:3000/usuarios
+  // Ruta PROTEGIDA: Solo usuarios logueados pueden ver la lista
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
     return this.usuariosService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/perfil')
+  actualizarPerfil(
+    @Param('id') id: string, 
+    @Body() updatePerfilDto: UpdatePerfilDto
+  ) {
+    return this.usuariosService.actualizarPerfil(id, updatePerfilDto);
   }
 }
