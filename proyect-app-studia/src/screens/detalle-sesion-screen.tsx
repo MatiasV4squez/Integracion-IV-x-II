@@ -1,244 +1,607 @@
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
+import { AttendanceCard } from '@/components/attendance-card';
+import { Avatar } from '@/components/avatar';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { FilterChip } from '@/components/filter-chip';
+import { MATERIAL_KINDS, MaterialItem } from '@/components/material-item';
 import { NoticeBanner } from '@/components/notice-banner';
 import { RatingStars } from '@/components/rating-stars';
 import { ScreenContainer } from '@/components/screen-container';
-import { StatusBadge } from '@/components/status-badge';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { SessionTimerCard } from '@/components/session-timer-card';
+import { TextField } from '@/components/text-field';
+import { TicketCard } from '@/components/ticket-card';
+import { TicketHeader } from '@/components/ticket-header';
+import { Txt } from '@/components/txt';
 import { STATUS_META } from '@/constants/session-status';
-import { ACCENT } from '@/constants/tones';
-import { useTheme } from '@/hooks/use-theme';
-import type { Session, SessionStatus } from '@/types/session';
-import { formatDate, formatDateTime, formatTimeRange } from '@/utils/format';
+import { useUI } from '@/hooks/use-ui';
+import { ME } from '@/mocks/sessions';
+import { getTutorById } from '@/mocks/tutors';
+import { useSessions } from '@/state/sessions-context';
+import type { ClosureResult, MaterialKind, Session } from '@/types/session';
+import { formatDateTime, formatDayLong, formatTime, plural } from '@/utils/format';
 import {
+  addMaterial,
+  adminResolve,
+  cancelSession,
+  checkIn,
+  closureTimeout,
   CLOSURE_TIMEOUT_HOURS,
+  counterpartCheckIn,
+  counterpartDeclares,
+  declareResult,
+  endSession,
+  expireRequest,
   getAvailableActions,
+  getCheckInPhase,
+  rateSession,
+  reportSession,
   requestExpiresAt,
-  type SessionAction,
+  respondToRequest,
+  startSessionNow,
+  type FlowResult,
 } from '@/utils/session-machine';
 
-type Props = {
-  session: Session;
-  /** Fecha ISO "actual". Por defecto, la del dispositivo. */
-  now?: string;
-};
+type Props = { sessionId?: string };
 
-type Notice = { tone: 'info' | 'warning' | 'danger' | 'alert' | 'neutral'; message: string };
-
-function getNotice(session: Session): Notice | null {
-  const isTutor = session.myRole === 'tutor';
-  switch (session.status) {
-    case 'pendiente': {
-      const deadline = formatDateTime(requestExpiresAt(session.createdAt));
-      return {
-        tone: 'warning',
-        message: isTutor
-          ? `Tienes hasta el ${deadline} para responder esta solicitud.`
-          : `Esperando respuesta del tutor. Si no responde antes del ${deadline}, la solicitud expira.`,
-      };
-    }
-    case 'confirmada':
-      return { tone: 'info', message: 'Horario reservado. Puedes cancelar hasta la hora de inicio.' };
-    case 'pendiente_cierre':
-      return {
-        tone: 'alert',
-        message: `La sesión ya terminó: ambas partes deben declarar el resultado. Si la otra parte no responde en ${CLOSURE_TIMEOUT_HOURS} horas, se acepta la primera declaración.`,
-      };
-    case 'en_conflicto':
-      return {
-        tone: 'danger',
-        message: 'Las declaraciones no coinciden. La sesión queda bloqueada hasta la revisión de un administrador.',
-      };
-    case 'rechazada':
-    case 'expirada':
-      return { tone: 'neutral', message: 'Esta solicitud no se concretó, por lo que no hubo sesión.' };
-    default:
-      return null;
-  }
-}
-
-const RESULT_BUTTONS: { label: string; status: SessionStatus }[] = [
-  { label: 'La sesión se realizó', status: 'completada' },
-  { label: 'La sesión no se realizó', status: 'no_realizada' },
-  { label: 'Hubo inasistencia', status: 'inasistencia' },
+const RESULTS: { key: ClosureResult; label: string }[] = [
+  { key: 'completada', label: 'La sesión se realizó' },
+  { key: 'no_realizada', label: 'La sesión no se realizó' },
+  { key: 'inasistencia', label: 'Hubo inasistencia' },
 ];
 
-/** CU-09 / CU-10 / CU-11: detalle de sesión con acciones según estado y rol. Maqueta sin backend. */
-export default function DetalleSesionScreen({ session, now = new Date().toISOString() }: Props) {
-  const theme = useTheme();
-  const [pickedRating, setPickedRating] = useState(0);
-  const [simulated, setSimulated] = useState<string | null>(null);
+const REPORT_REASONS = ['Falta de respeto', 'Impuntualidad o inasistencia', 'Contenido inapropiado', 'Otro'];
 
+/** CU-09 / CU-10 / CU-11: detalle de sesión con contenido, materiales, acciones por estado y panel de demo. */
+export default function DetalleSesionScreen({ sessionId }: Props) {
+  const router = useRouter();
+  const ui = useUI();
+  const { sessions, now, run, lastViewedId, setLastViewed } = useSessions();
+
+  const session =
+    sessions.find((s) => s.id === sessionId) ?? sessions.find((s) => s.id === lastViewedId) ?? sessions.find((s) => s.status === 'confirmada') ?? sessions[0];
+
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [showMaterialForm, setShowMaterialForm] = useState(false);
+  const [materialKind, setMaterialKind] = useState<MaterialKind>('guia');
+  const [materialTitle, setMaterialTitle] = useState('');
+  const [showReport, setShowReport] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
+  const [showDemo, setShowDemo] = useState(false);
+
+  useEffect(() => {
+    if (session) setLastViewed(session.id);
+  }, [session, setLastViewed]);
+
+  // Al cambiar de sesión se limpian los formularios.
+  useEffect(() => {
+    setFeedback(null);
+    setRating(0);
+    setComment('');
+    setShowMaterialForm(false);
+    setShowReport(false);
+    setReason(null);
+    setDescription('');
+  }, [session?.id]);
+
+  if (!session) {
+    return (
+      <ScreenContainer>
+        <EmptyState icon="📄" title="No hay sesiones para mostrar" message="Solicita una tutoría y aparecerá aquí." />
+        <AppButton label="Solicitar tutoría" onPress={() => router.navigate('/solicitud')} />
+      </ScreenContainer>
+    );
+  }
+
+  const id = session.id;
+  const iAmTutee = session.myRole === 'tutee';
+  const counterpart = iAmTutee ? session.tutor : session.tutee;
+  const tutorProfile = getTutorById(session.tutor.id);
   const actions = getAvailableActions({
     status: session.status,
     role: session.myRole,
     startsAt: session.startsAt,
     now,
     alreadyRated: session.myRating !== undefined,
+    alreadyDeclared: !!session.declaration?.mine,
+    alreadyReported: !!session.report,
   });
-  const has = (a: SessionAction) => actions.includes(a);
-  const notice = getNotice(session);
-  const simulate = (text: string) => setSimulated(text);
+  const has = (a: (typeof actions)[number]) => actions.includes(a);
 
-  const iAmTutee = session.myRole === 'tutee';
-  const tutorReputation =
-    session.tutor.reputation !== null
-      ? `★ ${session.tutor.reputation.toFixed(1)} (${session.tutor.ratingsCount})`
-      : 'Sin calificaciones';
+  const act = (op: Parameters<typeof run>[0], okText: string) => {
+    const res: FlowResult = run(op);
+    setFeedback({ ok: res.ok, text: res.ok ? okText : res.error });
+    return res.ok;
+  };
+
+  const submitRating = () => {
+    if (act((s) => rateSession(s, id, rating, comment), '¡Gracias! Tu calificación quedó registrada y no se puede editar.')) {
+      setRating(0);
+      setComment('');
+    }
+  };
+
+  const submitReport = () => {
+    if (act((s) => reportSession(s, id, reason ?? '', description), 'Reporte enviado. Quedó Pendiente de revisión por un administrador.')) {
+      setShowReport(false);
+      setReason(null);
+      setDescription('');
+    }
+  };
+
+  const submitMaterial = () => {
+    const kindLabel = MATERIAL_KINDS.find((k) => k.key === materialKind)?.label ?? 'Material';
+    const ok = act(
+      (s) =>
+        addMaterial(s, id, {
+          id: `${id}-m${session.materials.length + 1}`,
+          title: materialTitle || `${kindLabel} ${session.materials.length + 1}`,
+          kind: materialKind,
+          meta: 'PDF · demo',
+          uploadedBy: ME.name,
+        }),
+      'Material subido a la sesión.',
+    );
+    if (ok) {
+      setMaterialTitle('');
+      setShowMaterialForm(false);
+    }
+  };
+
+  const canUpload = ['confirmada', 'pendiente_cierre', 'completada'].includes(session.status);
+  const openTutorProfile = () => router.push({ pathname: '/tutor/[id]', params: { id: session.tutor.id, subject: session.subject.code } });
+
+  const { mine, theirs } = session.declaration ?? {};
+  const notice = getNotice(session, mine, theirs);
+  const phase = getCheckInPhase(session.startsAt, session.endsAt, now);
+  const showQr = ['confirmada', 'pendiente_cierre', 'completada'].includes(session.status);
+  const showTimer = session.status === 'pendiente' || session.status === 'confirmada';
+  const goBack = () => (router.canGoBack() ? router.back() : router.navigate('/historial'));
 
   return (
-    <ScreenContainer>
-      {/* Encabezado */}
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <StatusBadge status={session.status} />
-        <ThemedText type="subtitle" style={styles.title}>
-          {session.subject.name}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {session.subject.code} · Participas como {iAmTutee ? 'Tutee' : 'Tutor'}
-        </ThemedText>
-      </ThemedView>
+    <View style={[styles.flex, { backgroundColor: ui.bg }]}>
+      <TicketHeader title="Detalle de sesión" subtitle={`Tutoría · ${session.subject.code}`} status={session.status} onBack={goBack} />
+      <ScreenContainer>
+        {/* Ticket: materia, rol, lugar y horario */}
+        <TicketCard
+          overline={`UCT Tutorías · ${session.subject.code}`}
+          title={session.subject.name}
+          subtitle={formatDayLong(session.startsAt)}
+          chipLabel="Tu rol"
+          chipValue={iAmTutee ? 'Tutee' : 'Tutor'}
+          columns={[
+            { label: 'Lugar', value: session.place ?? 'Por definir', flex: 1.9 },
+            { label: 'Inicio', value: formatTime(session.startsAt) },
+            { label: 'Término', value: formatTime(session.endsAt) },
+          ]}
+        />
 
-      {notice ? <NoticeBanner tone={notice.tone} message={notice.message} /> : null}
+        {notice ? <NoticeBanner tone={notice.tone} message={notice.message} /> : null}
+        {session.report ? (
+          <NoticeBanner tone="warning" title="Reporte enviado" message={`Motivo: ${session.report.reason}. Pendiente de revisión por un administrador.`} />
+        ) : null}
+        {feedback ? <NoticeBanner tone={feedback.ok ? 'success' : 'danger'} message={feedback.text} /> : null}
 
-      {/* Datos de la sesión */}
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="smallBold">Detalles</ThemedText>
-        <InfoRow label="Fecha" value={formatDate(session.startsAt)} />
-        <InfoRow label="Horario" value={formatTimeRange(session.startsAt, session.endsAt)} />
-        <InfoRow label="Tutor" value={`${session.tutor.name}  ${tutorReputation}`} />
-        <InfoRow label="Tutee" value={session.tutee.name} />
-      </ThemedView>
+        {showTimer ? <SessionTimerCard session={session} now={now} /> : null}
+        {showQr ? (
+          <AttendanceCard
+            session={session}
+            phase={phase}
+            onCheckIn={() => act((st) => checkIn(st, id), '¡Asistencia registrada! Quedó respaldada con el QR de la sesión.')}
+          />
+        ) : null}
 
-      {/* Calificación (solo tiene sentido en sesiones completadas: BR04, BR17) */}
-      {session.status === 'completada' ? (
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedText type="smallBold">Calificaciones</ThemedText>
-          <View style={styles.ratingRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Recibida
-            </ThemedText>
-            {session.receivedRating ? (
-              <RatingStars value={session.receivedRating} size={18} />
-            ) : (
-              <ThemedText type="small">Pendiente</ThemedText>
-            )}
-          </View>
-          <View style={styles.ratingRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Tu calificación
-            </ThemedText>
-            {session.myRating ? (
-              <RatingStars value={session.myRating} size={18} />
-            ) : (
-              <ThemedText type="small">Sin calificar</ThemedText>
-            )}
-          </View>
-
-          {has('calificar') ? (
-            <View style={styles.rateBox}>
-              <ThemedText type="small">Califica esta sesión (1 a 5)</ThemedText>
-              <RatingStars value={pickedRating} onChange={setPickedRating} size={32} />
+        {/* Acciones */}
+        {actions.some((a) => a !== 'reportar') || has('reportar') ? (
+          <Card>
+            <Txt variant="h3">Acciones</Txt>
+            {has('aceptar') ? (
               <AppButton
-                label="Enviar calificación"
-                disabled={pickedRating === 0}
-                onPress={() => simulate(`Calificación enviada: ${pickedRating} de 5`)}
+                label="Aceptar solicitud"
+                onPress={() => act((s) => respondToRequest(s, id, true), 'Solicitud aceptada: la sesión quedó Confirmada.')}
               />
+            ) : null}
+            {has('rechazar') ? (
+              <AppButton label="Rechazar solicitud" variant="secondary" onPress={() => act((s) => respondToRequest(s, id, false), 'Solicitud rechazada.')} />
+            ) : null}
+            {has('cancelar') ? (
+              <AppButton
+                label="Cancelar sesión"
+                variant="danger"
+                onPress={() => act((s) => cancelSession(s, id), 'Sesión cancelada. El cupo quedó liberado.')}
+              />
+            ) : null}
+            {has('declarar_resultado') ? (
+              <>
+                <Txt variant="small" color="muted">
+                  ¿Cómo resultó la sesión?
+                </Txt>
+                {RESULTS.map((r) => (
+                  <AppButton
+                    key={r.key}
+                    label={r.label}
+                    variant="secondary"
+                    onPress={() => act((s) => declareResult(s, id, r.key), `Declaraste: ${STATUS_META[r.key].label}.`)}
+                  />
+                ))}
+              </>
+            ) : null}
+            {has('reportar') ? (
+              <>
+                <AppButton label={showReport ? 'Cancelar reporte' : 'Reportar usuario'} variant="danger" onPress={() => setShowReport((v) => !v)} />
+                {showReport ? (
+                  <View style={[styles.form, { backgroundColor: ui.surfaceAlt }]}>
+                    <Txt variant="label">Motivo</Txt>
+                    <View style={styles.wrapRow}>
+                      {REPORT_REASONS.map((r) => (
+                        <FilterChip key={r} label={r} selected={reason === r} onPress={() => setReason(r)} />
+                      ))}
+                    </View>
+                    <TextField placeholder="Describe lo ocurrido" value={description} onChangeText={setDescription} multiline />
+                    <AppButton label="Enviar reporte" variant="danger" disabled={!reason || !description.trim()} onPress={submitReport} />
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+          </Card>
+        ) : null}
+
+        {/* Participantes */}
+        <Card>
+          <Txt variant="h3">Participantes</Txt>
+          <Person
+            name={session.tutor.name}
+            role="Tutor"
+            extra={
+              session.tutor.reputation !== null
+                ? `★ ${session.tutor.reputation.toFixed(1)} · ${plural(session.tutor.ratingsCount, 'reseña', 'reseñas')}`
+                : 'Sin reseñas aún'
+            }
+            action={tutorProfile && iAmTutee ? <AppButton label="Ver perfil" size="sm" variant="secondary" onPress={openTutorProfile} /> : undefined}
+          />
+          <Person name={session.tutee.name} role="Tutee" />
+          <Info label="Solicitada" value={formatDateTime(session.createdAt)} />
+          {session.topic ? <Info label="Unidad" value={session.topic} /> : null}
+        </Card>
+
+        {/* Contenido */}
+        <Card>
+          <Txt variant="h3">Contenido de la tutoría</Txt>
+          {session.requestNote ? (
+            <View style={styles.gap2}>
+              <Txt variant="caption" color="muted">
+                {iAmTutee ? 'LO QUE PEDISTE REFORZAR' : 'LO QUE PIDIÓ REFORZAR'}
+              </Txt>
+              <Txt variant="body">“{session.requestNote}”</Txt>
             </View>
           ) : null}
-        </ThemedView>
-      ) : null}
-
-      {/* Historial de estados */}
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="smallBold">Historial de estados</ThemedText>
-        {session.events.map((event, index) => {
-          const last = index === session.events.length - 1;
-          return (
-            <View key={`${event.status}-${event.at}`} style={styles.timelineRow}>
-              <View style={styles.timelineRail}>
-                <View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: last ? ACCENT : theme.backgroundSelected },
-                  ]}
-                />
-                {!last ? <View style={[styles.line, { backgroundColor: theme.backgroundSelected }]} /> : null}
-              </View>
-              <View style={styles.timelineText}>
-                <ThemedText type="smallBold">{STATUS_META[event.status].label}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {formatDateTime(event.at)}
-                </ThemedText>
-              </View>
+          {session.notes ? (
+            <View style={styles.gap2}>
+              <Txt variant="caption" color="muted">
+                RESUMEN DE LA SESIÓN
+              </Txt>
+              <Txt variant="body">{session.notes}</Txt>
             </View>
-          );
-        })}
-      </ThemedView>
+          ) : null}
+          {!session.requestNote && !session.notes ? (
+            <Txt variant="small" color="muted">
+              Aún no hay resumen. Se agregará cuando se realice la tutoría.
+            </Txt>
+          ) : null}
 
-      {/* Acciones */}
-      {actions.length > 0 ? (
-        <View style={styles.actions}>
-          {has('aceptar') ? (
-            <AppButton label="Aceptar solicitud" onPress={() => simulate('Solicitud aceptada → Confirmada')} />
+          <View style={[styles.divider, { backgroundColor: ui.border }]} />
+          <View style={styles.between}>
+            <Txt variant="label">Guías y ejercicios ({session.materials.length})</Txt>
+            {canUpload ? (
+              <AppButton label={showMaterialForm ? 'Cancelar' : '+ Subir'} size="sm" variant="secondary" onPress={() => setShowMaterialForm((v) => !v)} />
+            ) : null}
+          </View>
+
+          {showMaterialForm ? (
+            <View style={[styles.form, { backgroundColor: ui.surfaceAlt }]}>
+              <View style={styles.wrapRow}>
+                {MATERIAL_KINDS.map((k) => (
+                  <FilterChip key={k.key} label={`${k.icon} ${k.label}`} selected={materialKind === k.key} onPress={() => setMaterialKind(k.key)} />
+                ))}
+              </View>
+              <TextField placeholder="Título (ej: Guía 4: Derivadas)" value={materialTitle} onChangeText={setMaterialTitle} />
+              <AppButton label="Adjuntar (simulado)" onPress={submitMaterial} />
+            </View>
           ) : null}
-          {has('rechazar') ? (
-            <AppButton label="Rechazar solicitud" variant="secondary" onPress={() => simulate('Solicitud rechazada')} />
-          ) : null}
-          {has('cancelar') ? (
-            <AppButton label="Cancelar sesión" variant="danger" onPress={() => simulate('Sesión cancelada')} />
-          ) : null}
-          {has('declarar_resultado')
-            ? RESULT_BUTTONS.map((r) => (
+
+          {session.materials.length > 0 ? (
+            session.materials.map((m) => (
+              <MaterialItem key={m.id} material={m} onPress={() => setFeedback({ ok: true, text: `Abriendo “${m.title}” (demo, sin archivo real).` })} />
+            ))
+          ) : (
+            <Txt variant="small" color="muted">
+              {canUpload ? 'Todavía no se han subido guías ni ejercicios.' : 'Se podrá subir material cuando la sesión esté confirmada.'}
+            </Txt>
+          )}
+        </Card>
+
+        {/* Calificación */}
+        {session.status === 'completada' ? (
+          <Card>
+            <Txt variant="h3">Calificaciones</Txt>
+            <View style={styles.between}>
+              <Txt variant="small" color="muted">
+                Recibida
+              </Txt>
+              {session.receivedRating ? <RatingStars value={session.receivedRating} size={18} /> : <Txt variant="small">Pendiente</Txt>}
+            </View>
+            <View style={styles.between}>
+              <Txt variant="small" color="muted">
+                Tu calificación
+              </Txt>
+              {session.myRating ? <RatingStars value={session.myRating} size={18} /> : <Txt variant="small">Sin calificar</Txt>}
+            </View>
+            {session.myComment ? (
+              <Txt variant="small" color="muted">
+                “{session.myComment}”
+              </Txt>
+            ) : null}
+
+            {has('calificar') ? (
+              <View style={[styles.form, { backgroundColor: ui.surfaceAlt }]}>
+                <Txt variant="label">Califica esta sesión (1 a 5)</Txt>
+                <RatingStars value={rating} onChange={setRating} size={34} />
+                <TextField placeholder="Comentario (opcional)" value={comment} onChangeText={setComment} multiline />
+                <AppButton label="Enviar calificación" disabled={rating === 0} onPress={submitRating} />
+              </View>
+            ) : null}
+          </Card>
+        ) : null}
+
+        {/* Historial de estados */}
+        <Card>
+          <Txt variant="h3">Historial de estados</Txt>
+          {session.events.map((event, index) => {
+            const last = index === session.events.length - 1;
+            return (
+              <View key={`${event.status}-${event.at}`} style={styles.timelineRow}>
+                <View style={styles.rail}>
+                  <View style={[styles.dot, { backgroundColor: last ? ui.primary : ui.border }]} />
+                  {!last ? <View style={[styles.line, { backgroundColor: ui.border }]} /> : null}
+                </View>
+                <View style={styles.timelineText}>
+                  <Txt variant="label">{STATUS_META[event.status].label}</Txt>
+                  <Txt variant="caption" color="muted">
+                    {formatDateTime(event.at)}
+                  </Txt>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+
+        {/* Siguiente paso */}
+        {iAmTutee ? (
+          <Card>
+            <Txt variant="h3">¿Qué sigue?</Txt>
+            {tutorProfile ? (
+              <AppButton
+                label={`Solicitar otra tutoría con ${session.tutor.name.split(' ')[0]}`}
+                onPress={() => router.navigate({ pathname: '/solicitud', params: { tutor: session.tutor.id, subject: session.subject.code } })}
+              />
+            ) : null}
+            <AppButton
+              label={`Buscar otro tutor de ${session.subject.name}`}
+              variant="secondary"
+              onPress={() => router.navigate({ pathname: '/solicitud', params: { subject: session.subject.code } })}
+            />
+            <AppButton label="Volver al historial" variant="ghost" onPress={() => router.navigate('/historial')} />
+          </Card>
+        ) : (
+          <AppButton label="Volver al historial" variant="secondary" onPress={() => router.navigate('/historial')} />
+        )}
+
+        {/* Panel de demostración: simula lo que haría el backend / la contraparte */}
+        <Card>
+          <View style={styles.between}>
+            <View style={styles.flex}>
+              <Txt variant="h3">🧪 Panel de demostración</Txt>
+              <Txt variant="caption" color="muted">
+                Simula eventos del backend para probar el flujo completo. Se quita al conectar la API.
+              </Txt>
+            </View>
+            <AppButton label={showDemo ? 'Ocultar' : 'Mostrar'} size="sm" variant="secondary" onPress={() => setShowDemo((v) => !v)} />
+          </View>
+          {showDemo ? (
+            <View style={styles.gap8}>
+              {session.status === 'pendiente' ? (
+                <>
+                  {iAmTutee ? (
+                    <>
+                      <AppButton
+                        label="El tutor acepta la solicitud"
+                        variant="secondary"
+                        onPress={() => act((s) => respondToRequest(s, id, true), 'Simulado: el tutor aceptó.')}
+                      />
+                      <AppButton
+                        label="El tutor rechaza la solicitud"
+                        variant="secondary"
+                        onPress={() => act((s) => respondToRequest(s, id, false), 'Simulado: el tutor rechazó.')}
+                      />
+                    </>
+                  ) : null}
+                  <AppButton
+                    label={`Pasan ${24} h sin respuesta (expira)`}
+                    variant="secondary"
+                    onPress={() => act((s) => expireRequest(s, id), 'Simulado: la solicitud expiró y el cupo se liberó.')}
+                  />
+                </>
+              ) : null}
+              {session.status === 'confirmada' ? (
+                <>
+                  <AppButton
+                    label="Inicia el horario de la sesión (habilita el check-in)"
+                    variant="secondary"
+                    onPress={() => act((s) => startSessionNow(s, id), 'Simulado: la sesión comenzó. Ya puedes registrar tu asistencia.')}
+                  />
+                  <AppButton
+                    label="La contraparte escanea el QR"
+                    variant="secondary"
+                    onPress={() => act((s) => counterpartCheckIn(s, id), 'Simulado: la contraparte registró su asistencia.')}
+                  />
+                  <AppButton
+                    label="Termina el horario de la sesión"
+                    variant="secondary"
+                    onPress={() => act((s) => endSession(s, id), 'Simulado: la sesión pasó a Pendiente de cierre.')}
+                  />
+                </>
+              ) : null}
+              {session.status === 'pendiente_cierre' ? (
+                <>
+                  {!theirs ? (
+                    mine ? (
+                      <>
+                        <AppButton
+                          label="La contraparte declara lo mismo"
+                          variant="secondary"
+                          onPress={() => act((s) => counterpartDeclares(s, id, mine), 'Simulado: coinciden las declaraciones.')}
+                        />
+                        <AppButton
+                          label="La contraparte declara algo distinto"
+                          variant="secondary"
+                          onPress={() =>
+                            act(
+                              (s) => counterpartDeclares(s, id, mine === 'completada' ? 'inasistencia' : 'completada'),
+                              'Simulado: declaraciones contradictorias.',
+                            )
+                          }
+                        />
+                      </>
+                    ) : (
+                      <AppButton
+                        label="La contraparte declara “Completada”"
+                        variant="secondary"
+                        onPress={() => act((s) => counterpartDeclares(s, id, 'completada'), 'Simulado: la contraparte declaró Completada.')}
+                      />
+                    )
+                  ) : null}
+                  {mine || theirs ? (
+                    <AppButton
+                      label={`Pasan ${CLOSURE_TIMEOUT_HOURS} h sin respuesta`}
+                      variant="secondary"
+                      onPress={() => act((s) => closureTimeout(s, id), 'Simulado: se aceptó provisionalmente la primera declaración.')}
+                    />
+                  ) : null}
+                </>
+              ) : null}
+              {session.status === 'en_conflicto' ? (
                 <AppButton
-                  key={r.status}
-                  label={r.label}
+                  label="El administrador resuelve: Completada"
                   variant="secondary"
-                  onPress={() => simulate(`Resultado declarado: ${STATUS_META[r.status].label}`)}
+                  onPress={() => act((s) => adminResolve(s, id, 'completada'), 'Simulado: el administrador resolvió el conflicto.')}
                 />
-              ))
-            : null}
-          {has('reportar') ? (
-            <AppButton label="Reportar usuario" variant="danger" onPress={() => simulate('Reporte enviado')} />
+              ) : null}
+              {['completada', 'cancelada', 'rechazada', 'expirada', 'no_realizada', 'inasistencia'].includes(session.status) ? (
+                <Txt variant="small" color="muted">
+                  Este es un estado final: no admite más transiciones (BR02).
+                </Txt>
+              ) : null}
+            </View>
           ) : null}
-        </View>
-      ) : null}
-
-      {simulated ? (
-        <NoticeBanner tone="success" title="Simulación (sin backend)" message={simulated} />
-      ) : null}
-    </ScreenContainer>
+        </Card>
+      </ScreenContainer>
+    </View>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function getNotice(session: Session, mine?: ClosureResult, theirs?: ClosureResult) {
+  const isTutor = session.myRole === 'tutor';
+  switch (session.status) {
+    case 'pendiente': {
+      const deadline = formatDateTime(requestExpiresAt(session.createdAt));
+      return {
+        tone: 'warning' as const,
+        message: isTutor
+          ? `Tienes hasta el ${deadline} para responder esta solicitud.`
+          : `Esperando respuesta del tutor. Si no responde antes del ${deadline}, la solicitud expira.`,
+      };
+    }
+    case 'confirmada':
+      return { tone: 'info' as const, message: 'Horario reservado. Puedes cancelar hasta la hora de inicio.' };
+    case 'pendiente_cierre':
+      if (mine) {
+        return {
+          tone: 'alert' as const,
+          message: `Declaraste “${STATUS_META[mine].label}”. Esperando a la contraparte: si no responde en ${CLOSURE_TIMEOUT_HOURS} h, se acepta tu declaración.`,
+        };
+      }
+      if (theirs) {
+        return { tone: 'alert' as const, message: `La contraparte declaró “${STATUS_META[theirs].label}”. Declara tu resultado para cerrar la sesión.` };
+      }
+      return {
+        tone: 'alert' as const,
+        message:
+          `La sesión ya terminó: ambas partes deben declarar el resultado. Si la otra parte no responde en ${CLOSURE_TIMEOUT_HOURS} h, se acepta la primera declaración.` +
+          (session.attendance?.mine && session.attendance?.theirs
+            ? ' Ambos registraron asistencia con el QR: lo esperable es declarar “La sesión se realizó”.'
+            : ''),
+      };
+    case 'en_conflicto':
+      return { tone: 'danger' as const, message: 'Las declaraciones no coinciden. La sesión queda bloqueada hasta la revisión de un administrador.' };
+    case 'rechazada':
+    case 'expirada':
+      return { tone: 'neutral' as const, message: 'Esta solicitud no se concretó, por lo que no hubo sesión.' };
+    default:
+      return null;
+  }
+}
+
+function Info({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
+      <Txt variant="small" color="muted" style={styles.infoLabel}>
         {label}
-      </ThemedText>
-      <ThemedText type="small" style={styles.infoValue}>
+      </Txt>
+      <Txt variant="small" style={styles.flex}>
         {value}
-      </ThemedText>
+      </Txt>
+    </View>
+  );
+}
+
+function Person({ name, role, extra, action }: { name: string; role: string; extra?: string; action?: ReactNode }) {
+  return (
+    <View style={styles.personRow}>
+      <Avatar name={name} size={40} />
+      <View style={styles.flex}>
+        <Txt variant="label">{name}</Txt>
+        <Txt variant="caption" color="muted">
+          {role}
+          {extra ? ` · ${extra}` : ''}
+        </Txt>
+      </View>
+      {action}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 16, borderRadius: 16, gap: 10 },
-  title: { fontSize: 26, lineHeight: 34 },
+  flex: { flex: 1 },
+  between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  topic: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  divider: { height: 1, marginVertical: 4 },
   infoRow: { flexDirection: 'row', gap: 12 },
-  infoLabel: { width: 72 },
-  infoValue: { flex: 1 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rateBox: { gap: 10, paddingTop: 6 },
+  infoLabel: { width: 76 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  gap2: { gap: 2 },
+  gap8: { gap: 8 },
+  wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  form: { padding: 12, borderRadius: 14, gap: 10 },
   timelineRow: { flexDirection: 'row', gap: 12 },
-  timelineRail: { alignItems: 'center', width: 12 },
+  rail: { alignItems: 'center', width: 12 },
   dot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
   line: { width: 2, flex: 1, marginVertical: 2 },
   timelineText: { flex: 1, paddingBottom: 12 },
-  actions: { gap: 10 },
 });

@@ -22,3 +22,13 @@ export const TONES = {
     alert: { bg: '#331B40', fg: '#DDA6F5' },
   },
 } as const satisfies Record<'light' | 'dark', Record<Tone, { bg: string; fg: string }>>;
+
+/** Color del punto de estado sobre fondos oscuros (cabecera del ticket). */
+export const TONE_DOT: Record<Tone, string> = {
+  warning: '#FBBF24',
+  info: '#38BDF8',
+  success: '#34D399',
+  danger: '#F87171',
+  neutral: '#94A3B8',
+  alert: '#C084FC',
+};

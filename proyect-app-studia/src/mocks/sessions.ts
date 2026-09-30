@@ -2,189 +2,179 @@
  * Datos de ejemplo para maquetar. Se reemplazan por llamadas al API Gateway
  * cuando las pantallas se conecten al backend.
  */
-import type { Session, SessionStatus, StatusEvent, TutorProfile, UserRole } from '@/types/session';
+import { getSubject } from '@/mocks/subjects';
+import { d, getTutorById } from '@/mocks/tutors';
+import type { ClosureResult, Material, Person, Session, SessionStatus, UserRole } from '@/types/session';
 
-/** "Ahora" fijo para que las vistas previas sean siempre iguales. */
-export const MOCK_NOW = '2026-09-28T12:00:00-03:00';
-/** Solicitudes pendientes actuales del usuario demo (BR05: máximo 4). */
-export const MOCK_PENDING_COUNT = 2;
+/** "Ahora" fijo para que la demo sea siempre igual. */
+export const MOCK_NOW = d('09-28', '12:00');
 
-const ME = { id: 'u-me', name: 'Alumno Demo' };
-const CAMILA = { id: 'u-1', name: 'Camila Rojas', reputation: 4.8, ratingsCount: 23 };
-const DIEGO = { id: 'u-2', name: 'Diego Soto', reputation: 4.2, ratingsCount: 9 };
-const VALENTINA = { id: 'u-3', name: 'Valentina Muñoz', reputation: null, ratingsCount: 0 };
+/** Usuario actual de la demo. */
+export const ME: Person = { id: 'u-me', name: 'Alumno Demo' };
+const ME_AS_TUTOR = { ...ME, reputation: 4.5, ratingsCount: 12 };
 
-const CALCULO = { code: 'MAT1010', name: 'Cálculo I' };
-const PROGRAMACION = { code: 'INFO1120', name: 'Programación' };
-const FISICA = { code: 'FIS1002', name: 'Física General' };
-const ALGEBRA = { code: 'MAT1020', name: 'Álgebra Lineal' };
+const STUDENTS: Record<string, Person> = {
+  's1': { id: 'u-s1', name: 'Javier Pino' },
+  's2': { id: 'u-s2', name: 'Antonia Reyes' },
+  's3': { id: 'u-s3', name: 'Felipe Neira' },
+  's4': { id: 'u-s4', name: 'Bastián Coloma' },
+  's5': { id: 'u-s5', name: 'Josefa Leiva' },
+};
+
+const mat = (id: string, title: string, kind: Material['kind'], meta: string, uploadedBy: string): Material => ({
+  id, title, kind, meta, uploadedBy,
+});
+
+const PLACES = [
+  'Biblioteca UCT · Cubículo 3',
+  'Campus San Juan Pablo II · Sala 204',
+  'Biblioteca UCT · Sala de estudio',
+  'Campus Menchaca Lira · Lab. 2',
+];
 
 type Seed = {
+  place?: string;
   id: string;
   status: SessionStatus;
   role: UserRole;
-  subject: Session['subject'];
-  other: { id: string; name: string };
-  createdAt: string;
+  subject: string;
+  /** Id de Tutor (si soy Tutee) o de estudiante (si soy Tutor). */
+  other: string;
+  created: string;
   start: string;
   end: string;
-  events: StatusEvent[];
+  events: [SessionStatus, string][];
+  blockId?: string;
+  topic?: string;
+  requestNote?: string;
+  notes?: string;
+  materials?: Material[];
+  declaration?: { mine?: ClosureResult; theirs?: ClosureResult };
   myRating?: number;
+  myComment?: string;
   receivedRating?: number;
 };
 
 function build(seed: Seed): Session {
-  const tutorData = [CAMILA, DIEGO, VALENTINA].find((t) => t.id === seed.other.id);
+  const subject = getSubject(seed.subject);
+  if (!subject) throw new Error(`Materia desconocida: ${seed.subject}`);
   const iAmTutee = seed.role === 'tutee';
+  const tutorData = iAmTutee ? getTutorById(seed.other) : undefined;
+
   return {
     id: seed.id,
-    subject: seed.subject,
+    subject: { code: subject.code, name: subject.name },
     myRole: seed.role,
     status: seed.status,
-    createdAt: seed.createdAt,
+    createdAt: seed.created,
     startsAt: seed.start,
     endsAt: seed.end,
-    tutor: iAmTutee
-      ? { id: seed.other.id, name: seed.other.name, reputation: tutorData?.reputation ?? null, ratingsCount: tutorData?.ratingsCount ?? 0 }
-      : { ...ME, reputation: 4.5, ratingsCount: 12 },
-    tutee: iAmTutee ? ME : seed.other,
+    blockId: seed.blockId,
+    place: seed.place ?? PLACES[Number(seed.id.replace(/\D/g, '')) % PLACES.length],
+    topic: seed.topic,
+    requestNote: seed.requestNote,
+    notes: seed.notes,
+    materials: seed.materials ?? [],
+    declaration: seed.declaration,
     myRating: seed.myRating,
+    myComment: seed.myComment,
     receivedRating: seed.receivedRating,
-    events: seed.events,
+    tutor: iAmTutee
+      ? { id: seed.other, name: tutorData?.name ?? 'Tutor', reputation: tutorData?.reputation ?? null, ratingsCount: tutorData?.ratingsCount ?? 0 }
+      : ME_AS_TUTOR,
+    tutee: iAmTutee ? ME : (STUDENTS[seed.other] ?? { id: seed.other, name: 'Estudiante' }),
+    events: seed.events.map(([status, at]) => ({ status, at })),
   };
 }
 
 export const MOCK_SESSIONS: Session[] = [
   build({
-    id: 's1', status: 'pendiente', role: 'tutee', subject: CALCULO, other: CAMILA,
-    createdAt: '2026-09-28T10:00:00-03:00', start: '2026-09-29T16:00:00-03:00', end: '2026-09-29T17:00:00-03:00',
-    events: [{ status: 'pendiente', at: '2026-09-28T10:00:00-03:00' }],
+    id: 's1', status: 'pendiente', role: 'tutee', subject: 'MAT1010', other: 't1', blockId: 't1-b1',
+    created: d('09-28', '10:00'), start: d('09-29', '16:00'), end: d('09-29', '17:00'),
+    topic: 'Derivadas', requestNote: 'Necesito repasar la regla de la cadena antes del certamen.',
+    events: [['pendiente', d('09-28', '10:00')]],
   }),
   build({
-    id: 's2', status: 'pendiente', role: 'tutor', subject: PROGRAMACION, other: { id: 'u-9', name: 'Javier Pino' },
-    createdAt: '2026-09-28T09:30:00-03:00', start: '2026-09-30T18:00:00-03:00', end: '2026-09-30T19:00:00-03:00',
-    events: [{ status: 'pendiente', at: '2026-09-28T09:30:00-03:00' }],
+    id: 's14', status: 'pendiente', role: 'tutee', subject: 'EST1010', other: 't5', blockId: 't5-b1',
+    created: d('09-28', '08:30'), start: d('10-01', '11:00'), end: d('10-01', '12:00'),
+    topic: 'Probabilidades',
+    events: [['pendiente', d('09-28', '08:30')]],
   }),
   build({
-    id: 's3', status: 'confirmada', role: 'tutee', subject: FISICA, other: DIEGO,
-    createdAt: '2026-09-26T15:00:00-03:00', start: '2026-09-30T10:00:00-03:00', end: '2026-09-30T11:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-26T15:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-26T18:20:00-03:00' },
+    id: 's2', status: 'pendiente', role: 'tutor', subject: 'INFO1120', other: 's1',
+    created: d('09-28', '09:30'), start: d('09-30', '18:00'), end: d('09-30', '19:00'),
+    topic: 'Recursión', requestNote: 'No entiendo cómo trazar una función recursiva.',
+    events: [['pendiente', d('09-28', '09:30')]],
+  }),
+  build({
+    id: 's3', status: 'confirmada', role: 'tutee', subject: 'FIS1002', other: 't2', blockId: 't2-b1',
+    created: d('09-26', '15:00'), start: d('09-30', '10:00'), end: d('09-30', '11:00'),
+    topic: 'Trabajo y energía',
+    materials: [mat('m1', 'Guía 3: Trabajo y energía', 'guia', 'PDF · 1.1 MB', 'Diego Soto')],
+    events: [['pendiente', d('09-26', '15:00')], ['confirmada', d('09-26', '18:20')]],
+  }),
+  build({
+    id: 's4', status: 'confirmada', role: 'tutor', subject: 'MAT1020', other: 's2',
+    created: d('09-27', '11:00'), start: d('09-28', '18:00'), end: d('09-28', '19:00'),
+    topic: 'Matrices y sistemas',
+    events: [['pendiente', d('09-27', '11:00')], ['confirmada', d('09-27', '13:45')]],
+  }),
+  build({
+    id: 's5', status: 'pendiente_cierre', role: 'tutee', subject: 'MAT1010', other: 't1',
+    created: d('09-25', '09:00'), start: d('09-27', '17:00'), end: d('09-27', '18:00'),
+    topic: 'Límites y continuidad',
+    materials: [mat('m2', 'Ejercicios: límites', 'ejercicios', 'PDF · 420 KB', 'Camila Rojas')],
+    events: [['pendiente', d('09-25', '09:00')], ['confirmada', d('09-25', '12:10')], ['pendiente_cierre', d('09-27', '18:00')]],
+  }),
+  build({
+    id: 's6', status: 'en_conflicto', role: 'tutor', subject: 'INFO1120', other: 's3',
+    created: d('09-22', '09:00'), start: d('09-25', '15:00'), end: d('09-25', '16:00'),
+    topic: 'Estructuras de datos', declaration: { mine: 'completada', theirs: 'inasistencia' },
+    events: [['pendiente', d('09-22', '09:00')], ['confirmada', d('09-22', '10:30')], ['pendiente_cierre', d('09-25', '16:00')], ['en_conflicto', d('09-26', '09:15')]],
+  }),
+  build({
+    id: 's7', status: 'completada', role: 'tutee', subject: 'FIS1002', other: 't2',
+    created: d('09-18', '09:00'), start: d('09-22', '16:00'), end: d('09-22', '17:00'),
+    topic: 'Cinemática', myRating: 5, receivedRating: 4,
+    myComment: 'Muy buena explicación de MRU y MRUA, con ejercicios tipo prueba.',
+    notes: 'Repasamos MRU y MRUA con la guía 2. Quedaron pendientes los problemas de lanzamiento vertical (ejercicios 7 al 10).',
+    materials: [
+      mat('m3', 'Guía 2: Cinemática', 'guia', 'PDF · 1.4 MB', 'Diego Soto'),
+      mat('m4', 'Ejercicios propuestos', 'ejercicios', 'PDF · 320 KB', 'Diego Soto'),
     ],
+    events: [['pendiente', d('09-18', '09:00')], ['confirmada', d('09-18', '11:00')], ['pendiente_cierre', d('09-22', '17:00')], ['completada', d('09-22', '19:30')]],
   }),
   build({
-    id: 's4', status: 'confirmada', role: 'tutor', subject: ALGEBRA, other: { id: 'u-10', name: 'Sofía Araya' },
-    createdAt: '2026-09-27T11:00:00-03:00', start: '2026-09-28T18:00:00-03:00', end: '2026-09-28T19:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-27T11:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-27T13:45:00-03:00' },
-    ],
+    id: 's8', status: 'completada', role: 'tutor', subject: 'MAT1020', other: 's4',
+    created: d('09-15', '09:00'), start: d('09-20', '11:00'), end: d('09-20', '12:00'),
+    topic: 'Valores propios', receivedRating: 5,
+    notes: 'Cálculo de valores y vectores propios de matrices 2x2 y 3x3. Se recomendó practicar diagonalización.',
+    materials: [mat('m5', 'Apuntes: valores propios', 'apuntes', 'PDF · 890 KB', 'Alumno Demo')],
+    events: [['pendiente', d('09-15', '09:00')], ['confirmada', d('09-15', '10:00')], ['pendiente_cierre', d('09-20', '12:00')], ['completada', d('09-20', '14:00')]],
   }),
   build({
-    id: 's5', status: 'pendiente_cierre', role: 'tutee', subject: CALCULO, other: CAMILA,
-    createdAt: '2026-09-25T09:00:00-03:00', start: '2026-09-27T17:00:00-03:00', end: '2026-09-27T18:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-25T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-25T12:10:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-27T18:00:00-03:00' },
-    ],
+    id: 's9', status: 'cancelada', role: 'tutee', subject: 'MAT1010', other: 't1',
+    created: d('09-14', '09:00'), start: d('09-18', '10:00'), end: d('09-18', '11:00'), topic: 'Integrales',
+    events: [['pendiente', d('09-14', '09:00')], ['confirmada', d('09-14', '12:00')], ['cancelada', d('09-17', '20:00')]],
   }),
   build({
-    id: 's6', status: 'en_conflicto', role: 'tutor', subject: PROGRAMACION, other: { id: 'u-11', name: 'Felipe Neira' },
-    createdAt: '2026-09-22T09:00:00-03:00', start: '2026-09-25T15:00:00-03:00', end: '2026-09-25T16:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-22T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-22T10:30:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-25T16:00:00-03:00' },
-      { status: 'en_conflicto', at: '2026-09-26T09:15:00-03:00' },
-    ],
+    id: 's10', status: 'rechazada', role: 'tutee', subject: 'INFO1120', other: 't3',
+    created: d('09-12', '09:00'), start: d('09-16', '15:00'), end: d('09-16', '16:00'), topic: 'Funciones',
+    events: [['pendiente', d('09-12', '09:00')], ['rechazada', d('09-12', '15:00')]],
   }),
   build({
-    id: 's7', status: 'completada', role: 'tutee', subject: FISICA, other: DIEGO,
-    createdAt: '2026-09-18T09:00:00-03:00', start: '2026-09-22T16:00:00-03:00', end: '2026-09-22T17:00:00-03:00',
-    myRating: 5, receivedRating: 4,
-    events: [
-      { status: 'pendiente', at: '2026-09-18T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-18T11:00:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-22T17:00:00-03:00' },
-      { status: 'completada', at: '2026-09-22T19:30:00-03:00' },
-    ],
+    id: 's11', status: 'expirada', role: 'tutee', subject: 'EST1010', other: 't2',
+    created: d('09-10', '09:00'), start: d('09-14', '09:00'), end: d('09-14', '10:00'), topic: 'Distribuciones',
+    events: [['pendiente', d('09-10', '09:00')], ['expirada', d('09-11', '09:05')]],
   }),
   build({
-    id: 's8', status: 'completada', role: 'tutor', subject: ALGEBRA, other: { id: 'u-12', name: 'Ignacio Vera' },
-    createdAt: '2026-09-15T09:00:00-03:00', start: '2026-09-20T11:00:00-03:00', end: '2026-09-20T12:00:00-03:00',
-    receivedRating: 5,
-    events: [
-      { status: 'pendiente', at: '2026-09-15T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-15T10:00:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-20T12:00:00-03:00' },
-      { status: 'completada', at: '2026-09-20T14:00:00-03:00' },
-    ],
+    id: 's12', status: 'no_realizada', role: 'tutor', subject: 'FIS1002', other: 's5',
+    created: d('09-05', '09:00'), start: d('09-09', '17:00'), end: d('09-09', '18:00'), topic: 'Dinámica',
+    events: [['pendiente', d('09-05', '09:00')], ['confirmada', d('09-05', '10:00')], ['pendiente_cierre', d('09-09', '18:00')], ['no_realizada', d('09-09', '20:00')]],
   }),
   build({
-    id: 's9', status: 'cancelada', role: 'tutee', subject: CALCULO, other: CAMILA,
-    createdAt: '2026-09-14T09:00:00-03:00', start: '2026-09-18T10:00:00-03:00', end: '2026-09-18T11:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-14T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-14T12:00:00-03:00' },
-      { status: 'cancelada', at: '2026-09-17T20:00:00-03:00' },
-    ],
-  }),
-  build({
-    id: 's10', status: 'rechazada', role: 'tutee', subject: PROGRAMACION, other: VALENTINA,
-    createdAt: '2026-09-12T09:00:00-03:00', start: '2026-09-16T15:00:00-03:00', end: '2026-09-16T16:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-12T09:00:00-03:00' },
-      { status: 'rechazada', at: '2026-09-12T15:00:00-03:00' },
-    ],
-  }),
-  build({
-    id: 's11', status: 'expirada', role: 'tutee', subject: ALGEBRA, other: DIEGO,
-    createdAt: '2026-09-10T09:00:00-03:00', start: '2026-09-14T09:00:00-03:00', end: '2026-09-14T10:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-10T09:00:00-03:00' },
-      { status: 'expirada', at: '2026-09-11T09:05:00-03:00' },
-    ],
-  }),
-  build({
-    id: 's12', status: 'no_realizada', role: 'tutor', subject: FISICA, other: { id: 'u-13', name: 'Martín Lagos' },
-    createdAt: '2026-09-05T09:00:00-03:00', start: '2026-09-09T17:00:00-03:00', end: '2026-09-09T18:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-05T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-05T10:00:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-09T18:00:00-03:00' },
-      { status: 'no_realizada', at: '2026-09-09T20:00:00-03:00' },
-    ],
-  }),
-  build({
-    id: 's13', status: 'inasistencia', role: 'tutee', subject: CALCULO, other: DIEGO,
-    createdAt: '2026-09-01T09:00:00-03:00', start: '2026-09-04T10:00:00-03:00', end: '2026-09-04T11:00:00-03:00',
-    events: [
-      { status: 'pendiente', at: '2026-09-01T09:00:00-03:00' },
-      { status: 'confirmada', at: '2026-09-01T10:00:00-03:00' },
-      { status: 'pendiente_cierre', at: '2026-09-04T11:00:00-03:00' },
-      { status: 'inasistencia', at: '2026-09-04T13:00:00-03:00' },
-    ],
+    id: 's13', status: 'inasistencia', role: 'tutee', subject: 'MAT1010', other: 't2',
+    created: d('09-01', '09:00'), start: d('09-04', '10:00'), end: d('09-04', '11:00'), topic: 'Límites y continuidad',
+    events: [['pendiente', d('09-01', '09:00')], ['confirmada', d('09-01', '10:00')], ['pendiente_cierre', d('09-04', '11:00')], ['inasistencia', d('09-04', '13:00')]],
   }),
 ];
-
-export function getMockSessionById(id?: string): Session {
-  return MOCK_SESSIONS.find((s) => s.id === id) ?? MOCK_SESSIONS[2];
-}
-
-export const MOCK_TUTOR: TutorProfile = {
-  id: CAMILA.id,
-  name: CAMILA.name,
-  reputation: CAMILA.reputation,
-  ratingsCount: CAMILA.ratingsCount,
-  subjects: [CALCULO, ALGEBRA],
-  availability: [
-    { id: 'b1', startsAt: '2026-09-29T16:00:00-03:00', endsAt: '2026-09-29T17:00:00-03:00' },
-    { id: 'b2', startsAt: '2026-09-29T17:00:00-03:00', endsAt: '2026-09-29T18:00:00-03:00' },
-    { id: 'b3', startsAt: '2026-09-30T10:00:00-03:00', endsAt: '2026-09-30T11:00:00-03:00' },
-    { id: 'b4', startsAt: '2026-10-01T15:00:00-03:00', endsAt: '2026-10-01T16:00:00-03:00' },
-    { id: 'b5', startsAt: '2026-10-01T16:00:00-03:00', endsAt: '2026-10-01T17:00:00-03:00' },
-    { id: 'b6', startsAt: '2026-10-02T09:00:00-03:00', endsAt: '2026-10-02T10:00:00-03:00' },
-  ],
-};

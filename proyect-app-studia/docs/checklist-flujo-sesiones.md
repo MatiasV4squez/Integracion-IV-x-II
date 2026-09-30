@@ -1,34 +1,43 @@
 # Checklist de pruebas: flujo de sesiones
 
-Pruebas automáticas de reglas (BR02, BR03, BR04, BR05, BR10, BR14, BR15): `npm test`
+Reglas de negocio (BR01-BR20 involucradas, check-in, cuenta regresiva): `npm test` (35 pruebas)
 
-Pruebas manuales de UI (`npx expo start`, menú de vista previa en la pantalla inicial):
+Pruebas manuales de UI: `npx expo start` (la app abre en Historial).
+
+## Navegación
+- [ ] La barra superior muestra Historial / Solicitar / Detalle y marca la pestaña activa
+- [ ] El contador "n/4 pendientes" lleva a Solicitar y se pone rojo con 4/4
+- [ ] "Detalle" abre la última sesión visitada
+- [ ] Botón ‹ del detalle vuelve a la pantalla anterior (o al Historial si no hay)
 
 ## Historial
-- [ ] Muestra las 13 sesiones de ejemplo ordenadas de la más reciente a la más antigua
-- [ ] Filtro **Activas**: pendiente, confirmada, pendiente de cierre, en conflicto
-- [ ] Filtro **Completadas** / **Otras** (rechazada, expirada, cancelada, no realizada, inasistencia)
-- [ ] Filtro por rol (Tutee / Tutor) se combina con el filtro de estado
-- [ ] Combinación sin resultados muestra el mensaje de lista vacía
-- [ ] Sesión completada muestra "Tu calificación" o "Sin calificar"
+- [ ] Tarjetas de resumen (Activas, Completadas, Tu promedio)
+- [ ] "Próxima sesión" abre su detalle
+- [ ] Buscador: materia, persona, unidad
+- [ ] Filtros de estado y de rol se combinan; lista vacía muestra mensaje
+- [ ] Acciones rápidas: Aceptar/Rechazar (Tutor con solicitud pendiente), Calificar, Declarar resultado
 
-## Detalle de sesión (uno por estado, desde el menú)
-- [ ] Pendiente + Tutor (s2): Aceptar / Rechazar. Pendiente + Tutee (s1): sin botones (BR14)
-- [ ] Confirmada antes del inicio (s3): Cancelar sesión + Reportar (BR15, BR10)
-- [ ] Pendiente de cierre (s5): 3 botones de resultado
-- [ ] En conflicto (s6): aviso rojo, sin calificar
-- [ ] Completada sin calificar (s8): estrellas 1–5, botón deshabilitado hasta elegir (BR19)
-- [ ] Completada ya calificada (s7): no permite calificar de nuevo (BR04)
-- [ ] Rechazada / Expirada (s10, s11): sin acciones ni reportar (BR10)
-- [ ] Línea de tiempo con los estados en orden
+## Detalle de sesión (ticket)
+- [ ] Cabecera azul con estado; tarjeta cian con materia, rol, lugar, inicio y término
+- [ ] Pendiente: "Tiempo para responder" (24 h) y, como Tutor, Aceptar / Rechazar (BR14)
+- [ ] Confirmada: cuenta regresiva "Comienza en"; Cancelar solo antes del inicio (BR15)
+- [ ] Panel de demo -> "Inicia el horario": el temporizador pasa a "Tiempo restante" y corre cada segundo
+- [ ] Check-in: deshabilitado antes de 15 min del inicio; habilitado en la ventana; no se repite
+- [ ] Panel de demo -> "La contraparte escanea el QR": aparece su asistencia
+- [ ] "Termina el horario" -> Pendiente de cierre; declarar resultado; coinciden -> final, difieren -> En conflicto (BR17/18)
+- [ ] Completada: calificar 1-5 con comentario, una sola vez (BR04/BR19); el promedio del tutor se actualiza
+- [ ] Reportar usuario solo si la sesión llegó a Confirmada (BR10); no se repite
+- [ ] Subir guías/ejercicios (confirmada, pendiente de cierre o completada) y abrirlos
+- [ ] "Ver perfil" abre al tutor; "¿Qué sigue?" pre-carga la solicitud
 
-## Solicitud
-- [ ] "Enviar solicitud" deshabilitado hasta elegir un horario
-- [ ] Cambiar de materia / horario actualiza el resumen
-- [ ] Con 4/4 pendientes: aviso rojo y botón bloqueado (BR05)
-- [ ] Aviso de expiración de 24 horas visible (BR03)
+## Solicitar tutoría
+- [ ] Materia -> Tutor -> Horario, con búsqueda y filtros
+- [ ] Horarios con cupos (máximo / actuales); bloque lleno no se puede elegir
+- [ ] Enviar solicitud: crea "Pendiente", suma al contador y al "Historial de solicitudes"
+- [ ] Con 4/4 pendientes el envío se bloquea (BR05)
+- [ ] Perfil del tutor: reseñas, historial, horarios y solicitar
 
 ## Ajustes de UI
-- [ ] Modo claro y oscuro (cambiar tema del dispositivo)
+- [ ] Modo claro y oscuro
 - [ ] Pantalla angosta (320 px) sin desbordes horizontales (NFR13)
-- [ ] Zonas táctiles de al menos 44–48 px
+- [ ] Zonas táctiles de al menos 44 px

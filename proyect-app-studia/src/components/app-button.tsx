@@ -1,24 +1,29 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ACCENT } from '@/constants/tones';
-import { useTheme } from '@/hooks/use-theme';
+import { Txt } from '@/components/txt';
+import { RADIUS } from '@/constants/ui';
 import { useTone } from '@/hooks/use-tone';
+import { useUI } from '@/hooks/use-ui';
 
 type Props = {
   label: string;
   onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  size?: 'md' | 'sm';
   disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
 };
 
-export function AppButton({ label, onPress, variant = 'primary', disabled = false }: Props) {
-  const theme = useTheme();
+export function AppButton({ label, onPress, variant = 'primary', size = 'md', disabled = false, style }: Props) {
+  const ui = useUI();
   const danger = useTone('danger');
 
-  const backgroundColor =
-    variant === 'primary' ? ACCENT : variant === 'danger' ? danger.bg : theme.backgroundSelected;
-  const color = variant === 'primary' ? '#FFFFFF' : variant === 'danger' ? danger.fg : theme.text;
+  const palette = {
+    primary: { bg: ui.primary, fg: ui.onPrimary, border: ui.primary },
+    secondary: { bg: ui.surface, fg: ui.text, border: ui.border },
+    danger: { bg: danger.bg, fg: danger.fg, border: danger.bg },
+    ghost: { bg: 'transparent', fg: ui.primary, border: 'transparent' },
+  }[variant];
 
   return (
     <Pressable
@@ -27,22 +32,20 @@ export function AppButton({ label, onPress, variant = 'primary', disabled = fals
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.button,
-        { backgroundColor, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
+        styles.base,
+        size === 'sm' ? styles.sm : styles.md,
+        { backgroundColor: palette.bg, borderColor: palette.border, opacity: disabled ? 0.45 : pressed ? 0.85 : 1 },
+        style,
       ]}>
-      <ThemedText type="smallBold" style={{ color }}>
+      <Txt variant="label" style={{ color: palette.fg }}>
         {label}
-      </ThemedText>
+      </Txt>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    minHeight: 48, // área táctil cómoda en móvil
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  base: { borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  md: { minHeight: 48 },
+  sm: { minHeight: 36, paddingHorizontal: 12 },
 });

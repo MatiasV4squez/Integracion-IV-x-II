@@ -1,8 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { STAR } from '@/constants/tones';
-import { useTheme } from '@/hooks/use-theme';
+import { Txt } from '@/components/txt';
+import { useUI } from '@/hooks/use-ui';
 
 type Props = {
   /** Valor entero de 1 a 5 (BR19). */
@@ -12,17 +11,15 @@ type Props = {
   size?: number;
 };
 
-export function RatingStars({ value, onChange, size = 22 }: Props) {
-  const theme = useTheme();
+export function RatingStars({ value, onChange, size = 20 }: Props) {
+  const ui = useUI();
 
   return (
     <View style={styles.row} accessibilityLabel={`Calificación ${value} de 5`}>
       {[1, 2, 3, 4, 5].map((n) => {
         const filled = n <= value;
         const star = (
-          <ThemedText style={{ fontSize: size, lineHeight: size + 6, color: filled ? STAR : theme.textSecondary }}>
-            {filled ? '★' : '☆'}
-          </ThemedText>
+          <Txt style={{ fontSize: size, lineHeight: size + 6, color: filled ? ui.star : ui.border }}>★</Txt>
         );
         return onChange ? (
           <Pressable
@@ -41,6 +38,4 @@ export function RatingStars({ value, onChange, size = 22 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 4 },
-});
+const styles = StyleSheet.create({ row: { flexDirection: 'row', gap: 2 } });
