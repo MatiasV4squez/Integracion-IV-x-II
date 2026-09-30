@@ -1,1 +1,4 @@
-export class CreateReporteDto {}
+export class CreateReporteDto {
+  titulo: string;
+  descripcion: string;
+}
