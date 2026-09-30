@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -6,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTutorMode } from '@/hooks/use-tutor-mode';
 import TutorHome from '@/screens/tutor-home';
 
 // Datos de ejemplo: reemplazar por datos reales cuando exista el backend.
@@ -63,7 +65,7 @@ export default function HomeScreen() {
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [isTutor, setIsTutor] = useState(false);
+  const { isTutor, setIsTutor } = useTutorMode();
 
   const q = query.trim().toLowerCase();
   const buildings = CAMPUS.buildings.filter((building) => building.name.toLowerCase().includes(q));
@@ -191,6 +193,17 @@ export default function HomeScreen() {
                 );
               })
             )}
+
+            <Pressable style={({ pressed }) => [styles.wideCard, pressed && styles.pressed]}>
+              <View style={styles.wideCardIcon}>
+                <Ionicons name="document-text-outline" size={26} color={colors.primary} />
+              </View>
+              <View style={styles.wideCardInfo}>
+                <Text style={styles.wideCardTitle}>¿Quieres ser tutor?</Text>
+                <Text style={styles.buildingMeta}>Sube tus datos académicos</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -358,6 +371,25 @@ function createStyles(colors: ThemeColors) {
     },
     badgeText: { fontSize: 13, fontWeight: '700' },
     empty: { color: colors.textMuted },
+    wideCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      marginTop: Spacing.md,
+      boxShadow: '0 2px 8px rgba(15, 27, 45, 0.08)',
+    },
+    wideCardIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: Radius.md,
+      backgroundColor: colors.iconSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    wideCardInfo: { flex: 1, marginHorizontal: Spacing.md },
+    wideCardTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
     pressed: { opacity: 0.7 },
   });
 }

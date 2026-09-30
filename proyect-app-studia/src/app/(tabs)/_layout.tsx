@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useTutorMode } from '@/hooks/use-tutor-mode';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -18,6 +19,7 @@ function tabIcon(active: IconName, inactive: IconName) {
 export default function TabsLayout() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const { isTutor } = useTutorMode();
 
   return (
     <Tabs
@@ -49,7 +51,11 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="buscar"
-        options={{ title: 'Buscar', tabBarIcon: tabIcon('search', 'search-outline') }}
+        options={{
+          title: 'Buscar',
+          tabBarIcon: tabIcon('search', 'search-outline'),
+          href: isTutor ? null : undefined,
+        }}
       />
       <Tabs.Screen
         name="historial"

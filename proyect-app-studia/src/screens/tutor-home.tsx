@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
@@ -8,13 +9,16 @@ import { useTheme } from '@/hooks/use-theme';
 export default function TutorHome() {
   const colors = useTheme();
   const styles = createStyles(colors);
+  const router = useRouter();
 
   return (
     <View style={styles.body}>
       <Text style={styles.sectionTitle}>¿Qué quieres hacer hoy?</Text>
 
       <View style={styles.cards}>
-        <Pressable style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
+        <Pressable
+          onPress={() => router.push('/tutor/solicitud')}
+          style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
           <LinearGradient
             colors={[colors.primary, colors.primaryDark]}
             start={{ x: 0, y: 0 }}
@@ -31,7 +35,9 @@ export default function TutorHome() {
           </LinearGradient>
         </Pressable>
 
-        <Pressable style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
+        <Pressable
+          onPress={() => router.push('/tutor/mis-tutorias')}
+          style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
           <View style={[styles.card, styles.cardSurface]}>
             <View style={styles.iconBox}>
               <Ionicons name="school-outline" size={28} color={colors.primary} />
@@ -42,17 +48,6 @@ export default function TutorHome() {
           </View>
         </Pressable>
       </View>
-
-      <Pressable style={({ pressed }) => [styles.wideCard, pressed && styles.pressed]}>
-        <View style={styles.iconBox}>
-          <Ionicons name="document-text-outline" size={26} color={colors.primary} />
-        </View>
-        <View style={styles.wideCardInfo}>
-          <Text style={styles.wideCardTitle}>¿Quieres ser tutor?</Text>
-          <Text style={styles.cardDescription}>Sube tus datos académicos</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
-      </Pressable>
     </View>
   );
 }
@@ -105,17 +100,6 @@ function createStyles(colors: ThemeColors) {
       marginTop: 'auto',
       paddingTop: Spacing.md,
     },
-    wideCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: Radius.lg,
-      padding: Spacing.lg,
-      marginTop: Spacing.md,
-      boxShadow: '0 2px 8px rgba(15, 27, 45, 0.08)',
-    },
-    wideCardInfo: { flex: 1, marginHorizontal: Spacing.md },
-    wideCardTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
     textOnPrimary: { color: colors.onPrimary },
     mutedOnPrimary: { color: 'rgba(255,255,255,0.85)' },
     actionOnSurface: { color: colors.primary },
