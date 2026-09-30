@@ -14,8 +14,8 @@ export default function TutorStackLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="mis-tutorias" options={{ title: 'Mis tutorías' }} />
-      <Stack.Screen name="solicitud" options={{ title: 'Hacer una solicitud' }} />
       <Stack.Screen name="tutoria/[id]" options={{ title: 'Detalle de tutoría' }} />
+      <Stack.Screen name="[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }

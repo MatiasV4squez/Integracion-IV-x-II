@@ -17,7 +17,7 @@ export default function TutorHome() {
 
       <View style={styles.cards}>
         <Pressable
-          onPress={() => router.push('/tutor/solicitud')}
+          onPress={() => router.push('/publicar-disponibilidad')}
           style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
           <LinearGradient
             colors={[colors.primary, colors.primaryDark]}
@@ -25,13 +25,13 @@ export default function TutorHome() {
             end={{ x: 1, y: 1 }}
             style={styles.card}>
             <View style={[styles.iconBox, styles.iconBoxOnPrimary]}>
-              <Ionicons name="add-circle-outline" size={28} color={colors.onPrimary} />
+              <Ionicons name="calendar-outline" size={28} color={colors.onPrimary} />
             </View>
-            <Text style={[styles.cardTitle, styles.textOnPrimary]}>Hacer una solicitud</Text>
+            <Text style={[styles.cardTitle, styles.textOnPrimary]}>Publicar disponibilidad</Text>
             <Text style={[styles.cardDescription, styles.mutedOnPrimary]}>
-              Pide una tutoría y reserva un espacio
+              Reserva un horario para dar tutoría
             </Text>
-            <Text style={[styles.cardAction, styles.textOnPrimary]}>Solicitar →</Text>
+            <Text style={[styles.cardAction, styles.textOnPrimary]}>Publicar →</Text>
           </LinearGradient>
         </Pressable>
 

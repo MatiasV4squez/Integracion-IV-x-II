@@ -1,17 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PseudoQr } from '@/components/pseudo-qr';
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTutorMode } from '@/hooks/use-tutor-mode';
+import { ME } from '@/mocks/sessions';
 import TutorHome from '@/screens/tutor-home';
 
-// Datos de ejemplo: reemplazar por datos reales cuando exista el backend.
-const USER = { name: 'María González' };
+// Mismo usuario que en el resto de la app (Historial, Buscar, etc.): @/mocks/sessions ME.
+const USER = ME;
 
 const ACTIVE_RESERVATION = {
   room: 'Cubículo A-03',
@@ -64,16 +67,40 @@ export default function HomeScreen() {
   const colors = useTheme();
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
+  const router = useRouter();
   const { isTutor, setIsTutor } = useTutorMode();
+
+  const [query, setQuery] = useState('');
+  const [reservation, setReservation] = useState(ACTIVE_RESERVATION);
+  const [showQr, setShowQr] = useState(false);
+  const searchRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const q = query.trim().toLowerCase();
   const buildings = CAMPUS.buildings.filter((building) => building.name.toLowerCase().includes(q));
+
+  const focusSearch = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    searchRef.current?.focus();
+  };
+
+  const reserveBuilding = (building: (typeof CAMPUS.buildings)[number]) => {
+    if (building.available === 0) return;
+    setReservation({
+      room: `${building.name} · cubículo disponible`,
+      location: `${CAMPUS.name} · ${building.floors} pisos`,
+      day: 'HOY',
+      time: '14:00',
+      remaining: '1h 30min restantes',
+    });
+    setShowQr(false);
+  };
 
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
@@ -104,6 +131,7 @@ export default function HomeScreen() {
           <Text style={styles.greeting}>Hola, {USER.name} 👋</Text>
 
           <TextInput
+            ref={searchRef}
             value={query}
             onChangeText={setQuery}
             placeholder="Buscar edificio o cubículo..."
@@ -119,7 +147,7 @@ export default function HomeScreen() {
           <View style={styles.body}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Mis reservas activas</Text>
-              <Pressable hitSlop={8}>
+              <Pressable hitSlop={8} onPress={() => router.push('/historial')}>
                 <Text style={styles.sectionLink}>Ver todas</Text>
               </Pressable>
             </View>
@@ -132,21 +160,30 @@ export default function HomeScreen() {
               <View style={styles.reservationTop}>
                 <View style={styles.reservationInfo}>
                   <Text style={styles.reservationLabel}>RESERVA ACTIVA</Text>
-                  <Text style={styles.reservationRoom}>{ACTIVE_RESERVATION.room}</Text>
-                  <Text style={styles.reservationLocation}>{ACTIVE_RESERVATION.location}</Text>
+                  <Text style={styles.reservationRoom}>{reservation.room}</Text>
+                  <Text style={styles.reservationLocation}>{reservation.location}</Text>
                 </View>
                 <View style={styles.timeBadge}>
-                  <Text style={styles.timeBadgeDay}>{ACTIVE_RESERVATION.day}</Text>
-                  <Text style={styles.timeBadgeTime}>{ACTIVE_RESERVATION.time}</Text>
+                  <Text style={styles.timeBadgeDay}>{reservation.day}</Text>
+                  <Text style={styles.timeBadgeTime}>{reservation.time}</Text>
                 </View>
               </View>
 
               <View style={styles.reservationFooter}>
-                <Text style={styles.reservationRemaining}>🕑 {ACTIVE_RESERVATION.remaining}</Text>
-                <Pressable style={({ pressed }) => [styles.qrButton, pressed && styles.pressed]}>
-                  <Text style={styles.qrButtonText}>Ver QR →</Text>
+                <Text style={styles.reservationRemaining}>🕑 {reservation.remaining}</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.qrButton, pressed && styles.pressed]}
+                  onPress={() => setShowQr((v) => !v)}>
+                  <Text style={styles.qrButtonText}>{showQr ? 'Ocultar QR ↑' : 'Ver QR →'}</Text>
                 </Pressable>
               </View>
+
+              {showQr ? (
+                <View style={styles.qrWrap}>
+                  <PseudoQr seed={reservation.room} size={140} color={colors.onPrimary} />
+                  <Text style={styles.qrCode}>{reservation.room}</Text>
+                </View>
+              ) : null}
             </LinearGradient>
 
             <View style={styles.stats}>
@@ -161,7 +198,7 @@ export default function HomeScreen() {
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{CAMPUS.name}</Text>
-              <Pressable hitSlop={8}>
+              <Pressable hitSlop={8} onPress={focusSearch}>
                 <Text style={styles.sectionLink}>Buscar espacio</Text>
               </Pressable>
             </View>
@@ -174,7 +211,13 @@ export default function HomeScreen() {
                 return (
                   <Pressable
                     key={building.id}
-                    style={({ pressed }) => [styles.buildingCard, pressed && styles.pressed]}>
+                    disabled={building.available === 0}
+                    onPress={() => reserveBuilding(building)}
+                    style={({ pressed }) => [
+                      styles.buildingCard,
+                      pressed && styles.pressed,
+                      building.available === 0 && styles.buildingCardDisabled,
+                    ]}>
                     <View style={styles.buildingIcon}>
                       <Text style={styles.buildingIconText}>{building.icon}</Text>
                     </View>
@@ -194,7 +237,9 @@ export default function HomeScreen() {
               })
             )}
 
-            <Pressable style={({ pressed }) => [styles.wideCard, pressed && styles.pressed]}>
+            <Pressable
+              style={({ pressed }) => [styles.wideCard, pressed && styles.pressed]}
+              onPress={() => setIsTutor(true)}>
               <View style={styles.wideCardIcon}>
                 <Ionicons name="document-text-outline" size={26} color={colors.primary} />
               </View>
@@ -322,6 +367,8 @@ function createStyles(colors: ThemeColors) {
       marginLeft: Spacing.sm,
     },
     qrButtonText: { color: colors.onPrimary, fontWeight: '700', fontSize: 13 },
+    qrWrap: { alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.lg },
+    qrCode: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
     stats: {
       flexDirection: 'row',
       gap: Spacing.md,
@@ -352,6 +399,7 @@ function createStyles(colors: ThemeColors) {
       marginBottom: Spacing.md,
       boxShadow: '0 2px 8px rgba(15, 27, 45, 0.08)',
     },
+    buildingCardDisabled: { opacity: 0.5 },
     buildingIcon: {
       width: 52,
       height: 52,

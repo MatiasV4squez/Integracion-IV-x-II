@@ -1,9 +1,8 @@
-import { View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 
-import { useTheme } from '@/hooks/use-theme';
+import TutoriasDisponiblesScreen from '@/screens/tutorias-disponibles-screen';
 
-// Pantalla en blanco: pendiente de diseño.
-export default function BuscarScreen() {
-  const colors = useTheme();
-  return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+export default function BuscarRoute() {
+  const { subject, tutor } = useLocalSearchParams<{ subject?: string; tutor?: string }>();
+  return <TutoriasDisponiblesScreen initialSubject={subject} initialTutor={tutor} />;
 }

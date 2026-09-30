@@ -1,24 +1,28 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
 import { initials } from '@/constants/tutorias';
+import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
+import { ME_AS_TUTOR, ME_PROFILE } from '@/mocks/sessions';
 
-// Datos de ejemplo: reemplazar por datos reales cuando exista el backend.
+// Mismo usuario que el resto de la app (@/mocks/sessions ME/ME_AS_TUTOR), solo con datos de perfil de ejemplo.
 const TUTOR = {
-  name: 'Diego Herrera',
-  career: 'Ingeniería Civil Informática',
-  university: 'Universidad Católica de Temuco',
-  year: '4° año',
-  gpa: '6.1',
-  rating: 4.8,
+  name: ME_AS_TUTOR.name,
+  career: ME_PROFILE.career,
+  university: ME_PROFILE.university,
+  year: ME_PROFILE.year,
+  gpa: ME_PROFILE.gpa,
+  rating: ME_AS_TUTOR.reputation,
 };
 
 const STATS = [
   { icon: 'school-outline' as const, value: '32', label: 'Tutorías dadas' },
   { icon: 'time-outline' as const, value: '48h', label: 'Horas totales' },
-  { icon: 'star-outline' as const, value: '4.8', label: 'Calificación' },
+  { icon: 'star-outline' as const, value: String(ME_AS_TUTOR.reputation), label: 'Calificación' },
 ];
 
 const SUBJECTS = ['Cálculo I', 'Cálculo II', 'Álgebra Lineal', 'Programación I'];
@@ -31,12 +35,20 @@ const AVAILABILITY = [
 
 export default function TutorProfileScreen() {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { logout } = useAuth();
   const styles = createStyles(colors);
+
+  const signOut = () => {
+    logout();
+    router.replace('/login');
+  };
 
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg }]}
       showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -101,6 +113,12 @@ export default function TutorProfileScreen() {
           </View>
         ))}
       </View>
+
+      <Pressable
+        onPress={signOut}
+        style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed]}>
+        <Text style={styles.signOutText}>Cerrar sesión</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -158,5 +176,14 @@ function createStyles(colors: ThemeColors) {
     availabilityRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
     availabilityDay: { color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 },
     availabilityTime: { color: colors.textMuted, fontSize: 13 },
+    signOutButton: {
+      borderRadius: Radius.md,
+      borderWidth: 1,
+      borderColor: colors.dangerText,
+      paddingVertical: Spacing.md,
+      alignItems: 'center',
+    },
+    signOutText: { color: colors.dangerText, fontWeight: '700', fontSize: 15 },
+    pressed: { opacity: 0.7 },
   });
 }

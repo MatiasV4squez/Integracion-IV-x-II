@@ -64,3 +64,5 @@ export const Radius = {
   xl: 24,
   full: 999,
 };
+
+export const MaxContentWidth = 800;
