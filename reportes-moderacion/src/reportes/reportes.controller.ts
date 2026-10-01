@@ -6,11 +6,13 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ReportesService } from './reportes.service.js';
 import { CreateReporteDto } from './dto/create-reporte.dto.js';
 import { UpdateReporteDto } from './dto/update-reporte.dto.js';
+import { ConsultaReportesAdminDto } from './dto/consulta-reportes-admin.dto.js';
 import { ValidarSesionParaReporteGuard } from './guards/validar-sesion-para-reporte.guard.js';
 
 @Controller('reportes')
@@ -26,6 +28,11 @@ export class ReportesController {
   @Get()
   findAll() {
     return this.reportesService.findAll();
+  }
+
+  @Get('admin')
+  consultarParaAdmin(@Query() filtros: ConsultaReportesAdminDto) {
+    return this.reportesService.consultarParaAdmin(filtros);
   }
 
   @Get(':id')
