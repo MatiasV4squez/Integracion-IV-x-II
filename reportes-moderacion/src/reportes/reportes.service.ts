@@ -3,6 +3,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { CreateReporteDto } from './dto/create-reporte.dto.js';
 import { UpdateReporteDto } from './dto/update-reporte.dto.js';
 import { ConsultaReportesAdminDto } from './dto/consulta-reportes-admin.dto.js';
+import { ResolverReporteDto } from './dto/resolver-reporte.dto.js';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
@@ -70,6 +71,17 @@ export class ReportesService {
     return nuevoReporte;
   }
 
+  async resolver(id: number, resolverReporteDto: ResolverReporteDto) {
+    const reporteActualizado = await this.prisma.reporte.update({
+      where: { id },
+      data: {
+        estado: resolverReporteDto.estado,
+      },
+    });
+
+    return reporteActualizado;
+  }
+  
   findAll() {
     return `This action returns all reportes`;
   }

@@ -14,6 +14,7 @@ import { CreateReporteDto } from './dto/create-reporte.dto.js';
 import { UpdateReporteDto } from './dto/update-reporte.dto.js';
 import { ConsultaReportesAdminDto } from './dto/consulta-reportes-admin.dto.js';
 import { ValidarSesionParaReporteGuard } from './guards/validar-sesion-para-reporte.guard.js';
+import { ResolverReporteDto } from './dto/resolver-reporte.dto.js';
 
 @Controller('reportes')
 export class ReportesController {
@@ -48,5 +49,13 @@ export class ReportesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.reportesService.remove(+id);
+  }
+
+  @Patch(':id/resolucion')
+  resolver(
+    @Param('id') id: string, 
+    @Body() resolverReporteDto: ResolverReporteDto
+  ) {
+    return this.reportesService.resolver(+id, resolverReporteDto);
   }
 }
