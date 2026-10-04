@@ -16,7 +16,8 @@ import {
 } from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
-import { UpdateSessionStatusDto } from './dto/update-session-status.dto'; // Asegúrate de ajustar la ruta de este DTO según la estructura de tus carpetas
+import { ResolveConflictDto } from './dto/resolve-conflict.dto'; // Asegúrate de importar el DTO correspondiente
+import { UpdateSessionStatusDto } from './dto/update-session-status.dto';
 import {
   OCCUPYING_STATES,
   parseIdentifier,
@@ -165,6 +166,48 @@ export class SessionsService {
       const session = await this.findSessionOrFail(tx, id);
       validateTutor(session, tutorId);
       return this.transitionSession(tx, session, updateStatusDto.estado as sesion_estado_sesion_enum);
+    });
+
+    return toSessionResponse(updated);
+  }
+
+  // 1. Obtener historial de sesiones por usuario
+  async getHistorialSesiones(idUsuario: string) {
+    const userId = parseIdentifier(idUsuario, 'id_usuario');
+
+    const sesiones = await this.prisma.sesion.findMany({
+      where: {
+        OR: [
+          { id_tutee: userId },
+          { id_tutor: userId },
+        ],
+      },
+      orderBy: {
+        fecha_creacion: 'desc',
+      },
+    });
+
+    return sesiones.map((sesion) => toSessionResponse(sesion));
+  }
+
+  // 2. Resolución administrativa de conflictos
+  async resolveConflict(
+    idSesion: string,
+    resolveConflictDto: ResolveConflictDto,
+    idAdmin: string,
+  ) {
+    const id = parseIdentifier(idSesion, 'id_sesion');
+    const adminId = parseIdentifier(idAdmin, 'id_admin');
+
+    const updated = await runSerializable(this.prisma, async (tx) => {
+      const session = await this.findSessionOrFail(tx, id);
+
+      // Validar si la sesión se encuentra actualmente en un estado resolbible (e.g. EN_CONFLICTO)
+      validateState(session, 'EN_CONFLICTO');
+
+      const nextState = resolveConflictDto.nuevo_estado as sesion_estado_sesion_enum;
+
+      return this.transitionSession(tx, session, nextState);
     });
 
     return toSessionResponse(updated);

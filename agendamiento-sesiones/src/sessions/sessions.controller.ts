@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -10,6 +11,7 @@ import {
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
+import { ResolveConflictDto } from './dto/resolve-conflict.dto';
 import { UpdateSessionStatusDto } from './dto/update-session-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/autenticacion-request';
@@ -21,6 +23,12 @@ export class SessionsController {
   @Post()
   async createSession(@Body() createSessionDto: CreateSessionDto) {
     return this.sessionsService.createSession(createSessionDto);
+  }
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  async getHistory(@Req() request: AuthenticatedRequest) {
+    return this.sessionsService.getHistorialSesiones(request.user.idUsuario);
   }
 
   @Patch(':id/accept')
@@ -70,6 +78,20 @@ export class SessionsController {
       idSesion,
       request.user.idUsuario,
       declaracion,
+    );
+  }
+
+  @Patch(':id/resolve-conflict')
+  @UseGuards(JwtAuthGuard)
+  async resolveConflict(
+    @Param('id') idSesion: string,
+    @Body() resolveConflictDto: ResolveConflictDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.sessionsService.resolveConflict(
+      idSesion,
+      resolveConflictDto,
+      request.user.idUsuario,
     );
   }
 }
