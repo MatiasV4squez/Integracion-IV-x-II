@@ -1,14 +1,36 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializable } from '../database/serializable-transaction';
-import { type Prisma, type resultado_cierre_enum, type sesion, type sesion_estado_sesion_enum } from '../generated/prisma/client';
+import {
+  type Prisma,
+  type resultado_cierre_enum,
+  type sesion,
+  type sesion_estado_sesion_enum,
+} from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { CalificarSesionDto } from './dto/calificar-sesion.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
 import { ResolveConflictDto } from './dto/resolve-conflict.dto';
 import { ReputacionIntegracionService } from './reputacion-integracion.service';
-import { aRespuestaCalificacion, OCCUPYING_STATES, parseIdentifier, toDeclarationResponse, toSessionResponse, ValidateTransition, validateParticipant, validateState, validateTutor } from './session.rules';
+import {
+  aRespuestaCalificacion,
+  OCCUPYING_STATES,
+  parseIdentifier,
+  toDeclarationResponse,
+  toSessionResponse,
+  ValidateTransition,
+  validateParticipant,
+  validateState,
+  validateTutor,
+} from './session.rules';
 
 @Injectable()
 export class SessionsService {
@@ -52,8 +74,7 @@ export class SessionsService {
       const session = await this.findSessionOrFail(tx, id);
       validateTutor(session, userId);
       validateState(session, 'PENDIENTE');
-      const result = await this.transitionSession(tx, session, 'RECHAZADA');
-      return result;
+      return this.transitionSession(tx, session, 'RECHAZADA');
     });
     return toSessionResponse(updated);
   }
@@ -66,8 +87,7 @@ export class SessionsService {
       validateParticipant(session, userId);
       validateState(session, 'CONFIRMADA');
       await this.ensureBeforeStart(tx, session.inicio);
-      const result = await this.transitionSession(tx, session, 'CANCELADA');
-      return result;
+      return this.transitionSession(tx, session, 'CANCELADA');
     });
     return toSessionResponse(updated);
   }
@@ -126,7 +146,9 @@ export class SessionsService {
           declarations[1].resultado_declarado &&
         declarations[0].id_usuario_inasistente ===
           declarations[1].id_usuario_inasistente;
-      const next = sameResult ? dto.resultado_declarado : 'EN_CONFLICTO';
+      const next = sameResult
+        ? (dto.resultado_declarado as unknown as sesion_estado_sesion_enum)
+        : ('EN_CONFLICTO' as sesion_estado_sesion_enum);
       const updated = await this.transitionSession(tx, session, next);
       return { session: updated, declaration: own };
     });
@@ -137,16 +159,12 @@ export class SessionsService {
     };
   }
 
-  // 1. Obtener historial de sesiones por usuario
   async getHistorialSesiones(idUsuario: string) {
     const userId = parseIdentifier(idUsuario, 'id_usuario');
 
     const sesiones = await this.prisma.sesion.findMany({
       where: {
-        OR: [
-          { id_tutee: userId },
-          { id_tutor: userId },
-        ],
+        OR: [{ id_tutee: userId }, { id_tutor: userId }],
       },
       orderBy: {
         fecha_creacion: 'desc',
@@ -160,7 +178,6 @@ export class SessionsService {
     }));
   }
 
-  // 2. Resolución administrativa de conflictos
   async resolveConflict(
     idSesion: string,
     resolveConflictDto: ResolveConflictDto,
@@ -197,13 +214,15 @@ export class SessionsService {
   ) {
     const idSesionNumerico = parseIdentifier(idSesion, 'id_sesion');
     const evaluador = parseIdentifier(idUsuario, 'id_usuario');
-    const resultado = await runSerializable(this.prisma, async (transaccion) => {
+
+    const resultado = await runSerializable(this.prisma, async (transaccion: Prisma.TransactionClient) => {
       const sesion = await this.findSessionOrFail(
         transaccion,
         idSesionNumerico,
       );
       validateParticipant(sesion, evaluador);
       validateState(sesion, 'COMPLETADA');
+
       const evaluado =
         evaluador === sesion.id_tutor ? sesion.id_tutee : sesion.id_tutor;
       if (evaluador === evaluado) {
@@ -211,17 +230,21 @@ export class SessionsService {
       }
 
       const insercion = await transaccion.calificacion.createMany({
-        data: [{
-          id_sesion: idSesionNumerico,
-          id_evaluador: evaluador,
-          id_evaluado: evaluado,
-          puntuacion: dto.puntuacion,
-        }],
+        data: [
+          {
+            id_sesion: idSesionNumerico,
+            id_evaluador: evaluador,
+            id_evaluado: evaluado,
+            puntuacion: dto.puntuacion,
+          },
+        ],
         skipDuplicates: true,
       });
+
       if (insercion.count !== 1) {
         throw new ConflictException('Ya calificaste esta sesión.');
       }
+
       const calificacion = await transaccion.calificacion.findUniqueOrThrow({
         where: {
           id_sesion_id_evaluador: {
@@ -230,16 +253,19 @@ export class SessionsService {
           },
         },
       });
+
       const reputacionTutor = await this.calcularReputacionTutor(
         transaccion,
         sesion.id_tutor,
       );
+
       const debeSincronizar = evaluado === sesion.id_tutor;
       if (debeSincronizar) {
         await transaccion.entrega_reputacion_tutor.create({
           data: { id_calificacion: calificacion.id_calificacion },
         });
       }
+
       return { calificacion, reputacionTutor, debeSincronizar };
     });
 
@@ -252,6 +278,7 @@ export class SessionsService {
         this.logger.error('No se pudo iniciar la sincronización de reputación.');
       }
     }
+
     return {
       calificacion: aRespuestaCalificacion(resultado.calificacion),
       reputacion_tutor: resultado.reputacionTutor,
@@ -264,21 +291,23 @@ export class SessionsService {
   }
 
   private async calcularReputacionTutor(
-    cliente: Pick<Prisma.TransactionClient, 'calificacion'>,
+    cliente: Prisma.TransactionClient | PrismaService,
     idTutor: bigint,
   ) {
-    const resumen = await cliente.calificacion.aggregate({
+    const resumen = await (cliente as Prisma.TransactionClient).calificacion.aggregate({
       where: { id_evaluado: idTutor, sesion: { id_tutor: idTutor } },
       _avg: { puntuacion: true },
       _count: { _all: true },
     });
+
     const cantidad = resumen._count._all;
-    const promedio = resumen._avg.puntuacion;
+    const promedio = resumen._avg.puntuacion ?? 0;
+
     return {
       id_tutor: idTutor.toString(),
       cantidad_calificaciones: cantidad,
       promedio,
-      requiere_revision: cantidad >= 3 && promedio !== null && promedio < 2.5,
+      requiere_revision: cantidad >= 3 && promedio < 2.5,
     };
   }
 
@@ -350,7 +379,7 @@ export class SessionsService {
           await this.transitionSession(
             tx,
             session,
-            session.declaraciones[0].resultado_declarado,
+            session.declaraciones[0].resultado_declarado as unknown as sesion_estado_sesion_enum,
             true,
           );
         });
