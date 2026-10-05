@@ -9,6 +9,9 @@ import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SessionService } from './session.service';
+import { InternalModeracionController } from './internal-moderacion.controller';
+import { InternalServiceGuard } from './internal-service.guard';
+import { ModeracionCuentasService } from './moderacion-cuentas.service';
 
 @Global()
 @Module({
@@ -28,13 +31,15 @@ import { SessionService } from './session.service';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, InternalModeracionController],
   providers: [
     AuthService,
     PasswordService,
     TokenService,
     SessionService,
     JwtAuthGuard,
+    InternalServiceGuard,
+    ModeracionCuentasService,
   ],
   exports: [JwtModule, JwtAuthGuard, SessionService],
 })

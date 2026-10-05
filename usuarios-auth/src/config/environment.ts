@@ -56,6 +56,10 @@ export function validateEnvironment(config: Record<string, unknown>) {
   if (Buffer.byteLength(jwtSecret, 'utf8') < 32) {
     throw new Error('JWT_SECRET debe contener al menos 32 bytes.');
   }
+  const internalServiceApiKey = required(config, 'INTERNAL_SERVICE_API_KEY');
+  if (Buffer.byteLength(internalServiceApiKey, 'utf8') < 32) {
+    throw new Error('INTERNAL_SERVICE_API_KEY debe contener al menos 32 bytes.');
+  }
   const jwtAccessTtlSeconds = integerInRange(
     config.JWT_ACCESS_TTL_SECONDS,
     'JWT_ACCESS_TTL_SECONDS',
@@ -95,6 +99,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     DATABASE_URL: databaseUrl,
     PORT: port,
     JWT_SECRET: jwtSecret,
+    INTERNAL_SERVICE_API_KEY: internalServiceApiKey,
     JWT_ACCESS_TTL_SECONDS: jwtAccessTtlSeconds,
     JWT_IDLE_TIMEOUT_SECONDS: jwtIdleTimeoutSeconds,
     SMTP_HOST: smtpHost,
