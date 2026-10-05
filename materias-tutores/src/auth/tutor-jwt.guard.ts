@@ -1,13 +1,6 @@
-import {
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import {
-  AuthenticatedJwtGuard,
-  type AuthenticatedRequest,
-} from './authenticated-jwt.guard.js';
+import { AuthenticatedJwtGuard, type AuthenticatedRequest } from './authenticated-jwt.guard.js';
 
 export interface TutorRequest extends AuthenticatedRequest {
   idTutor: bigint;

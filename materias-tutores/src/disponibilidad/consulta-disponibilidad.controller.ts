@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
 import { parsePositiveId } from '../auth/parse-positive-id.js';
 import type { BloqueDisponibilidadResponseDto } from './dto/bloque-disponibilidad.response.dto.js';

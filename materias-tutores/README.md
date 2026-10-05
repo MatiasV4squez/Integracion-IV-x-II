@@ -61,6 +61,38 @@ La respuesta es un arreglo de objetos con `idBloque`, `dia`, `horaInicio`, `hora
 
 La consulta refleja los estados almacenados en `materias-tutores`. Para ocultar las solicitudes pendientes y sesiones confirmadas en la aplicación integrada, Agendamiento debe actualizar el estado de los bloques al reservarlos y liberarlos; esa integración sigue pendiente.
 
+## Postulaciones y tutores habilitados
+
+La migración `20261004120000_postulaciones_tutores` crea `postulacion_tutor`, `tutor_materia`, `perfil_tutor` y el registro idempotente de calificaciones. Ejecútala en la base del microservicio con `npm run prisma:deploy`. Los identificadores `BIGINT` se envían como texto en JSON. El JWT identifica al estudiante o al administrador; ninguna ruta acepta un ID de usuario en el cuerpo para postular.
+
+| Método y ruta | Acceso | Uso |
+| --- | --- | --- |
+| `POST /postulaciones` | Usuario autenticado | `multipart/form-data`: `idMateria` (texto) y `certificado` (PDF/PNG, hasta 5 MB). Responde `201` con estado `PENDIENTE`. |
+| `GET /postulaciones/mias` | Usuario autenticado | Historial propio. |
+| `GET /postulaciones/pendientes` | Administrador | Cola en `PENDIENTE` y `PENDIENTE_ROL`. |
+| `GET /postulaciones/:idPostulacion/certificado` | Dueño o administrador | Descarga privada del archivo. |
+| `PATCH /postulaciones/:idPostulacion/aprobar` | Administrador | JSON `{ "notaAcreditada": 5.0 }`, mínimo 5.0. |
+| `PATCH /postulaciones/:idPostulacion/rechazar` | Administrador | JSON `{ "motivoRechazo": "Certificado ilegible" }`. |
+| `POST /postulaciones/:idPostulacion/reintentar-rol` | Administrador | Reintenta el rol tras un fallo del servicio de usuarios. |
+
+El backend verifica extensión, MIME, firma del archivo y tamaño; el administrador verifica manualmente el contenido y la nota. Los certificados se guardan con nombre derivado de SHA-256 en `CERTIFICADOS_DIR`, privado y persistente; respalda este directorio junto con la base. La ruta de certificados exige identidad y nunca expone la ruta local. Una única postulación activa por usuario y materia se protege con índice parcial en PostgreSQL. Una postulación rechazada puede enviarse de nuevo.
+
+Al aprobar se registra `PENDIENTE_ROL` y la relación `tutor_materia` queda `vigente=false`. El servicio llama por HTTP al endpoint configurado en `USUARIOS_AUTH_ASIGNAR_TUTOR_URL` con `X-Integracion-Secret` y el JSON `{ "idUsuario": "10", "rol": "TUTOR" }`. Ese endpoint debe responder `2xx` y ser idempotente. Solo tras esa confirmación se marca `APROBADA` y `vigente=true`. Si falta la configuración o falla la llamada, la API devuelve `503`; el administrador puede reintentar sin volver a acreditar la nota. La URL concreta y el endpoint receptor se deben acordar con `usuarios-auth`; este repositorio no contiene ese microservicio y no se ha comprobado esa llamada contra él.
+
+## Contratos con Agendamiento y reputación
+
+Las rutas internas requieren `X-Integracion-Secret` de al menos 32 bytes. Configura el mismo secreto en el servicio emisor. No son rutas para clientes web o móviles.
+
+| Método y ruta | Cuerpo | Efecto |
+| --- | --- | --- |
+| `PATCH /integraciones/bloques/:idBloque/estado` | `{ "estado": "RESERVADO" }` o `{ "estado": "DISPONIBLE" }` | Reserva al crear una solicitud; conserva la reserva en `PENDIENTE`, `CONFIRMADA` y `PENDIENTE_CIERRE`; libera al cancelar, rechazar o cerrar cuando ya no hay solicitudes activas. Es idempotente y solo permite `DISPONIBLE ↔ RESERVADO`. |
+| `POST /integraciones/tutores/:idTutor/calificaciones` | `{ "idCalificacion": "42", "puntuacion": 5, "rolEvaluado": "TUTOR" }` | Registra una evaluación recibida como tutor. El identificador del evento evita duplicados. |
+| `GET /tutores/:idTutor/reputacion` | JWT Bearer | Devuelve `cantidadCalificaciones`, `promedio` exacto y estado `ACTIVO` o `EN_REVISION`. |
+
+La búsqueda pública existente solo devuelve bloques `DISPONIBLE`, y la edición o desactivación de un bloque exige ese mismo estado mediante una escritura condicional. El evento de calificación actualiza suma y cantidad en una transacción serializable; desde tres calificaciones, un promedio inferior a 2.5 marca `EN_REVISION`. El servicio emisor debe enviar únicamente notas que el usuario recibió actuando como tutor. La fuente de verdad de sesiones y calificaciones está en otros microservicios, por lo que el despliegue integrado requiere que estos llamen a las rutas anteriores; no se han probado llamadas reales entre micros.
+
+La documentación OpenAPI está disponible en `GET /api` al iniciar la aplicación.
+
 ## Verificación
 
 ```sh
@@ -82,15 +114,15 @@ npm run test:e2e
 - `src/materias/`: módulo HTTP del catálogo de materias, con controlador, servicio y DTO de respuesta.
 - `src/disponibilidad/`: gestión HTTP de bloques propios y consulta de horarios disponibles de un tutor.
 - `src/auth/`: verificación local del JWT y lectura segura del ID del tutor.
-- `prisma/schema.prisma`: proveedor PostgreSQL y modelos `Materia` y `BloqueHorario`.
+- `prisma/schema.prisma`: modelos de materia, bloque, postulación, habilitación y reputación.
 - `prisma/migrations/`: historial versionado de cambios de esquema.
 - `prisma/seed.ts`: datos iniciales idempotentes del catálogo.
 - `prisma.config.ts`: configuración de Prisma CLI y carga de `.env`.
 - `test/`: pruebas de extremo a extremo.
 
-El proyecto tiene sus propias dependencias y compilación. Según el SRS, se integrará mediante HTTP/REST con el API Gateway y gestionará su propio esquema o base de datos PostgreSQL, sin acceso directo a las bases de otros servicios.
+El proyecto tiene sus propias dependencias y compilación. Según el SRS, se integra mediante HTTP/REST con otros servicios y gestiona su propio esquema o base de datos PostgreSQL, sin acceso directo a las bases ajenas.
 
-La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos deben importar `DatabaseModule` e inyectar `PrismaService`. El catálogo de materias y la gestión propia de bloques están implementados; las postulaciones, la validación administrativa, la búsqueda de tutores y la integración con otros servicios quedan pendientes.
+La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos importan `DatabaseModule` e inyectan `PrismaService`. Están implementados el catálogo, la gestión de bloques, las postulaciones, la revisión y los contratos internos; falta conectarlos y probarlos contra los otros microservicios reales.
 
 No se crean tablas al arrancar. Las migraciones crean y aplican los cambios de esquema en desarrollo. `npm run prisma:deploy` aplica migraciones existentes en el entorno de despliegue.
 

@@ -1,22 +1,8 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { parsePositiveId } from '../auth/parse-positive-id.js';
 import { TutorJwtGuard, type TutorRequest } from '../auth/tutor-jwt.guard.js';
 import type { BloqueDisponibilidadResponseDto } from './dto/bloque-disponibilidad.response.dto.js';
-import {
-  validarActualizarBloque,
-  validarCrearBloque,
-} from './dto/validate-bloque-body.js';
+import { validarActualizarBloque, validarCrearBloque } from './dto/validate-bloque-body.js';
 import { DisponibilidadService } from './disponibilidad.service.js';
 
 @UseGuards(TutorJwtGuard)

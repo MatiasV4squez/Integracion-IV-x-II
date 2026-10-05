@@ -6,6 +6,8 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { MateriasModule } from './materias/materias.module.js';
 import { DisponibilidadModule } from './disponibilidad/disponibilidad.module.js';
+import { PostulacionesModule } from './postulaciones/postulaciones.module.js';
+import { IntegracionesModule } from './integraciones/integraciones.module.js';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { DisponibilidadModule } from './disponibilidad/disponibilidad.module.js'
     DatabaseModule,
     MateriasModule,
     DisponibilidadModule,
+    PostulacionesModule,
+    IntegracionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

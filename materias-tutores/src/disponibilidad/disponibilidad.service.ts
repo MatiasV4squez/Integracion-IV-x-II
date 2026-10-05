@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type BloqueHorario } from '../generated/prisma/client.js';
 import type { CrearBloqueDisponibilidadDto } from './dto/crear-bloque-disponibilidad.dto.js';

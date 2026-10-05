@@ -12,8 +12,59 @@ model Materia {
   idMateria BigInt @id @default(autoincrement()) @map("id_materia")
   codigo    String @unique @db.VarChar(50)
   nombre    String @db.VarChar(150)
+  postulaciones PostulacionTutor[]
+  tutoresHabilitados TutorMateria[]
 
   @@map("materia")
+}
+
+model PostulacionTutor {
+  idPostulacion BigInt @id @default(autoincrement()) @map("id_postulacion")
+  idUsuario BigInt @map("id_usuario")
+  idMateria BigInt @map("id_materia")
+  idAdministradorRevision BigInt? @map("id_administrador_revision")
+  certificadoRef String @map("certificado_ref") @db.VarChar(500)
+  certificadoNombre String @map("certificado_nombre") @db.VarChar(255)
+  certificadoTipo String @map("certificado_tipo") @db.VarChar(30)
+  notaAcreditada Decimal? @map("nota_acreditada") @db.Decimal(3,1)
+  estado String @default("PENDIENTE") @db.VarChar(30)
+  fechaPostulacion DateTime @default(now()) @map("fecha_postulacion")
+  fechaRevision DateTime? @map("fecha_revision")
+  motivoRechazo String? @map("motivo_rechazo") @db.VarChar(500)
+  materia Materia @relation(fields: [idMateria], references: [idMateria])
+
+  @@index([estado, fechaPostulacion])
+  @@index([idUsuario, idMateria, estado])
+  @@map("postulacion_tutor")
+}
+
+model TutorMateria {
+  idTutorMateria BigInt @id @default(autoincrement()) @map("id_tutor_materia")
+  idUsuario BigInt @map("id_usuario")
+  idMateria BigInt @map("id_materia")
+  fechaHabilitacion DateTime @default(now()) @map("fecha_habilitacion")
+  vigente Boolean @default(true)
+  materia Materia @relation(fields: [idMateria], references: [idMateria])
+
+  @@unique([idUsuario, idMateria])
+  @@map("tutor_materia")
+}
+
+model PerfilTutor {
+  idUsuario BigInt @id @map("id_usuario")
+  cantidadCalificaciones Int @default(0) @map("cantidad_calificaciones")
+  sumaCalificaciones Int @default(0) @map("suma_calificaciones")
+  estado String @default("ACTIVO") @db.VarChar(30)
+
+  @@map("perfil_tutor")
+}
+
+model CalificacionTutorProcesada {
+  idCalificacion BigInt @id @map("id_calificacion")
+  idTutor BigInt @map("id_tutor")
+  puntuacion Int
+
+  @@map("calificacion_tutor_procesada")
 }
 
 model BloqueHorario {

@@ -6,6 +6,7 @@ coverage/
 .nyc_output/
 *.tsbuildinfo
 src/generated/prisma/
+certificados/
 
 # Local environment and secrets
 .env

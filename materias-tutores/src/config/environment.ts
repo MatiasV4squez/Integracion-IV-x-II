@@ -36,6 +36,30 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error('JWT_SECRET debe contener al menos 32 bytes.');
   }
 
+  const integracionSecret = config.INTEGRACION_SECRET;
+  if (
+    integracionSecret !== undefined &&
+    (typeof integracionSecret !== 'string' ||
+      Buffer.byteLength(integracionSecret, 'utf8') < 32)
+  ) {
+    throw new Error('INTEGRACION_SECRET debe contener al menos 32 bytes.');
+  }
+  const rolUrl = config.USUARIOS_AUTH_ASIGNAR_TUTOR_URL;
+  if (rolUrl !== undefined) {
+    if (typeof rolUrl !== 'string')
+      throw new Error(
+        'USUARIOS_AUTH_ASIGNAR_TUTOR_URL debe ser una URL válida.',
+      );
+    try {
+      const url = new URL(rolUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+    } catch {
+      throw new Error(
+        'USUARIOS_AUTH_ASIGNAR_TUTOR_URL debe ser una URL HTTP válida.',
+      );
+    }
+  }
+
   return {
     ...config,
     DATABASE_URL: databaseUrl,
