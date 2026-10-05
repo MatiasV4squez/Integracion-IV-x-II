@@ -22,6 +22,8 @@ model sesion {
   fecha_actualizacion   DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
   resultado_provisional Boolean                   @default(false)
   declaraciones         declaracion_cierre[]
+  resolucion_conflicto  resolucion_conflicto_sesion?
+  calificaciones        calificacion[]
 
   @@index([id_tutee, estado_sesion])
   @@index([id_tutor, inicio, fin])
@@ -39,6 +41,43 @@ model declaracion_cierre {
 
   @@unique([id_sesion, id_usuario])
   @@index([id_sesion, fecha_declaracion])
+}
+
+// Auditoría propia de la transición administrativa; otros micros referencian el ID.
+model resolucion_conflicto_sesion {
+  id_resolucion     BigInt               @id @default(autoincrement())
+  id_sesion         BigInt               @unique
+  id_administrador  BigInt
+  estado_final      resultado_cierre_enum
+  motivo_resolucion String               @db.VarChar(500)
+  observaciones     String?              @db.Text
+  fecha_resolucion  DateTime             @default(now()) @db.Timestamptz(3)
+  sesion             sesion               @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+}
+
+model calificacion {
+  id_calificacion    BigInt   @id @default(autoincrement())
+  id_sesion          BigInt
+  id_evaluador       BigInt
+  id_evaluado        BigInt
+  puntuacion         Int
+  fecha_calificacion DateTime @default(now()) @db.Timestamptz(3)
+  sesion             sesion   @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+  entrega_reputacion entrega_reputacion_tutor?
+
+  @@unique([id_sesion, id_evaluador])
+  @@index([id_evaluado])
+}
+
+// Cola durable para sincronizar notas recibidas como tutor con materias-tutores.
+model entrega_reputacion_tutor {
+  id_calificacion BigInt       @id
+  fecha_creacion  DateTime     @default(now()) @db.Timestamptz(3)
+  fecha_entrega   DateTime?    @db.Timestamptz(3)
+  intentos        Int          @default(0)
+  calificacion    calificacion @relation(fields: [id_calificacion], references: [id_calificacion], onDelete: Restrict)
+
+  @@index([fecha_entrega, fecha_creacion])
 }
 
 enum resultado_cierre_enum {

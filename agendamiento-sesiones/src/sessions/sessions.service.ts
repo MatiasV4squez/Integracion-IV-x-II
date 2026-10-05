@@ -1,47 +1,29 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { runSerializable } from '../database/serializable-transaction';
-import {
-  type Prisma,
-  type sesion,
-  type sesion_estado_sesion_enum,
-} from '../generated/prisma/client';
+import { type Prisma, type resultado_cierre_enum, type sesion, type sesion_estado_sesion_enum } from '../generated/prisma/client';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { CalificarSesionDto } from './dto/calificar-sesion.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
-import { ResolveConflictDto } from './dto/resolve-conflict.dto'; // Asegúrate de importar el DTO correspondiente
-import { UpdateSessionStatusDto } from './dto/update-session-status.dto';
-import {
-  OCCUPYING_STATES,
-  parseIdentifier,
-  toDeclarationResponse,
-  toSessionResponse,
-  ValidateTransition,
-  validateParticipant,
-  validateState,
-  validateTutor,
-} from './session.rules';
+import { ResolveConflictDto } from './dto/resolve-conflict.dto';
+import { ReputacionIntegracionService } from './reputacion-integracion.service';
+import { aRespuestaCalificacion, OCCUPYING_STATES, parseIdentifier, toDeclarationResponse, toSessionResponse, ValidateTransition, validateParticipant, validateState, validateTutor } from './session.rules';
 
 @Injectable()
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reputacionIntegracion: ReputacionIntegracionService,
+  ) {}
 
   createSession(dto: CreateSessionDto) {
     parseIdentifier(dto.id_tutor, 'id_tutor');
     parseIdentifier(dto.id_tutee, 'id_tutee');
     parseIdentifier(dto.id_materia, 'id_materia');
     parseIdentifier(dto.id_bloque, 'id_bloque');
-    // Pendiente del equipo: obtener el horario y comprobar la reserva del bloque.
-    // No persistir solicitudes con horarios inventados o disponibilidad sin validar.
     throw new ServiceUnavailableException(
       'La creación de solicitudes está pendiente de la conexión con bloques horarios.',
     );
@@ -155,22 +137,6 @@ export class SessionsService {
     };
   }
 
-  async updateSessionStatusByTutor(
-    id_sesion: string,
-    updateStatusDto: UpdateSessionStatusDto,
-  ) {
-    const id = parseIdentifier(id_sesion, 'id_sesion');
-    const tutorId = parseIdentifier(updateStatusDto.id_tutor, 'id_tutor');
-
-    const updated = await runSerializable(this.prisma, async (tx) => {
-      const session = await this.findSessionOrFail(tx, id);
-      validateTutor(session, tutorId);
-      return this.transitionSession(tx, session, updateStatusDto.estado as sesion_estado_sesion_enum);
-    });
-
-    return toSessionResponse(updated);
-  }
-
   // 1. Obtener historial de sesiones por usuario
   async getHistorialSesiones(idUsuario: string) {
     const userId = parseIdentifier(idUsuario, 'id_usuario');
@@ -185,9 +151,13 @@ export class SessionsService {
       orderBy: {
         fecha_creacion: 'desc',
       },
+      include: { calificaciones: true },
     });
 
-    return sesiones.map((sesion) => toSessionResponse(sesion));
+    return sesiones.map((sesion) => ({
+      ...toSessionResponse(sesion),
+      calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
+    }));
   }
 
   // 2. Resolución administrativa de conflictos
@@ -202,15 +172,114 @@ export class SessionsService {
     const updated = await runSerializable(this.prisma, async (tx) => {
       const session = await this.findSessionOrFail(tx, id);
 
-      // Validar si la sesión se encuentra actualmente en un estado resolbible (e.g. EN_CONFLICTO)
       validateState(session, 'EN_CONFLICTO');
-
       const nextState = resolveConflictDto.nuevo_estado as sesion_estado_sesion_enum;
-
-      return this.transitionSession(tx, session, nextState);
+      const resolved = await this.transitionSession(tx, session, nextState);
+      await tx.resolucion_conflicto_sesion.create({
+        data: {
+          id_sesion: id,
+          id_administrador: adminId,
+          estado_final: resolveConflictDto.nuevo_estado as resultado_cierre_enum,
+          motivo_resolucion: resolveConflictDto.motivo_resolucion.trim(),
+          observaciones: resolveConflictDto.observaciones ?? null,
+        },
+      });
+      return resolved;
     });
 
     return toSessionResponse(updated);
+  }
+
+  async calificarSesion(
+    idSesion: string,
+    idUsuario: string,
+    dto: CalificarSesionDto,
+  ) {
+    const idSesionNumerico = parseIdentifier(idSesion, 'id_sesion');
+    const evaluador = parseIdentifier(idUsuario, 'id_usuario');
+    const resultado = await runSerializable(this.prisma, async (transaccion) => {
+      const sesion = await this.findSessionOrFail(
+        transaccion,
+        idSesionNumerico,
+      );
+      validateParticipant(sesion, evaluador);
+      validateState(sesion, 'COMPLETADA');
+      const evaluado =
+        evaluador === sesion.id_tutor ? sesion.id_tutee : sesion.id_tutor;
+      if (evaluador === evaluado) {
+        throw new BadRequestException('No puedes calificarte a ti mismo.');
+      }
+
+      const insercion = await transaccion.calificacion.createMany({
+        data: [{
+          id_sesion: idSesionNumerico,
+          id_evaluador: evaluador,
+          id_evaluado: evaluado,
+          puntuacion: dto.puntuacion,
+        }],
+        skipDuplicates: true,
+      });
+      if (insercion.count !== 1) {
+        throw new ConflictException('Ya calificaste esta sesión.');
+      }
+      const calificacion = await transaccion.calificacion.findUniqueOrThrow({
+        where: {
+          id_sesion_id_evaluador: {
+            id_sesion: idSesionNumerico,
+            id_evaluador: evaluador,
+          },
+        },
+      });
+      const reputacionTutor = await this.calcularReputacionTutor(
+        transaccion,
+        sesion.id_tutor,
+      );
+      const debeSincronizar = evaluado === sesion.id_tutor;
+      if (debeSincronizar) {
+        await transaccion.entrega_reputacion_tutor.create({
+          data: { id_calificacion: calificacion.id_calificacion },
+        });
+      }
+      return { calificacion, reputacionTutor, debeSincronizar };
+    });
+
+    if (resultado.debeSincronizar) {
+      try {
+        await this.reputacionIntegracion.enviarCalificacion(
+          resultado.calificacion.id_calificacion,
+        );
+      } catch {
+        this.logger.error('No se pudo iniciar la sincronización de reputación.');
+      }
+    }
+    return {
+      calificacion: aRespuestaCalificacion(resultado.calificacion),
+      reputacion_tutor: resultado.reputacionTutor,
+    };
+  }
+
+  async obtenerReputacionTutor(idTutor: string) {
+    const idTutorNumerico = parseIdentifier(idTutor, 'id_tutor');
+    return this.calcularReputacionTutor(this.prisma, idTutorNumerico);
+  }
+
+  private async calcularReputacionTutor(
+    cliente: Pick<Prisma.TransactionClient, 'calificacion'>,
+    idTutor: bigint,
+  ) {
+    const resumen = await cliente.calificacion.aggregate({
+      where: { id_evaluado: idTutor, sesion: { id_tutor: idTutor } },
+      _avg: { puntuacion: true },
+      _count: { _all: true },
+    });
+    const cantidad = resumen._count._all;
+    const promedio = resumen._avg.puntuacion;
+    return {
+      id_tutor: idTutor.toString(),
+      cantidad_calificaciones: cantidad,
+      promedio,
+      requiere_revision: cantidad >= 3 && promedio !== null && promedio < 2.5,
+    };
   }
 
   @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })

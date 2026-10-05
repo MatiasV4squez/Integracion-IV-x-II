@@ -1,18 +1,9 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { DeclararCierreDto } from './dto/declarar-cierre.dto';
 import { ResolveConflictDto } from './dto/resolve-conflict.dto';
-import { UpdateSessionStatusDto } from './dto/update-session-status.dto';
+import { CalificarSesionDto } from './dto/calificar-sesion.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/autenticacion-request';
 
@@ -29,6 +20,11 @@ export class SessionsController {
   @UseGuards(JwtAuthGuard)
   async getHistory(@Req() request: AuthenticatedRequest) {
     return this.sessionsService.getHistorialSesiones(request.user.idUsuario);
+  }
+
+  @Get('tutors/:id/reputation')
+  obtenerReputacionTutor(@Param('id') idTutor: string) {
+    return this.sessionsService.obtenerReputacionTutor(idTutor);
   }
 
   @Patch(':id/accept')
@@ -58,15 +54,6 @@ export class SessionsController {
     return this.sessionsService.cancelSession(idSesion, request.user.idUsuario);
   }
 
-  @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
-  updateStatus(
-    @Param('id') id: string,
-    @Body() updateStatusDto: UpdateSessionStatusDto,
-  ) {
-    return this.sessionsService.updateSessionStatusByTutor(id, updateStatusDto);
-  }
-
   @Post(':id/closure-declarations')
   @UseGuards(JwtAuthGuard)
   declararCierre(
@@ -81,6 +68,20 @@ export class SessionsController {
     );
   }
 
+  @Post(':id/ratings')
+  @UseGuards(JwtAuthGuard)
+  calificarSesion(
+    @Param('id') idSesion: string,
+    @Body() calificacion: CalificarSesionDto,
+    @Req() solicitud: AuthenticatedRequest,
+  ) {
+    return this.sessionsService.calificarSesion(
+      idSesion,
+      solicitud.user.idUsuario,
+      calificacion,
+    );
+  }
+
   @Patch(':id/resolve-conflict')
   @UseGuards(JwtAuthGuard)
   async resolveConflict(
@@ -88,6 +89,15 @@ export class SessionsController {
     @Body() resolveConflictDto: ResolveConflictDto,
     @Req() request: AuthenticatedRequest,
   ) {
+    const esAdministrador = request.user.roles.some((rol) =>
+      ['ADMINISTRADOR', 'ADMIN'].includes(rol.trim().toUpperCase()),
+    );
+    if (!esAdministrador) {
+      throw new ForbiddenException(
+        'Solo un administrador puede resolver conflictos.',
+      );
+    }
+
     return this.sessionsService.resolveConflict(
       idSesion,
       resolveConflictDto,

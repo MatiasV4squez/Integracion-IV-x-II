@@ -1,9 +1,4 @@
-import {
-    CanActivate,
-    ExecutionContext,
-    Injectable,
-    UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedRequest } from './autenticacion-request';
 
@@ -57,9 +52,19 @@ export class JwtAuthGuard implements CanActivate {
                 'El token no contiene una vigencia válida.',
             );
         }
+        const roles = payload.roles;
+        if (
+            !Array.isArray(roles) ||
+            !roles.every((rol: unknown) => typeof rol === 'string')
+        ) {
+            throw new UnauthorizedException(
+                'El token no contiene roles válidos.',
+            );
+        }
 
         request.user = {
             idUsuario: payload.sub,
+            roles: roles as string[],
         };
 
         return true;

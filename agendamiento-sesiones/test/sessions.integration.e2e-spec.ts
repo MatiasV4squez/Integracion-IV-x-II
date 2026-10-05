@@ -11,13 +11,10 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { getDatabaseUrl } from '../src/database/database.config';
 import { PrismaService } from '../src/database/prisma.service';
-import {
-  Prisma,
-  PrismaClient,
-  type sesion_estado_sesion_enum,
-} from '../src/generated/prisma/client';
+import { Prisma, PrismaClient, type sesion_estado_sesion_enum } from '../src/generated/prisma/client';
 import { SessionsModule } from '../src/sessions/sessions.module';
 import { SessionsService } from '../src/sessions/sessions.service';
+import { ReputacionIntegracionService } from '../src/sessions/reputacion-integracion.service';
 
 // Pruebas de sesiones y JWT con PostgreSQL real en un esquema aislado.
 describe('Aceptar, rechazar y cancelar sesiones', () => {
@@ -25,6 +22,8 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
   let prisma: PrismaClient;
   let admin: Client;
   let service: SessionsService;
+  let integracion: ReputacionIntegracionService;
+  let configuracion: ConfigService;
   const schema = `test_sessions_${randomUUID().replaceAll('-', '')}`;
   const secret = randomBytes(32).toString('hex');
   const jwt = new JwtService({ secret });
@@ -45,6 +44,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
         iss: 'stp-usuarios-auth',
         aud: 'stp-clients',
         exp: Math.floor(Date.now() / 1000) + 600,
+        roles: sub === tutor ? ['TUTOR'] : ['TUTEE'],
         ...claims,
       }).filter(([, value]) => value !== undefined),
     );
@@ -65,6 +65,16 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       .set('Authorization', `Bearer ${token(user)}`)
       .send(body);
   }
+  function calificar(
+    id: string | bigint,
+    puntuacion: unknown,
+    usuario = tutee,
+  ) {
+    return request(app.getHttpServer())
+      .post(`/sessions/${id}/ratings`)
+      .set('Authorization', `Bearer ${token(usuario)}`)
+      .send({ puntuacion });
+  }
   function create(blockId: string, student = tutee, owner = tutor) {
     return request(app.getHttpServer()).post('/sessions').send({
       id_tutee: student,
@@ -80,6 +90,9 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       'bloque_horario',
       'reserva_bloque',
       'declaracion_cierre',
+      'resolucion_conflicto_sesion',
+      'calificacion',
+      'entrega_reputacion_tutor',
     ]) {
       const found = await admin.query('SELECT to_regclass($1) AS name', [
         `public.${table}`,
@@ -133,8 +146,13 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     );
     await app.init();
     service = app.get(SessionsService);
+    integracion = app.get(ReputacionIntegracionService);
+    configuracion = app.get(ConfigService);
   }, 30000);
   beforeEach(async () => {
+    await prisma.entrega_reputacion_tutor.deleteMany();
+    await prisma.calificacion.deleteMany();
+    await prisma.resolucion_conflicto_sesion.deleteMany();
     await prisma.declaracion_cierre.deleteMany();
     await prisma.sesion.deleteMany();
   });
@@ -155,11 +173,13 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
   async function fixture(
     state: sesion_estado_sesion_enum = 'PENDIENTE',
     day = '2099-06-20',
+    estudiante = tutee,
+    docente = tutor,
   ) {
     return prisma.sesion.create({
       data: {
-        id_tutor: BigInt(tutor),
-        id_tutee: BigInt(tutee),
+        id_tutor: BigInt(docente),
+        id_tutee: BigInt(estudiante),
         id_materia: BigInt(materia),
         id_bloque: 9007199254741000n,
         estado_sesion: state,
@@ -174,6 +194,201 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       where: { id_sesion: BigInt(id) },
     });
   }
+
+  it('solo los participantes pueden calificar una sesión completada', async () => {
+    const completada = await fixture('COMPLETADA');
+    const pendiente = await fixture('PENDIENTE_CIERRE');
+    const conflicto = await fixture('EN_CONFLICTO');
+    await request(app.getHttpServer())
+      .post(`/sessions/${completada.id_sesion}/ratings`)
+      .send({ puntuacion: 4 })
+      .expect(401);
+    await calificar(completada.id_sesion, 4, outsider).expect(403);
+    await calificar(pendiente.id_sesion, 4).expect(409);
+    await calificar(conflicto.id_sesion, 4).expect(409);
+    await calificar('9223372036854775807', 4).expect(404);
+    expect(await prisma.calificacion.count()).toBe(0);
+  });
+
+  it('valida la escala entera y rechaza datos de evaluador enviados por el cliente', async () => {
+    const sesion = await fixture('COMPLETADA');
+    for (const puntuacion of [0, 6, 2.5, '4', null]) {
+      await calificar(sesion.id_sesion, puntuacion).expect(400);
+    }
+    await request(app.getHttpServer())
+      .post(`/sessions/${sesion.id_sesion}/ratings`)
+      .set('Authorization', `Bearer ${token(tutee)}`)
+      .send({ puntuacion: 4, id_evaluado: outsider })
+      .expect(400);
+    expect(await prisma.calificacion.count()).toBe(0);
+  });
+
+  it('registra ambas calificaciones, conserva su unicidad y las muestra en el historial', async () => {
+    const sesion = await fixture('COMPLETADA');
+    const primera = await calificar(sesion.id_sesion, 4).expect(201);
+    expect(primera.body.calificacion).toMatchObject({
+      id_sesion: sesion.id_sesion.toString(),
+      id_evaluador: tutee,
+      id_evaluado: tutor,
+      puntuacion: 4,
+    });
+    expect(primera.body.reputacion_tutor).toMatchObject({
+      id_tutor: tutor,
+      cantidad_calificaciones: 1,
+      promedio: 4,
+      requiere_revision: false,
+    });
+    await calificar(sesion.id_sesion, 2, tutor).expect(201);
+    await calificar(sesion.id_sesion, 5).expect(409);
+    expect(await prisma.calificacion.count()).toBe(2);
+    const registros = await prisma.calificacion.findMany({
+      where: { id_sesion: sesion.id_sesion },
+      orderBy: { id_evaluador: 'asc' },
+    });
+    expect(registros.map((registro) => registro.id_evaluado)).toEqual([
+      BigInt(tutee),
+      BigInt(tutor),
+    ]);
+    expect(registros.map((registro) => registro.puntuacion).sort()).toEqual([
+      2, 4,
+    ]);
+    const historial = await request(app.getHttpServer())
+      .get('/sessions/history')
+      .set('Authorization', `Bearer ${token(tutee)}`)
+      .expect(200);
+    const sesionHistorial = historial.body.find(
+      (item: { id_sesion: string }) =>
+        item.id_sesion === sesion.id_sesion.toString(),
+    );
+    expect(sesionHistorial.calificaciones).toHaveLength(2);
+  });
+
+  it('calcula reputación solo con notas recibidas como tutor y detecta el umbral', async () => {
+    const inicial = await request(app.getHttpServer())
+      .get(`/sessions/tutors/${tutor}/reputation`)
+      .expect(200);
+    expect(inicial.body).toMatchObject({
+      cantidad_calificaciones: 0,
+      promedio: null,
+      requiere_revision: false,
+    });
+    for (const puntuacion of [2, 2, 3]) {
+      const sesion = await fixture('COMPLETADA');
+      await calificar(sesion.id_sesion, puntuacion).expect(201);
+      await calificar(sesion.id_sesion, 1, tutor).expect(201);
+    }
+    const comoEstudiante = await fixture(
+      'COMPLETADA',
+      '2099-06-20',
+      tutor,
+      outsider,
+    );
+    await calificar(comoEstudiante.id_sesion, 1, outsider).expect(201);
+    const reputacion = await request(app.getHttpServer())
+      .get(`/sessions/tutors/${tutor}/reputation`)
+      .expect(200);
+    expect(reputacion.body.cantidad_calificaciones).toBe(3);
+    expect(reputacion.body.promedio).toBeCloseTo(7 / 3);
+    expect(reputacion.body.requiere_revision).toBe(true);
+    const cuarta = await fixture('COMPLETADA');
+    await calificar(cuarta.id_sesion, 5).expect(201);
+    const recuperada = await request(app.getHttpServer())
+      .get(`/sessions/tutors/${tutor}/reputation`)
+      .expect(200);
+    expect(recuperada.body).toMatchObject({
+      cantidad_calificaciones: 4,
+      promedio: 3,
+      requiere_revision: false,
+    });
+  });
+
+  it('dos calificaciones simultáneas del mismo participante solo crean una', async () => {
+    const sesion = await fixture('COMPLETADA');
+    const respuestas = await Promise.all([
+      calificar(sesion.id_sesion, 1),
+      calificar(sesion.id_sesion, 5),
+    ]);
+    expect(respuestas.map((respuesta) => respuesta.status).sort()).toEqual([
+      201, 409,
+    ]);
+    const puntuacionGanadora = respuestas.find(
+      (respuesta) => respuesta.status === 201,
+    )!.body.calificacion.puntuacion;
+    const registro = await prisma.calificacion.findUniqueOrThrow({
+      where: {
+        id_sesion_id_evaluador: {
+          id_sesion: sesion.id_sesion,
+          id_evaluador: BigInt(tutee),
+        },
+      },
+    });
+    expect(registro.puntuacion).toBe(puntuacionGanadora);
+    expect(await prisma.calificacion.count()).toBe(1);
+  });
+
+  it('envía al otro micro solo las notas recibidas como tutor', async () => {
+    jest.spyOn(configuracion, 'get').mockImplementation((clave) => {
+      if (clave === 'MATERIAS_TUTORES_URL') return 'http://127.0.0.1:3001';
+      if (clave === 'INTEGRACION_SECRET') return secret;
+      return clave === 'JWT_SECRET' ? secret : undefined;
+    });
+    const enviar = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true, status: 201 } as Response);
+    const sesion = await fixture('COMPLETADA');
+    const respuesta = await calificar(sesion.id_sesion, 5).expect(201);
+    const idCalificacion = respuesta.body.calificacion.id_calificacion;
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(String(enviar.mock.calls[0][0])).toBe(
+      `http://127.0.0.1:3001/integraciones/tutores/${tutor}/calificaciones`,
+    );
+    expect(enviar.mock.calls[0][1]).toMatchObject({
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Integracion-Secret': secret,
+      },
+      body: JSON.stringify({
+        idCalificacion,
+        puntuacion: 5,
+        rolEvaluado: 'TUTOR',
+      }),
+    });
+    const entrega = await prisma.entrega_reputacion_tutor.findUniqueOrThrow({
+      where: { id_calificacion: BigInt(idCalificacion) },
+    });
+    expect(entrega.fecha_entrega).toBeInstanceOf(Date);
+    await calificar(sesion.id_sesion, 2, tutor).expect(201);
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(await prisma.entrega_reputacion_tutor.count()).toBe(1);
+  });
+
+  it('conserva y reintenta la entrega cuando materias-tutores falla', async () => {
+    jest.spyOn(configuracion, 'get').mockImplementation((clave) => {
+      if (clave === 'MATERIAS_TUTORES_URL') return 'http://127.0.0.1:3001';
+      if (clave === 'INTEGRACION_SECRET') return secret;
+      return clave === 'JWT_SECRET' ? secret : undefined;
+    });
+    const enviar = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: false, status: 503 } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 201 } as Response);
+    const sesion = await fixture('COMPLETADA');
+    await calificar(sesion.id_sesion, 4).expect(201);
+    expect(await prisma.calificacion.count()).toBe(1);
+    const pendiente = await prisma.entrega_reputacion_tutor.findFirstOrThrow();
+    expect(pendiente.fecha_entrega).toBeNull();
+    expect(pendiente.intentos).toBe(1);
+
+    await integracion.reenviarPendientes();
+    const entregada = await prisma.entrega_reputacion_tutor.findFirstOrThrow();
+    expect(entregada.fecha_entrega).toBeInstanceOf(Date);
+    expect(entregada.intentos).toBe(2);
+    expect(enviar).toHaveBeenCalledTimes(2);
+    await integracion.reenviarPendientes();
+    expect(enviar).toHaveBeenCalledTimes(2);
+  });
 
   it('no expone creación de bloques ni conserva su tabla', async () => {
     await request(app.getHttpServer())
@@ -205,6 +420,15 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       await act('9223372036854775807', action).expect(404);
     },
   );
+  it('retira la ruta de estado que aceptaba id_tutor desde el cuerpo', async () => {
+    const session = await fixture();
+    await request(app.getHttpServer())
+      .patch(`/sessions/${session.id_sesion}/status`)
+      .set('Authorization', `Bearer ${token(outsider)}`)
+      .send({ id_tutor: tutor, estado: 'RECHAZADA' })
+      .expect(404);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('PENDIENTE');
+  });
   it.each([
     ['firma', {}, 'x'.repeat(64)],
     ['expirado', { exp: 1 }, secret],
@@ -459,6 +683,148 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
       'EN_CONFLICTO',
     );
+  });
+  it('solo un administrador puede resolver una sesión en conflicto', async () => {
+    const session = await fixture('EN_CONFLICTO');
+    const ruta = `/sessions/${session.id_sesion}/resolve-conflict`;
+    const cuerpo = {
+      nuevo_estado: 'COMPLETADA',
+      motivo_resolucion: 'Revisión de declaraciones',
+    };
+
+    await request(app.getHttpServer()).patch(ruta).send(cuerpo).expect(401);
+    await request(app.getHttpServer())
+      .patch(ruta)
+      .set('Authorization', `Bearer ${token(tutor)}`)
+      .send(cuerpo)
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(ruta)
+      .set('Authorization', `Bearer ${token(outsider, { roles: [123] })}`)
+      .send(cuerpo)
+      .expect(401);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      'EN_CONFLICTO',
+    );
+    expect(await prisma.resolucion_conflicto_sesion.count()).toBe(0);
+  });
+
+  it('registra administrador, motivo y observaciones al resolver el conflicto', async () => {
+    const session = await fixture('EN_CONFLICTO');
+    const cuerpo = {
+      nuevo_estado: 'COMPLETADA',
+      motivo_resolucion: 'Revisión de declaraciones',
+      observaciones: 'Coincide con la evidencia revisada',
+    };
+    const respuesta = await request(app.getHttpServer())
+      .patch(`/sessions/${session.id_sesion}/resolve-conflict`)
+      .set(
+        'Authorization',
+        `Bearer ${token(outsider, { roles: ['ADMINISTRADOR'] })}`,
+      )
+      .send(cuerpo)
+      .expect(200);
+    expect(respuesta.body.estado_sesion).toBe('COMPLETADA');
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('COMPLETADA');
+    const resolucion =
+      await prisma.resolucion_conflicto_sesion.findUniqueOrThrow({
+        where: { id_sesion: session.id_sesion },
+      });
+    expect(resolucion.id_administrador).toBe(BigInt(outsider));
+    expect(resolucion.estado_final).toBe('COMPLETADA');
+    expect(resolucion.motivo_resolucion).toBe(cuerpo.motivo_resolucion);
+    expect(resolucion.observaciones).toBe(cuerpo.observaciones);
+    expect(resolucion.fecha_resolucion).toBeInstanceOf(Date);
+  });
+
+  it('rechaza un segundo intento y conserva la primera resolución', async () => {
+    const session = await fixture('EN_CONFLICTO');
+    const ruta = `/sessions/${session.id_sesion}/resolve-conflict`;
+    const autorizacion = `Bearer ${token(outsider, { roles: ['ADMINISTRADOR'] })}`;
+    await request(app.getHttpServer())
+      .patch(ruta)
+      .set('Authorization', autorizacion)
+      .send({ nuevo_estado: 'COMPLETADA', motivo_resolucion: 'Primer motivo' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(ruta)
+      .set('Authorization', autorizacion)
+      .send({
+        nuevo_estado: 'NO_REALIZADA',
+        motivo_resolucion: 'Segundo motivo',
+      })
+      .expect(409);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('COMPLETADA');
+    expect(await prisma.resolucion_conflicto_sesion.count()).toBe(1);
+    const resolucion =
+      await prisma.resolucion_conflicto_sesion.findUniqueOrThrow({
+        where: { id_sesion: session.id_sesion },
+      });
+    expect(resolucion.estado_final).toBe('COMPLETADA');
+    expect(resolucion.motivo_resolucion).toBe('Primer motivo');
+  });
+
+  it('solo una de dos resoluciones simultáneas cambia el estado y crea auditoría', async () => {
+    const session = await fixture('EN_CONFLICTO');
+    const ruta = `/sessions/${session.id_sesion}/resolve-conflict`;
+    const intentos = [
+      {
+        admin: outsider,
+        estado: 'COMPLETADA',
+        motivo: 'Revisión del administrador uno',
+      },
+      {
+        admin: tutor,
+        estado: 'NO_REALIZADA',
+        motivo: 'Revisión del administrador dos',
+      },
+    ];
+    const respuestas = await Promise.all(
+      intentos.map((intento) =>
+        request(app.getHttpServer())
+          .patch(ruta)
+          .set(
+            'Authorization',
+            `Bearer ${token(intento.admin, { roles: ['ADMIN'] })}`,
+          )
+          .send({
+            nuevo_estado: intento.estado,
+            motivo_resolucion: intento.motivo,
+          }),
+      ),
+    );
+    expect(respuestas.map((respuesta) => respuesta.status).sort()).toEqual([
+      200, 409,
+    ]);
+    const ganador =
+      intentos[respuestas.findIndex((respuesta) => respuesta.status === 200)];
+    const resolucion =
+      await prisma.resolucion_conflicto_sesion.findUniqueOrThrow({
+        where: { id_sesion: session.id_sesion },
+      });
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      ganador.estado,
+    );
+    expect(resolucion.estado_final).toBe(ganador.estado);
+    expect(resolucion.id_administrador).toBe(BigInt(ganador.admin));
+    expect(resolucion.motivo_resolucion).toBe(ganador.motivo);
+    expect(await prisma.resolucion_conflicto_sesion.count()).toBe(1);
+  });
+  it('rechaza resoluciones sin motivo válido y no registra una decisión', async () => {
+    const session = await fixture('EN_CONFLICTO');
+    const ruta = `/sessions/${session.id_sesion}/resolve-conflict`;
+    const autorizacion = `Bearer ${token(outsider, { roles: ['ADMINISTRADOR'] })}`;
+    for (const motivo_resolucion of ['', '   ', 'x'.repeat(501)]) {
+      await request(app.getHttpServer())
+        .patch(ruta)
+        .set('Authorization', autorizacion)
+        .send({ nuevo_estado: 'COMPLETADA', motivo_resolucion })
+        .expect(400);
+    }
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe(
+      'EN_CONFLICTO',
+    );
+    expect(await prisma.resolucion_conflicto_sesion.count()).toBe(0);
   });
   it('rechaza declaraciones sin permiso, datos inválidos y estados ajenos al cierre', async () => {
     const session = await fixture('PENDIENTE_CIERRE');

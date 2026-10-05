@@ -5,10 +5,15 @@ import { SessionsService } from './sessions.service';
 import { SessionsCronService } from './sessions-cron.service';
 import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
+import { ReputacionIntegracionService } from './reputacion-integracion.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, ConfigModule],
   controllers: [SessionsController],
-  providers: [SessionsService, SessionsCronService],
+  providers: [
+    SessionsService,
+    SessionsCronService,
+    ReputacionIntegracionService,
+  ],
 })
 export class SessionsModule {}

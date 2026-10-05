@@ -1,13 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
-import {
-  type declaracion_cierre,
-  type sesion,
-  type sesion_estado_sesion_enum,
-} from '../generated/prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { type calificacion, type declaracion_cierre, type sesion, type sesion_estado_sesion_enum } from '../generated/prisma/client';
 
 export const OCCUPYING_STATES: sesion_estado_sesion_enum[] = [
   'PENDIENTE',
@@ -110,5 +102,16 @@ export function toDeclarationResponse(declaration: declaracion_cierre) {
     id_usuario_inasistente:
       declaration.id_usuario_inasistente?.toString() ?? null,
     fecha_declaracion: declaration.fecha_declaracion,
+  };
+}
+
+export function aRespuestaCalificacion(calificacionRegistrada: calificacion) {
+  return {
+    id_calificacion: calificacionRegistrada.id_calificacion.toString(),
+    id_sesion: calificacionRegistrada.id_sesion.toString(),
+    id_evaluador: calificacionRegistrada.id_evaluador.toString(),
+    id_evaluado: calificacionRegistrada.id_evaluado.toString(),
+    puntuacion: calificacionRegistrada.puntuacion,
+    fecha_calificacion: calificacionRegistrada.fecha_calificacion,
   };
 }
