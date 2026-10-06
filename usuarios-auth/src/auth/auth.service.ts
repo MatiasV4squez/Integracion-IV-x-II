@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
@@ -24,6 +28,14 @@ export class AuthService {
         statusCode: 401,
         code: 'AUTH_INVALID_CREDENTIALS',
         message: 'Correo o contraseña incorrectos.',
+      });
+    }
+
+    if (usuario.estado_cuenta === 'SUSPENDIDO') {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'AUTH_ACCOUNT_SUSPENDED',
+        message: 'La cuenta se encuentra suspendida.',
       });
     }
 

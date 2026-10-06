@@ -38,6 +38,7 @@ export class SessionService {
         fecha_expiracion: { gt: ahora },
         fecha_revocacion: null,
         ultima_actividad: { gt: actividadMinima },
+        usuario: { estado_cuenta: { not: 'SUSPENDIDO' } },
       },
       data: { ultima_actividad: ahora },
     });
