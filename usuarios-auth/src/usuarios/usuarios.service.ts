@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdatePerfilDto } from './dto/update-perfil.dto';
-import * as bcrypt from 'bcrypt';
+import { hash } from 'argon2';
 
 const datosPublicosSelect = {
   id_usuario: true,
@@ -31,12 +31,11 @@ export class UsuariosService implements OnModuleInit {
       update: {},
       create: { id_rol: 1, nombre: 'ESTUDIANTE' },
     });
-    console.log('✅ Rol ESTUDIANTE verificado/creado en la base de datos');
+    console.log('Rol ESTUDIANTE verificado/creado en la base de datos');
   }
   
   async create(createUsuarioDto: CreateUsuarioDto) {
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(createUsuarioDto.password_hash, saltRounds);
+    const hashedPassword = await hash(createUsuarioDto.password_hash);
 
     return this.prisma.usuario.create({
       data: {
