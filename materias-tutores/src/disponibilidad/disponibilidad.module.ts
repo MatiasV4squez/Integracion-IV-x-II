@@ -21,5 +21,6 @@ import { DisponibilidadService } from './disponibilidad.service.js';
   ],
   controllers: [DisponibilidadController, ConsultaDisponibilidadController],
   providers: [DisponibilidadService, TutorJwtGuard, AuthenticatedJwtGuard],
+  exports: [DisponibilidadService],
 })
 export class DisponibilidadModule {}

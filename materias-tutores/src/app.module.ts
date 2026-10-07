@@ -8,6 +8,7 @@ import { MateriasModule } from './materias/materias.module.js';
 import { DisponibilidadModule } from './disponibilidad/disponibilidad.module.js';
 import { PostulacionesModule } from './postulaciones/postulaciones.module.js';
 import { IntegracionesModule } from './integraciones/integraciones.module.js';
+import { TutoresModule } from './tutores/tutores.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { IntegracionesModule } from './integraciones/integraciones.module.js';
     DisponibilidadModule,
     PostulacionesModule,
     IntegracionesModule,
+    TutoresModule,
   ],
   controllers: [AppController],
   providers: [AppService],
