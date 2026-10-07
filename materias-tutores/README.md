@@ -61,19 +61,77 @@ La respuesta es un arreglo de objetos con `idBloque`, `dia`, `horaInicio`, `hora
 
 La consulta refleja los estados almacenados en `materias-tutores`. Para ocultar las solicitudes pendientes y sesiones confirmadas en la aplicación integrada, Agendamiento debe actualizar el estado de los bloques al reservarlos y liberarlos; esa integración sigue pendiente.
 
+## Búsqueda de tutores por materia
+
+`GET /tutores` devuelve los tutores con una habilitación vigente para la materia indicada, sus calificaciones y sus horarios disponibles. La consulta pagina los tutores antes de consultar sus perfiles y horarios, y utiliza un orden ascendente por identificador de habilitación.
+
+| Parámetro   | Obligatorio | Valor predeterminado | Validación                                                                              |
+| ----------- | ----------- | -------------------- | --------------------------------------------------------------------------------------- |
+| `materiaId` | Sí          | —                    | Entero positivo dentro del rango `BIGINT` de PostgreSQL.                                |
+| `page`      | No          | `1`                  | Entero positivo seguro; el desplazamiento `(page - 1) * limit` también debe ser seguro. |
+| `limit`     | No          | `10`                 | Entero entre `1` y `100`.                                                               |
+
+Los parámetros numéricos deben contener únicamente dígitos. Los valores vacíos, negativos, decimales, no numéricos o repetidos se rechazan con `400`. Los valores predeterminados se aplican únicamente cuando el parámetro no se envía.
+
+Ejemplo de consulta:
+
+```http
+GET /tutores?materiaId=1&page=1&limit=2
+```
+
+Ejemplo ilustrativo de respuesta `200`:
+
+```json
+{
+  "items": [
+    {
+      "idTutor": "10",
+      "promedioCalificaciones": 4.5,
+      "cantidadCalificaciones": 4,
+      "horariosDisponibles": [
+        {
+          "idBloque": "5",
+          "dia": "2026-10-08",
+          "horaInicio": "09:00",
+          "horaFin": "10:00"
+        }
+      ]
+    },
+    {
+      "idTutor": "15",
+      "promedioCalificaciones": null,
+      "cantidadCalificaciones": 0,
+      "horariosDisponibles": []
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "limit": 2,
+  "totalPages": 2
+}
+```
+
+`items` contiene únicamente los tutores de la página solicitada. `total` cuenta todas las habilitaciones vigentes de esa materia y `totalPages` es `Math.ceil(total / limit)`. Si no hay coincidencias, ambos totales son `0`. Si se pide una página posterior a la última, la respuesta sigue siendo `200`, con `items: []`, conservando el total de coincidencias y la página solicitada. El promedio es `null` cuando el tutor no tiene calificaciones. Los identificadores se devuelven como texto para conservar la precisión de `BIGINT`.
+
+Los horarios incluyen únicamente bloques `DISPONIBLE` cuyo inicio no ha llegado, según la zona `America/Santiago`. Un tutor sin horarios disponibles permanece en los resultados con `horariosDisponibles: []`. La visibilidad refleja los estados de la base del microservicio; la reserva y liberación desde Agendamiento siguen pendientes de integración.
+
+Esta ruta todavía no exige autenticación ni devuelve el nombre del tutor. Esas partes de RF09/CU07 quedan pendientes del contrato con `usuarios-auth`; esta implementación no completa por sí sola toda la búsqueda exigida por el SRS. La respuesta anterior era un arreglo; los consumidores deben utilizar ahora el objeto paginado y leer la lista desde `items`.
+
+Las pruebas HTTP de esta ruta utilizan el controller, el caso de uso y los adaptadores, con Prisma simulado. También se comprobó manualmente con PostgreSQL local el reparto de tres tutores entre dos páginas y la exclusión de bloques reservados e inactivos; los datos temporales utilizados se eliminaron.
+
 ## Postulaciones y tutores habilitados
 
 La migración `20261004120000_postulaciones_tutores` crea `postulacion_tutor`, `tutor_materia`, `perfil_tutor` y el registro idempotente de calificaciones. Ejecútala en la base del microservicio con `npm run prisma:deploy`. Los identificadores `BIGINT` se envían como texto en JSON. El JWT identifica al estudiante o al administrador; ninguna ruta acepta un ID de usuario en el cuerpo para postular.
 
-| Método y ruta | Acceso | Uso |
-| --- | --- | --- |
-| `POST /postulaciones` | Usuario autenticado | `multipart/form-data`: `idMateria` (texto) y `certificado` (PDF/PNG, hasta 5 MB). Responde `201` con estado `PENDIENTE`. |
-| `GET /postulaciones/mias` | Usuario autenticado | Historial propio. |
-| `GET /postulaciones/pendientes` | Administrador | Cola en `PENDIENTE` y `PENDIENTE_ROL`. |
-| `GET /postulaciones/:idPostulacion/certificado` | Dueño o administrador | Descarga privada del archivo. |
-| `PATCH /postulaciones/:idPostulacion/aprobar` | Administrador | JSON `{ "notaAcreditada": 5.0 }`, mínimo 5.0. |
-| `PATCH /postulaciones/:idPostulacion/rechazar` | Administrador | JSON `{ "motivoRechazo": "Certificado ilegible" }`. |
-| `POST /postulaciones/:idPostulacion/reintentar-rol` | Administrador | Reintenta el rol tras un fallo del servicio de usuarios. |
+| Método y ruta                                       | Acceso                | Uso                                                                                                                      |
+| --------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `POST /postulaciones`                               | Usuario autenticado   | `multipart/form-data`: `idMateria` (texto) y `certificado` (PDF/PNG, hasta 5 MB). Responde `201` con estado `PENDIENTE`. |
+| `GET /postulaciones/mias`                           | Usuario autenticado   | Historial propio.                                                                                                        |
+| `GET /postulaciones/pendientes`                     | Administrador         | Cola en `PENDIENTE` y `PENDIENTE_ROL`.                                                                                   |
+| `GET /postulaciones/:idPostulacion/certificado`     | Dueño o administrador | Descarga privada del archivo.                                                                                            |
+| `PATCH /postulaciones/:idPostulacion/aprobar`       | Administrador         | JSON `{ "notaAcreditada": 5.0 }`, mínimo 5.0.                                                                            |
+| `PATCH /postulaciones/:idPostulacion/rechazar`      | Administrador         | JSON `{ "motivoRechazo": "Certificado ilegible" }`.                                                                      |
+| `POST /postulaciones/:idPostulacion/reintentar-rol` | Administrador         | Reintenta el rol tras un fallo del servicio de usuarios.                                                                 |
 
 El backend verifica extensión, MIME, firma del archivo y tamaño; el administrador verifica manualmente el contenido y la nota. Los certificados se guardan con nombre derivado de SHA-256 en `CERTIFICADOS_DIR`, privado y persistente; respalda este directorio junto con la base. La ruta de certificados exige identidad y nunca expone la ruta local. Una única postulación activa por usuario y materia se protege con índice parcial en PostgreSQL. Una postulación rechazada puede enviarse de nuevo.
 
@@ -83,11 +141,11 @@ Al aprobar se registra `PENDIENTE_ROL` y la relación `tutor_materia` queda `vig
 
 Las rutas internas requieren `X-Integracion-Secret` de al menos 32 bytes. Configura el mismo secreto en el servicio emisor. No son rutas para clientes web o móviles.
 
-| Método y ruta | Cuerpo | Efecto |
-| --- | --- | --- |
-| `PATCH /integraciones/bloques/:idBloque/estado` | `{ "estado": "RESERVADO" }` o `{ "estado": "DISPONIBLE" }` | Reserva al crear una solicitud; conserva la reserva en `PENDIENTE`, `CONFIRMADA` y `PENDIENTE_CIERRE`; libera al cancelar, rechazar o cerrar cuando ya no hay solicitudes activas. Es idempotente y solo permite `DISPONIBLE ↔ RESERVADO`. |
-| `POST /integraciones/tutores/:idTutor/calificaciones` | `{ "idCalificacion": "42", "puntuacion": 5, "rolEvaluado": "TUTOR" }` | Registra una evaluación recibida como tutor. El identificador del evento evita duplicados. |
-| `GET /tutores/:idTutor/reputacion` | JWT Bearer | Devuelve `cantidadCalificaciones`, `promedio` exacto y estado `ACTIVO` o `EN_REVISION`. |
+| Método y ruta                                         | Cuerpo                                                                | Efecto                                                                                                                                                                                                                                     |
+| ----------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PATCH /integraciones/bloques/:idBloque/estado`       | `{ "estado": "RESERVADO" }` o `{ "estado": "DISPONIBLE" }`            | Reserva al crear una solicitud; conserva la reserva en `PENDIENTE`, `CONFIRMADA` y `PENDIENTE_CIERRE`; libera al cancelar, rechazar o cerrar cuando ya no hay solicitudes activas. Es idempotente y solo permite `DISPONIBLE ↔ RESERVADO`. |
+| `POST /integraciones/tutores/:idTutor/calificaciones` | `{ "idCalificacion": "42", "puntuacion": 5, "rolEvaluado": "TUTOR" }` | Registra una evaluación recibida como tutor. El identificador del evento evita duplicados.                                                                                                                                                 |
+| `GET /tutores/:idTutor/reputacion`                    | JWT Bearer                                                            | Devuelve `cantidadCalificaciones`, `promedio` exacto y estado `ACTIVO` o `EN_REVISION`.                                                                                                                                                    |
 
 La búsqueda pública existente solo devuelve bloques `DISPONIBLE`, y la edición o desactivación de un bloque exige ese mismo estado mediante una escritura condicional. El evento de calificación actualiza suma y cantidad en una transacción serializable; desde tres calificaciones, un promedio inferior a 2.5 marca `EN_REVISION`. El servicio emisor debe enviar únicamente notas que el usuario recibió actuando como tutor. La fuente de verdad de sesiones y calificaciones está en otros microservicios, por lo que el despliegue integrado requiere que estos llamen a las rutas anteriores; no se han probado llamadas reales entre micros.
 
@@ -114,6 +172,8 @@ npm run test:e2e
 - `src/materias/`: módulo HTTP del catálogo de materias, con controlador, servicio y DTO de respuesta.
 - `src/disponibilidad/`: gestión HTTP de bloques propios y consulta de horarios disponibles de un tutor.
 - `src/auth/`: verificación local del JWT y lectura segura del ID del tutor.
+- `src/tutores/application/`: caso de uso, modelos y ports de búsqueda sin dependencias de HTTP ni Prisma.
+- `src/tutores/infrastructure/`: adaptadores de Prisma y disponibilidad; `http/` contiene el controller y los DTO y validadores de consulta.
 - `prisma/schema.prisma`: modelos de materia, bloque, postulación, habilitación y reputación.
 - `prisma/migrations/`: historial versionado de cambios de esquema.
 - `prisma/seed.ts`: datos iniciales idempotentes del catálogo.

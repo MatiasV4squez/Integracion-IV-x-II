@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { TutoresRepository } from '../application/ports/tutores.repository.js';
 import type { TutorResumen } from '../application/models/tutor-resumen.js';
+import type { Paginacion } from '../application/models/paginacion.js';
 
 @Injectable()
 export class PrismaTutoresRepository implements TutoresRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async buscarHabilitadosPorMateria(idMateria: bigint): Promise<TutorResumen[]> {
+  async buscarHabilitadosPorMateria(idMateria: bigint, paginacion: Paginacion): Promise<{ items: TutorResumen[]; total: number }> {
     const tutores = await this.prisma.tutorMateria.findMany({
       where: {
         idMateria,
@@ -16,8 +17,15 @@ export class PrismaTutoresRepository implements TutoresRepository {
       select: {
         idUsuario: true,
       },
+      skip: (paginacion.page - 1) * paginacion.limit,
+      take: paginacion.limit,
+      orderBy: { idTutorMateria: 'asc' },
     });
     const idsTutores = tutores.map((tutor) => tutor.idUsuario);
+
+    const total = await this.prisma.tutorMateria.count({
+      where: { idMateria, vigente: true },
+    });
 
     const perfiles = await this.prisma.perfilTutor.findMany({
       where: {
@@ -32,7 +40,7 @@ export class PrismaTutoresRepository implements TutoresRepository {
 
     const perfilesPorUsuario = new Map(perfiles.map((perfil) => [perfil.idUsuario, perfil]));
 
-    return tutores.map((tutor) => {
+    const items = tutores.map((tutor) => {
       const perfil = perfilesPorUsuario.get(tutor.idUsuario);
       return {
         idTutor: tutor.idUsuario.toString(),
@@ -40,5 +48,7 @@ export class PrismaTutoresRepository implements TutoresRepository {
         cantidadCalificaciones: perfil ? perfil.cantidadCalificaciones : 0,
       };
     });
+
+    return { items, total };
   }
 }

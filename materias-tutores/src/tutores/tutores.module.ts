@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TutoresController } from './tutores.controller.js';
+import { TutoresController } from './infrastructure/http/tutores.controller.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { BuscarTutoresPorMateriaUseCase } from './application/buscar-tutores-por-materia.use-case.js';
 import { TUTORES_REPOSITORY, type TutoresRepository } from './application/ports/tutores.repository.js';
