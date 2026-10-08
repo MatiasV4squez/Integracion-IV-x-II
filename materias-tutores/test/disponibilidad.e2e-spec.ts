@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import type { App } from 'supertest/types';
+import type { Server } from 'node:http';
 import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 
@@ -44,7 +44,7 @@ const prismaMock = {
 };
 
 describe('DisponibilidadController (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication<Server>;
 
   beforeEach(async () => {
     vi.resetAllMocks();

@@ -8,18 +8,11 @@ import { MateriasModule } from './materias/materias.module.js';
 import { DisponibilidadModule } from './disponibilidad/disponibilidad.module.js';
 import { PostulacionesModule } from './postulaciones/postulaciones.module.js';
 import { IntegracionesModule } from './integraciones/integraciones.module.js';
+import { ReputacionModule } from './reputacion/reputacion.module.js';
 import { TutoresModule } from './tutores/tutores.module.js';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({ validate: validateEnvironment }),
-    DatabaseModule,
-    MateriasModule,
-    DisponibilidadModule,
-    PostulacionesModule,
-    IntegracionesModule,
-    TutoresModule,
-  ],
+  imports: [ConfigModule.forRoot({ validate: validateEnvironment }), DatabaseModule, MateriasModule, DisponibilidadModule, PostulacionesModule, IntegracionesModule, TutoresModule, ReputacionModule],
   controllers: [AppController],
   providers: [AppService],
 })
