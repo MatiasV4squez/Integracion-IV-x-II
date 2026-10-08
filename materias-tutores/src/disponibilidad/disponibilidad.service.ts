@@ -67,7 +67,7 @@ export class DisponibilidadService {
     };
   }
 
-  async crearBloque(
+async crearBloque(
     idTutor: bigint,
     dto: CrearBloqueDisponibilidadDto,
   ): Promise<BloqueDisponibilidadResponseDto> {
@@ -80,6 +80,25 @@ export class DisponibilidadService {
         'La hora de inicio debe ser menor que la hora de fin',
       );
     }
+
+    const bloquesExistentes = await this.prisma.bloqueHorario.findMany({
+      where: {
+        idTutor,
+        dia: dia,
+        estadoBloque: { not: 'INACTIVO' }
+      }
+    });
+
+    const haySolapamiento = bloquesExistentes.some((bloque) => {
+      return horaInicio < bloque.horaFin && horaFin > bloque.horaInicio;
+    });
+
+    if (haySolapamiento) {
+      throw new ConflictException(
+        'El horario choca con un bloque de disponibilidad ya existente',
+      );
+    }
+
 
     const bloque = await this.prisma.bloqueHorario.create({
       data: {

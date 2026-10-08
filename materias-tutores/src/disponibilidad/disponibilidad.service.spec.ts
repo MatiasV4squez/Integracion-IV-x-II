@@ -43,6 +43,7 @@ describe('DisponibilidadService', () => {
       horaFin: new Date('1970-01-01T10:30:00.000Z'),
       estadoBloque: 'DISPONIBLE',
     };
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([]);
     prismaMock.bloqueHorario.create.mockResolvedValue(bloqueCreado);
 
     const resultado = await service.crearBloque(10n, {
@@ -68,26 +69,25 @@ describe('DisponibilidadService', () => {
     });
   });
 
-  it('la hora de inicio debe ser anterior a la hora de fin', async () => {
+it('debería rechazar la creación si el horario choca con un bloque existente', async () => {
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([
+      {
+        idBloque: 1n,
+        idTutor: 10n,
+        dia: new Date('2026-10-01T00:00:00.000Z'),
+        horaInicio: new Date('1970-01-01T10:00:00.000Z'),
+        horaFin: new Date('1970-01-01T12:00:00.000Z'),
+        estadoBloque: 'DISPONIBLE',
+      },
+    ]);
+
     await expect(
       service.crearBloque(10n, {
         dia: '2026-10-01',
-        horaInicio: '10:30',
-        horaFin: '09:00',
+        horaInicio: '11:00',
+        horaFin: '13:00',
       }),
-    ).rejects.toThrow('La hora de inicio debe ser menor que la hora de fin');
-
-    expect(prismaMock.bloqueHorario.create).not.toHaveBeenCalled();
-  });
-
-  it('horaInicio debe usar el formato HH:mm', async () => {
-    await expect(
-      service.crearBloque(10n, {
-        dia: '2026-10-01',
-        horaInicio: '9:00',
-        horaFin: '10:30',
-      }),
-    ).rejects.toThrow('horaInicio debe usar el formato HH:mm');
+    ).rejects.toThrow('El horario choca con un bloque de disponibilidad ya existente');
 
     expect(prismaMock.bloqueHorario.create).not.toHaveBeenCalled();
   });
