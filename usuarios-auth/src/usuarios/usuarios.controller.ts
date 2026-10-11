@@ -1,34 +1,42 @@
-// Agustin Addon
-
-import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
-import { UsuariosService } from './usuarios.service';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { RegistrarUsuarioUseCase } from './aplicacion/registrar-user.use-case';
+import { LoginUsuarioUseCase } from './aplicacion/login-usuario.use-case';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
-import { UpdatePerfilDto } from './dto/update-perfil.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { LoginDto } from '../auth/dto/login.dto';
 
 @Controller('usuarios')
 export class UsuariosController {
-  constructor(private readonly usuariosService: UsuariosService) {}
+  constructor(
+    private readonly registrarUsuario: RegistrarUsuarioUseCase,
+    private readonly loginUsuario: LoginUsuarioUseCase,
+  ) {}
 
-  // Ruta PÚBLICA: No exige token para permitir el registro
-  @Post()
-  create(@Body() createUsuarioDto: CreateUsuarioDto) {
-    return this.usuariosService.create(createUsuarioDto);
+  @Post('registro')
+  async crear(@Body() createUsuarioDto: CreateUsuarioDto) {
+    const usuario = await this.registrarUsuario.ejecutar(createUsuarioDto);
+    // En la respuesta, mapeamos a lo que el cliente espera ver (sin enviar la password)
+    return {
+      id: usuario.id_usuario?.toString(),
+      nombre: usuario.nombre,
+      correo: usuario.correo_institucional,
+      estado: usuario.estado_cuenta
+    };
   }
 
-  // Ruta PROTEGIDA: Solo usuarios logueados pueden ver la lista
-  @UseGuards(JwtAuthGuard)
-  @Get()
-  findAll() {
-    return this.usuariosService.findAll();
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Patch(':id/perfil')
-  actualizarPerfil(
-    @Param('id') id: string, 
-    @Body() updatePerfilDto: UpdatePerfilDto
-  ) {
-    return this.usuariosService.actualizarPerfil(id, updatePerfilDto);
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() loginDto: LoginDto) {
+    const usuario = await this.loginUsuario.ejecutar(
+      loginDto.correo_institucional, 
+      loginDto.password
+    );
+    
+    // Aquí el controlador debería encargarse de generar el Token JWT
+    // Por ahora, solo retornamos los datos del usuario validado
+    return {
+      id: usuario.id_usuario?.toString(),
+      nombre: usuario.nombre,
+      correo: usuario.correo_institucional
+    };
   }
 }

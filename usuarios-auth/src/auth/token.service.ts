@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
-import { SessionService } from './session.service';
 
 interface IdentidadAutenticada {
   id_usuario: string;
@@ -20,7 +19,6 @@ export class TokenService {
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly sessions: SessionService,
   ) {}
 
   async emitir(usuario: IdentidadAutenticada): Promise<TokenEmitido> {
@@ -35,7 +33,6 @@ export class TokenService {
       correo_institucional: usuario.correo_institucional,
       roles: usuario.roles,
     });
-    await this.sessions.registrar(usuario.id_usuario, jti, fechaExpiracion);
 
     return { valor, expiraEnSegundos };
   }

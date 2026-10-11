@@ -1,17 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
-import { TokenService } from './token.service';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { SessionService } from './session.service';
-import { InternalModeracionController } from './internal-moderacion.controller';
 import { InternalServiceGuard } from './internal-service.guard';
-import { ModeracionCuentasService } from './moderacion-cuentas.service';
 
 @Global()
 @Module({
@@ -31,16 +24,11 @@ import { ModeracionCuentasService } from './moderacion-cuentas.service';
       }),
     }),
   ],
-  controllers: [AuthController, InternalModeracionController],
+  controllers: [],
   providers: [
-    AuthService,
     PasswordService,
-    TokenService,
-    SessionService,
-    JwtAuthGuard,
     InternalServiceGuard,
-    ModeracionCuentasService,
   ],
-  exports: [JwtModule, JwtAuthGuard, SessionService],
+  exports: [JwtModule],
 })
 export class AuthModule {}

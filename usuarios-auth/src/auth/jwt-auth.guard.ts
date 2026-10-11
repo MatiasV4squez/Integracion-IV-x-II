@@ -9,7 +9,6 @@ import type { JwtPayload } from 'jsonwebtoken';
 import type { Request } from 'express';
 import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import type { AuthenticatedUser } from './authenticated-user';
-import { SessionService } from './session.service';
 
 export interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -32,7 +31,6 @@ function unauthorized(): UnauthorizedException {
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
-    private readonly sessions: SessionService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -67,11 +65,11 @@ export class JwtAuthGuard implements CanActivate {
       throw unauthorized();
     }
 
-    const activa = await this.sessions.registrarActividad(
-      payload.sub,
-      payload.jti,
-    );
-    if (!activa) throw unauthorized();
+    //const activa = await this.sessions.registrarActividad(
+    //  payload.sub,
+      //payload.jti,
+   // );
+    //if (!activa) throw unauthorized();
 
     request.user = {
       sub: payload.sub,
