@@ -18,3 +18,5 @@ coverage/
 *.log
 .tmp/
 .temp/
+.vscode/
+STP UserSettings.json
