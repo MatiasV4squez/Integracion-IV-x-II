@@ -24,6 +24,8 @@ model sesion {
   declaraciones         declaracion_cierre[]
   resolucion_conflicto  resolucion_conflicto_sesion?
   calificaciones        calificacion[]
+  liberacion_bloque      liberacion_bloque_sesion?
+  avisos_moderacion      aviso_moderacion_sesion[]
 
   @@index([id_tutee, estado_sesion])
   @@index([id_tutor, inicio, fin])
@@ -78,6 +80,40 @@ model entrega_reputacion_tutor {
   calificacion    calificacion @relation(fields: [id_calificacion], references: [id_calificacion], onDelete: Restrict)
 
   @@index([fecha_entrega, fecha_creacion])
+}
+
+// Solicitud durable de liberación, guardada junto a la transición de la sesión.
+model liberacion_bloque_sesion {
+  id_sesion        BigInt    @id
+  id_bloque        BigInt
+  fecha_creacion   DateTime  @default(now()) @db.Timestamptz(3)
+  fecha_liberacion DateTime? @db.Timestamptz(3)
+  intentos         Int       @default(0)
+  ultimo_error     String?   @db.VarChar(500)
+  sesion           sesion    @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@index([fecha_liberacion, fecha_creacion])
+}
+
+// Instantánea durable del conflicto o de su resolución para reportes/moderación.
+model aviso_moderacion_sesion {
+  id_aviso        BigInt                    @id @default(autoincrement())
+  id_sesion       BigInt
+  tipo            tipo_aviso_moderacion_enum
+  contenido       Json
+  fecha_creacion  DateTime                  @default(now()) @db.Timestamptz(3)
+  fecha_entrega   DateTime?                 @db.Timestamptz(3)
+  intentos        Int                       @default(0)
+  ultimo_error    String?                   @db.VarChar(500)
+  sesion          sesion                    @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@unique([id_sesion, tipo])
+  @@index([fecha_entrega, fecha_creacion])
+}
+
+enum tipo_aviso_moderacion_enum {
+  CONFLICTO_DETECTADO
+  CONFLICTO_RESUELTO
 }
 
 enum resultado_cierre_enum {

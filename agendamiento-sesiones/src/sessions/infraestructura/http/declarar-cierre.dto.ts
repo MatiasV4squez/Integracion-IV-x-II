@@ -1,11 +1,11 @@
 import { IsIn, IsOptional, Matches } from 'class-validator';
-import { type resultado_cierre_enum } from '../../generated/prisma/client';
+import type { ResultadoCierre } from '../../dominio/tipos/estado-sesion';
 
 const RESULTADOS = ['COMPLETADA', 'NO_REALIZADA', 'INASISTENCIA'] as const;
 
 export class DeclararCierreDto {
   @IsIn(RESULTADOS)
-  resultado_declarado: resultado_cierre_enum;
+  resultado_declarado: ResultadoCierre;
 
   @IsOptional()
   @Matches(/^[1-9][0-9]{0,18}$/, {

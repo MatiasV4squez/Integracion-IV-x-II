@@ -6,7 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { getDatabaseUrl } from './database/database.config';
 import { DatabaseModule } from './database/database.module';
-import { SessionsModule } from './sessions/sessions.module';
+import { SessionsModule } from './sessions/infraestructura/sessions.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -21,14 +21,14 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ...(process.env.NODE_ENV === 'test'
       ? []
       : [
-          ObserveModule.forRoot({
-            appKey: 'YOUR_APP_KEY',
-            appSecret: 'YOUR_APP_SECRET',
-            serviceId: 'agendamiento-sesiones',
-          }),
-        ]),
+        ObserveModule.forRoot({
+          appKey: 'YOUR_APP_KEY',
+          appSecret: 'YOUR_APP_SECRET',
+          serviceId: 'agendamiento-sesiones',
+        }),
+      ]),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -42,21 +42,33 @@ puede ejecutarse con Node.js 22.12 o superior en la rama 22 LTS.
 6. Inicia el servicio con `npm run start:dev`.
 
 NestJS abre la conexión al iniciar y la cierra al apagar el servicio.
-Los módulos que necesiten persistencia deben importar `DatabaseModule` e inyectar
-`PrismaService`. La configuración de la aplicación y de la CLI de Prisma comparte
-la misma resolución de credenciales.
+Los adaptadores de persistencia utilizan `PrismaService`; los casos de uso
+reciben puertos propios y no dependen de Prisma. La configuración de la
+aplicación y de la CLI de Prisma comparte la misma resolución de credenciales.
 
-El esquema está en `prisma/schema.prisma` y contiene únicamente sesiones.
+El esquema está en `prisma/schema.prisma` y contiene sesiones, declaraciones,
+resoluciones, calificaciones, entregas pendientes de reputación, liberaciones
+pendientes de bloques y avisos pendientes a reportes/moderación.
 Los identificadores de sesión, usuario, materia y bloque son BIGINT y se envían
-como texto en JSON. No hay modelo de bloques ni cliente de otro microservicio.
+como texto en JSON. No hay modelo local de bloques. Las integraciones de disponibilidad, reserva y reputación utilizan HTTP/REST
+hacia materias-tutores.
+El emisor de conflictos y resoluciones hacia reportes/moderación utiliza el
+[contrato HTTP provisional](docs/moderacion.md), con persistencia y reintentos
+cada minuto. Configura `REPORTES_MODERACION_URL` y
+`MODERACION_INTEGRACION_SECRET` cuando el receptor implemente las rutas acordadas.
 Las migraciones se aplican explícitamente; `DB_SYNCHRONIZE` no se utiliza.
 Las migraciones que retiran tablas se detienen si encuentran datos que requieren
 revisión; no convierten ni borran registros automáticamente.
 
-Las rutas de aceptar, rechazar y cancelar y sus pruebas se describen en
-[docs/solicitudes.md](docs/solicitudes.md). La creación devuelve 503 hasta conectar
-la obtención del horario y la disponibilidad del bloque. La reserva y liberación
-de bloques quedan pendientes del trabajo de conexión entre microservicios.
+La creación, las rutas de aceptar/rechazar/cancelar y sus pruebas se describen
+en [docs/solicitudes.md](docs/solicitudes.md). `POST /sessions` requiere JWT y los
+IDs de tutor, materia y bloque; obtiene el horario de materias-tutores, reserva
+el bloque y guarda una solicitud PENDIENTE. Configura `MATERIAS_TUTORES_URL` e
+`INTEGRACION_SECRET` para esa conexión. Si falla el guardado después de reservar,
+intenta liberar el bloque. Rechazo, cancelación, expiración y cierre registran
+liberaciones en la misma transacción del cambio de estado y las envían después
+del commit. Un cron reintenta los pendientes cada minuto si el otro micro falla.
+Aplica la migración nueva con `npm run prisma:deploy` al actualizar otro entorno.
 
 ```bash
 npm run prisma:validate
@@ -74,6 +86,12 @@ con las credenciales locales y comprueba una consulta real mediante Prisma.
 `.env`, sus variantes locales, `node_modules`, `dist` y el cliente generado están
 excluidos por `.gitignore`. Se versionan `.env.example`, el esquema, las futuras
 migraciones y `package-lock.json` para reproducir las dependencias.
+
+## Arquitectura hexagonal
+
+El dominio, los casos de uso y los adaptadores están organizados en
+`src/sessions`. Los controladores y DTO están en `src/sessions/infraestructura/http`;
+los casos de uso están en `src/sessions/aplicacion/casos-de-uso`.
 
 ## Project setup
 

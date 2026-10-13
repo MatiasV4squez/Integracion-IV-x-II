@@ -6,8 +6,7 @@ import { PrismaClient } from '../generated/prisma/client';
 @Injectable()
 export class PrismaService
   extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+  implements OnModuleInit, OnModuleDestroy {
   constructor(configService: ConfigService) {
     super({
       adapter: new PrismaPg({
