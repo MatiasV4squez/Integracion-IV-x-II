@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RolesController } from './roles.controller';
 import { RolesService } from './roles.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/infraestructura/http/jwt-auth.guard';
 
 describe('RolesController', () => {
   let controller: RolesController;

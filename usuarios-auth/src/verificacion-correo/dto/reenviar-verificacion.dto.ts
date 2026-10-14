@@ -1,3 +1,3 @@
-import { CorreoInstitucionalDto } from '../../auth/dto/correo-institucional.dto';
+import { CorreoInstitucionalDto } from '../../auth/infraestructura/http/dto/correo-institucional.dto';
 
 export class ReenviarVerificacionDto extends CorreoInstitucionalDto {}

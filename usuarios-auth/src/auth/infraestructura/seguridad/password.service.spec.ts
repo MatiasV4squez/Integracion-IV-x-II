@@ -1,5 +1,5 @@
 import { PasswordService } from './password.service';
-import { loginFixture } from '../../test/fixtures/login.fixture';
+import { loginFixture } from '../../../../test/fixtures/login.fixture';
 
 describe('Comprobación de contraseña para login', () => {
   const service = new PasswordService();

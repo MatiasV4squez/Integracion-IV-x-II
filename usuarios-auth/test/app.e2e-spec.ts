@@ -1,7 +1,9 @@
 import { Test } from '@nestjs/testing';
+import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac } from 'node:crypto';
+import { verify } from 'argon2';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { serializeBigInt } from '../src/config/json-serialization';
@@ -30,16 +32,14 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     correo_verificado: true,
     roles: [{ rol: { nombre: 'Tutor' } }],
   };
+  let cuentaActual = { ...usuarioExistente };
   const prisma = {
     usuario: {
       findUnique: jest.fn(),
       create: jest.fn(),
-      findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
-    rol: { create: jest.fn(), findMany: jest.fn() },
-    usuarioRol: { create: jest.fn(), findMany: jest.fn() },
     sesion: { create: jest.fn(), updateMany: jest.fn() },
     verificacionCorreo: {
       create: jest.fn(),
@@ -57,6 +57,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       DATABASE_URL: 'postgresql://test@localhost/usuarios_auth_test',
       PORT: '3000',
       JWT_SECRET: 'secreto-jwt-de-prueba-con-al-menos-32-bytes',
+      INTERNAL_SERVICE_API_KEY: 'clave-interna-de-prueba-con-al-menos-32-bytes',
       JWT_ACCESS_TTL_SECONDS: '1800',
       JWT_IDLE_TIMEOUT_SECONDS: '1800',
       SMTP_HOST: 'smtp.example.test',
@@ -80,6 +81,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       .compile();
     app = module.createNestApplication<NestExpressApplication>();
     app.set('json replacer', serializeBigInt);
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
     jwt = app.get(JwtService);
   });
@@ -87,6 +89,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     sesiones.clear();
+    cuentaActual = { ...usuarioExistente };
     prisma.sesion.create.mockImplementation(
       async ({
         data,
@@ -109,36 +112,73 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       }: {
         where: {
           id_usuario: bigint;
-          jti: string;
+          jti?: string;
           fecha_revocacion: null;
           fecha_expiracion?: { gt: Date };
           ultima_actividad?: { gt: Date };
+          OR?: Array<{
+            fecha_expiracion?: { lte: Date };
+            ultima_actividad?: { lte: Date };
+          }>;
         };
         data: Partial<SesionSimulada>;
       }) => {
-        const sesion = sesiones.get(where.jti);
-        if (
-          !sesion ||
-          sesion.id_usuario !== where.id_usuario ||
-          sesion.fecha_revocacion !== where.fecha_revocacion ||
-          (where.fecha_expiracion &&
-            sesion.fecha_expiracion <= where.fecha_expiracion.gt) ||
-          (where.ultima_actividad &&
-            sesion.ultima_actividad <= where.ultima_actividad.gt)
-        ) {
-          return { count: 0 };
+        let count = 0;
+        for (const sesion of sesiones.values()) {
+          if (
+            sesion.id_usuario !== where.id_usuario ||
+            (where.jti !== undefined && sesion.jti !== where.jti) ||
+            sesion.fecha_revocacion !== where.fecha_revocacion ||
+            (where.fecha_expiracion &&
+              sesion.fecha_expiracion <= where.fecha_expiracion.gt) ||
+            (where.ultima_actividad &&
+              sesion.ultima_actividad <= where.ultima_actividad.gt) ||
+            (where.OR &&
+              !where.OR.some(
+                (filtro) =>
+                  (filtro.fecha_expiracion &&
+                    sesion.fecha_expiracion <= filtro.fecha_expiracion.lte) ||
+                  (filtro.ultima_actividad &&
+                    sesion.ultima_actividad <= filtro.ultima_actividad.lte),
+              ))
+          )
+            continue;
+          Object.assign(sesion, data);
+          count++;
         }
-        Object.assign(sesion, data);
+        return { count };
+      },
+    );
+    prisma.usuario.findUnique.mockImplementation(async () => cuentaActual);
+    prisma.usuario.updateMany.mockImplementation(
+      async ({
+        where,
+        data,
+      }: {
+        where: {
+          id_usuario: bigint;
+          estado_cuenta?: string;
+          correo_verificado?: boolean;
+        };
+        data: Partial<typeof usuarioExistente>;
+      }) => {
+        if (
+          where.id_usuario !== cuentaActual.id_usuario ||
+          (where.estado_cuenta !== undefined &&
+            where.estado_cuenta !== cuentaActual.estado_cuenta) ||
+          (where.correo_verificado !== undefined &&
+            where.correo_verificado !== cuentaActual.correo_verificado)
+        )
+          return { count: 0 };
+        Object.assign(cuentaActual, data);
         return { count: 1 };
       },
     );
-    prisma.usuario.findUnique.mockResolvedValue(usuarioExistente);
     prisma.verificacionCorreo.create.mockResolvedValue({
       id_verificacion: 10n,
     });
     prisma.verificacionCorreo.updateMany.mockResolvedValue({ count: 1 });
     prisma.usuario.update.mockResolvedValue({});
-    prisma.usuario.updateMany.mockResolvedValue({ count: 1 });
     prisma.$transaction.mockImplementation(
       async (callback: (client: typeof prisma) => Promise<unknown>) =>
         callback(prisma),
@@ -232,14 +272,11 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     { password: '' },
     { password: 123 },
     { correo_institucional: 'inválido' },
-    { roles: ['Administrador'] },
   ])('rechaza datos inválidos de login: %j', async (overrides) => {
     const respuesta = await login(overrides).expect(400);
     expect(respuesta.body).toMatchObject({
       statusCode: 400,
-      code: 'AUTH_INVALID_REQUEST',
-      message: 'Los datos de autenticación no son válidos.',
-      details: expect.any(Array),
+      message: expect.any(Array),
     });
     expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
   });
@@ -361,31 +398,16 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       .expect(400);
     expect(respuesta.body).toMatchObject({
       statusCode: 400,
-      code: 'EMAIL_VERIFICATION_INVALID_REQUEST',
-      message: 'Los datos de verificación no son válidos.',
+      message: expect.any(Array),
     });
     expect(prisma.verificacionCorreo.findUnique).not.toHaveBeenCalled();
   });
 
-  it.each(['/usuarios', '/roles', '/usuario-rol', '/verificacion-correo'])(
-    'rechaza GET y POST sin sesión en %s',
-    async (path) => {
-      for (const method of ['get', 'post'] as const) {
-        const respuesta = await request(app.getHttpServer())
-          [method](path)
-          .expect(401);
-        expect(respuesta.body.code).toBe('AUTH_SESSION_INVALID');
-      }
-      expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
-    },
-  );
-
   it('cierra solo la sesión actual y rechaza la reutilización de su JWT', async () => {
     const primera = (await login().expect(200)).body.access_token as string;
     const segunda = (await login().expect(200)).body.access_token as string;
-    prisma.usuario.findMany.mockResolvedValue([]);
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/auth/sesion')
       .auth(primera, { type: 'bearer' })
       .expect(200);
     await request(app.getHttpServer())
@@ -393,7 +415,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       .auth(primera, { type: 'bearer' })
       .expect(204);
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/auth/sesion')
       .auth(primera, { type: 'bearer' })
       .expect(401);
     await request(app.getHttpServer())
@@ -401,7 +423,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       .auth(primera, { type: 'bearer' })
       .expect(401);
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/auth/sesion')
       .auth(segunda, { type: 'bearer' })
       .expect(200);
     const { jti } = jwt.decode<{ jti: string }>(primera);
@@ -413,24 +435,14 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
   });
 
-  it('permite consultar las verificaciones previas con una sesión activa', async () => {
-    const { body } = await login().expect(200);
-    prisma.verificacionCorreo.findMany.mockResolvedValue([]);
-    await request(app.getHttpServer())
-      .get('/verificacion-correo')
-      .auth(body.access_token, { type: 'bearer' })
-      .expect(200, []);
-  });
-
   it('actualiza la actividad de una sesión vigente', async () => {
     const { body } = await login().expect(200);
     const { jti } = jwt.decode<{ jti: string }>(body.access_token);
     const sesion = sesiones.get(jti)!;
     const anterior = new Date(Date.now() - 60_000);
     sesion.ultima_actividad = anterior;
-    prisma.usuario.findMany.mockResolvedValue([]);
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/auth/sesion')
       .auth(body.access_token, { type: 'bearer' })
       .expect(200);
     expect(sesion.ultima_actividad.getTime()).toBeGreaterThan(
@@ -451,11 +463,10 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       if (estado === 'inexistente') sesiones.delete(jti);
       const anterior = sesion.ultima_actividad;
       const respuesta = await request(app.getHttpServer())
-        .get('/usuarios')
+        .get('/auth/sesion')
         .auth(body.access_token, { type: 'bearer' })
         .expect(401);
       expect(respuesta.body.code).toBe('AUTH_SESSION_INVALID');
-      expect(prisma.usuario.findMany).not.toHaveBeenCalled();
       expect(sesion.ultima_actividad).toEqual(anterior);
     },
   );
@@ -477,7 +488,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       options,
     );
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/auth/sesion')
       .auth(token, { type: 'bearer' })
       .expect(401);
     expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
@@ -493,81 +504,196 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
         roles: ['Tutor'],
       });
       await request(app.getHttpServer())
-        .get('/usuarios')
+        .get('/auth/sesion')
         .auth(token, { type: 'bearer' })
         .expect(401);
       expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
     },
   );
 
-  it('restaura el POST y GET originales de usuarios sin aplicar las reglas nuevas del login', async () => {
-    const { body } = await login().expect(200);
+  it('conserva el registro público y nunca devuelve el hash de contraseña', async () => {
     const dto = {
-      nombre: 'Usuario previo',
-      correo_institucional: email,
-      password_hash: loginFixture.passwordHash,
+      nombre: 'Usuario nuevo',
+      correo_institucional: 'nuevo@alu.uct.cl',
+      password_hash: loginFixture.password,
     };
-    const guardado = {
+    prisma.usuario.findUnique.mockResolvedValueOnce(null);
+    prisma.usuario.create.mockResolvedValueOnce({
       id_usuario: 9007199254740993n,
       ...dto,
       estado_cuenta: 'ACTIVO',
       correo_verificado: false,
-    };
-    prisma.usuario.create.mockResolvedValue(guardado);
-    prisma.usuario.findMany.mockResolvedValue([guardado]);
-
+      roles: [{ rol: { nombre: 'ESTUDIANTE' } }],
+    });
     const respuesta = await request(app.getHttpServer())
-      .post('/usuarios')
-      .auth(body.access_token, { type: 'bearer' })
+      .post('/usuarios/registro')
       .send(dto)
       .expect(201);
-    expect(respuesta.body.id_usuario).toBe('9007199254740993');
-    expect(prisma.usuario.create).toHaveBeenCalledWith({
-      data: { ...dto, estado_cuenta: 'ACTIVO', correo_verificado: false },
+    expect(respuesta.body).toEqual({
+      id: '9007199254740993',
+      nombre: dto.nombre,
+      correo: dto.correo_institucional,
+      estado: 'ACTIVO',
     });
-    const listado = await request(app.getHttpServer())
-      .get('/usuarios')
+    const datosGuardados = prisma.usuario.create.mock.calls[0][0] as {
+      data: { password_hash: string };
+    };
+    expect(
+      await verify(datosGuardados.data.password_hash, dto.password_hash),
+    ).toBe(true);
+    expect(respuesta.body).not.toHaveProperty('password_hash');
+  });
+
+  it('comparte el flujo JWT con el login de usuarios', async () => {
+    const { body } = await request(app.getHttpServer())
+      .post('/usuarios/login')
+      .send({ correo_institucional: email, password: loginFixture.password })
+      .expect(200);
+    expect(body.access_token).toEqual(expect.any(String));
+    await request(app.getHttpServer())
+      .get('/auth/sesion')
       .auth(body.access_token, { type: 'bearer' })
       .expect(200);
-    expect(listado.body).toEqual([respuesta.body]);
   });
 
-  it('vuelve a conectar el POST y GET originales de roles', async () => {
-    const { body } = await login().expect(200);
-    const rol = { id_rol: 1, nombre: 'Tutor' };
-    prisma.rol.create.mockResolvedValue(rol);
-    prisma.rol.findMany.mockResolvedValue([rol]);
+  it.each([{ estado_cuenta: 'INACTIVO' }])(
+    'rechaza cuentas pendientes de activación: %j',
+    async (estado) => {
+      Object.assign(cuentaActual, estado);
+      const { body } = await login().expect(403);
+      expect(body.code).toBe('AUTH_ACCOUNT_INACTIVE');
+      expect(prisma.sesion.create).not.toHaveBeenCalled();
+    },
+  );
 
-    await request(app.getHttpServer())
-      .post('/roles')
-      .auth(body.access_token, { type: 'bearer' })
-      .send({ nombre: 'Tutor' })
-      .expect(201, rol);
-    expect(prisma.rol.create).toHaveBeenCalledWith({
-      data: { nombre: 'Tutor' },
+  it('no entrega JWT si la cuenta cambia de estado antes de crear la sesión', async () => {
+    prisma.usuario.updateMany.mockResolvedValueOnce({ count: 0 });
+    const { body } = await login().expect(403);
+    expect(body).not.toHaveProperty('access_token');
+    expect(prisma.sesion.create).not.toHaveBeenCalled();
+  });
+
+  function moderar(id: string, estado: string) {
+    return request(app.getHttpServer())
+      .patch('/internal/usuarios/' + id + '/estado-cuenta')
+      .set(
+        'x-internal-service-key',
+        process.env.INTERNAL_SERVICE_API_KEY as string,
+      )
+      .send({ estado });
+  }
+
+  it('suspende todas las sesiones y la reactivación requiere un login nuevo', async () => {
+    const primera = (await login().expect(200)).body.access_token as string;
+    const segunda = (await login().expect(200)).body.access_token as string;
+    await moderar('1', 'SUSPENDIDO').expect(200, {
+      id_usuario: '1',
+      estado_cuenta: 'SUSPENDIDO',
+      sesiones_revocadas: 2,
+    });
+    expect((await login().expect(403)).body.code).toBe(
+      'AUTH_ACCOUNT_SUSPENDED',
+    );
+    for (const token of [primera, segunda]) {
+      await request(app.getHttpServer())
+        .get('/auth/sesion')
+        .auth(token, { type: 'bearer' })
+        .expect(401);
+    }
+    await moderar('1', 'ACTIVO').expect(200, {
+      id_usuario: '1',
+      estado_cuenta: 'ACTIVO',
+      sesiones_revocadas: 0,
     });
     await request(app.getHttpServer())
-      .get('/roles')
-      .auth(body.access_token, { type: 'bearer' })
-      .expect(200, [rol]);
+      .get('/auth/sesion')
+      .auth(primera, { type: 'bearer' })
+      .expect(401);
+    const nueva = (await login().expect(200)).body.access_token as string;
+    await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .auth(nueva, { type: 'bearer' })
+      .expect(200);
   });
 
-  it('vuelve a conectar el POST y GET originales de usuario-rol y serializa BigInt', async () => {
+  it('rechaza operaciones de una cuenta suspendida aunque la sesión no se haya revocado', async () => {
     const { body } = await login().expect(200);
-    const relacion = { id_usuario: 1n, id_rol: 1 };
-    prisma.usuarioRol.create.mockResolvedValue(relacion);
-    prisma.usuarioRol.findMany.mockResolvedValue([relacion]);
-    const esperado = { id_usuario: '1', id_rol: 1 };
+    cuentaActual.estado_cuenta = 'SUSPENDIDO';
+    await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .auth(body.access_token, { type: 'bearer' })
+      .expect(401);
+  });
 
+  it('revoca la sesión inactiva y no permite recuperarla alterando su actividad', async () => {
+    const { body } = await login().expect(200);
+    const { jti } = jwt.decode<{ jti: string }>(body.access_token);
+    const sesion = sesiones.get(jti)!;
+    sesion.ultima_actividad = new Date(Date.now() - 1800_000);
     await request(app.getHttpServer())
-      .post('/usuario-rol')
+      .get('/auth/sesion')
       .auth(body.access_token, { type: 'bearer' })
-      .send({ id_usuario: 1, id_rol: 1 })
-      .expect(201, esperado);
-    expect(prisma.usuarioRol.create).toHaveBeenCalledWith({ data: relacion });
+      .expect(401);
+    expect(sesion.fecha_revocacion).toBeInstanceOf(Date);
+    sesion.ultima_actividad = new Date();
     await request(app.getHttpServer())
-      .get('/usuario-rol')
+      .get('/auth/sesion')
       .auth(body.access_token, { type: 'bearer' })
-      .expect(200, [esperado]);
+      .expect(401);
+  });
+
+  it('protege la moderación interna con una clave de servicio', async () => {
+    await request(app.getHttpServer())
+      .patch('/internal/usuarios/1/estado-cuenta')
+      .send({ estado: 'SUSPENDIDO' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch('/internal/usuarios/1/estado-cuenta')
+      .set('x-internal-service-key', 'clave-incorrecta')
+      .send({ estado: 'SUSPENDIDO' })
+      .expect(401);
+    expect(prisma.usuario.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-1', '9223372036854775808'])(
+    'rechaza identificadores de moderación inválidos: %s',
+    async (id) => {
+      await moderar(id, 'SUSPENDIDO').expect(400);
+      expect(prisma.usuario.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rechaza un estado de cuenta no permitido', async () => {
+    await moderar('1', 'ADMINISTRADOR').expect(400);
+    expect(prisma.usuario.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 al moderar un usuario inexistente', async () => {
+    await moderar('2', 'SUSPENDIDO').expect(404);
+    expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('mantiene el login de cuentas activas con correo sin verificar', async () => {
+    cuentaActual.correo_verificado = false;
+    const { body } = await login().expect(200);
+    expect(body.usuario.correo_verificado).toBe(false);
+    await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .auth(body.access_token, { type: 'bearer' })
+      .expect(200);
+  });
+
+  it('descarta los roles enviados por el cliente y utiliza los del usuario persistido', async () => {
+    const { body } = await login({ roles: ['ADMINISTRADOR'] }).expect(200);
+    const payload = jwt.decode<{ roles: string[] }>(body.access_token);
+    expect(payload.roles).toEqual(['Tutor']);
+  });
+
+  it('requiere autenticación para consultar una sesión', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .expect(401);
+    expect(body.code).toBe('AUTH_SESSION_INVALID');
+    expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VerificacionCorreoController } from './verificacion-correo.controller';
 import { VerificacionCorreoService } from './verificacion-correo.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/infraestructura/http/jwt-auth.guard';
 
 describe('VerificacionCorreoController', () => {
   let controller: VerificacionCorreoController;

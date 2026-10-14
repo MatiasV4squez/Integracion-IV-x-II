@@ -1,109 +1,67 @@
 # Usuarios y autenticación — STP
 
-Alcance actual: **login, emisión de JWT, errores de autenticación, verificación de correo mediante SMTP, protección de endpoints y revocación de sesión**.
+Auth se organiza en tres capas de arquitectura hexagonal:
 
-## Incluido
+```text
+src/auth/
+├── dominio/          # Contratos, identidad y validación de identificadores
+├── aplicacion/       # Login, sesiones y moderación
+├── infraestructura/
+│   ├── http/         # Controladores, guards y DTO de peticiones
+│   ├── seguridad/    # Adaptadores JWT y Argon2, con su prueba de contraseñas
+│   └── persistencia/ # Adaptador Prisma para sesiones y estado de cuenta
+└── auth.module.ts    # Conecta los puertos con sus adaptadores
+```
 
-- `POST /auth/login` para un usuario existente.
-- Consulta del usuario por correo y comprobación de su contraseña contra el hash almacenado.
-- Respuesta con datos públicos, sin exponer la contraseña ni su hash.
-- Emisión de un JWT firmado después de validar las credenciales.
-- Errores de entrada y credenciales con códigos estables para Web y Móvil.
-- Generación y envío de enlaces de verificación de correo de un solo uso.
-- Confirmación y reenvío de verificación para usuarios existentes.
+- **Dominio**: `auth.ports.ts` agrupa los contratos y la identidad autenticada; las reglas compartidas no dependen de NestJS, Prisma ni JWT.
+- **Aplicación**: `AuthService` coordina login; `SessionService` controla el ciclo de sesión; `ModeracionCuentasService` coordina el estado de cuentas. Sus dependencias de persistencia, contraseña y token se expresan mediante interfaces.
+- **Infraestructura**: `http` agrupa controladores, guards y DTO; `seguridad` contiene `PasswordService` y `TokenService`, que encapsulan Argon2 y JWT; `persistencia` contiene `PrismaAuthRepository`, que implementa los dos contratos de persistencia con una sola instancia y mantiene las transacciones.
+- **Composición**: `auth.module.ts` registra las implementaciones. `UsuariosPersistenceModule` comparte el repositorio existente entre Usuarios y Auth sin dependencias circulares.
 
-El login emite JWT Bearer asociados a una sesión persistida. Los endpoints de usuarios, roles, relaciones usuario-rol y el CRUD básico de verificaciones requieren una sesión activa. Login y verificación de correo permanecen públicos. La sesión puede cerrarse explícitamente y expira al superar el tiempo de inactividad configurado.
+La respuesta del login tiene un tipo explícito. La actividad de sesión utiliza un objeto con campos nombrados para distinguir el instante actual del límite de inactividad. El repositorio comparte el filtro de sesión y utiliza un bloque explícito para revocar al suspender.
 
-El registro institucional, la generación y almacenamiento del hash de contraseña, y la gestión completa de perfil y roles corresponden a Agustín y no se implementan como parte de estas tareas. Se conservan sus rutas básicas previas `GET/POST /usuarios`, `GET/POST /roles` y `GET/POST /usuario-rol`, con sus DTO y métodos originales. El CRUD previo de usuarios recibe `password_hash`; no equivale al registro institucional con protección de contraseña pendiente.
+Auth contiene 19 archivos, incluidas sus dos pruebas unitarias. Los consumidores importan el guard y el DTO de correo directamente desde `infraestructura/http`, sin archivos puente. La separación en subcarpetas organiza los adaptadores por función y conserva los contratos y las operaciones existentes. Ambos endpoints de login delegan en el mismo servicio y se conserva la validación global anterior de `main.ts`.
 
-La validación nueva está limitada al controlador de autenticación para no cambiar los contratos previos. Las respuestas JSON convierten los identificadores `BigInt` a texto.
+## Endpoints de Auth
 
-También se conserva el CRUD original `GET/POST /verificacion-correo`. El flujo seguro nuevo se expone por rutas separadas bajo `/auth`, sin modificar los contratos previos de tu compañero.
+| Método y ruta                                | Acceso                   | Resultado                                       |
+| -------------------------------------------- | ------------------------ | ----------------------------------------------- |
+| `POST /auth/login`                           | Público                  | JWT y datos públicos del usuario.               |
+| `POST /usuarios/login`                       | Público                  | Mismo flujo y respuesta que Auth.               |
+| `GET /auth/sesion`                           | JWT y sesión vigentes    | Identidad y registro de actividad.              |
+| `POST /auth/logout`                          | JWT y sesión vigentes    | Revoca la sesión actual; responde 204.          |
+| `PATCH /internal/usuarios/:id/estado-cuenta` | `x-internal-service-key` | Cambia el estado y devuelve sesiones revocadas. |
 
-## Configuración
+El login recibe `correo_institucional` y `password`. Devuelve `usuario`, `access_token`, `token_type`, `expires_in` y `mensaje`, sin incluir la contraseña ni su hash.
 
-Requisitos: Node.js 24 y PostgreSQL. Desde `usuarios-auth`:
+Se rechazan credenciales incorrectas (401), cuentas suspendidas (403) y cuentas inactivas (403). Una cuenta ACTIVO con correo aún sin verificar conserva el acceso anterior; conectar registro y verificación de correo queda como tarea separada.
+
+El guard verifica HS256, emisor, audiencia e identidad, además de la sesión persistida, su expiración, revocación y estado vigente de la cuenta. El token tiene vencimiento absoluto. Una sesión inactiva se revoca cuando se intenta utilizar nuevamente.
+
+El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" }`. Suspensión y revocación se realizan en una transacción. Login y suspensión toman el mismo bloqueo de cuenta para impedir la creación de sesiones después de suspender. Reactivar no recupera sesiones revocadas: requiere un login nuevo.
+
+## Alcance
+
+En `roles`, `usuario-rol` y `verificacion-correo` solo se actualizaron los imports del guard en sus pruebas y del DTO compartido de correo. Sus rutas CRUD y su autorización quedan pendientes de la decisión del equipo sobre esos módulos. Se mantiene el flujo de verificación existente bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
+
+El registro conserva su implementación y la validación global existente. No envía automáticamente el enlace de verificación. Las antiguas rutas raíz GET/POST /usuarios no forman parte del controlador actual.
+
+## Configuración y comprobación
+
+Se conservan las variables de `.env.example`: PostgreSQL, secretos JWT e interno, tiempos de sesión y configuración de correo. El modelo Sesion corresponde a la migración existente `20260927000100_sesiones_jwt`. No se agregó una migración ni se aplicaron cambios a la base de datos.
+
+Desde `usuarios-auth`:
 
 ```powershell
-Copy-Item .env.example .env
-npm ci
-```
-
-Configurar `DATABASE_URL`, `JWT_SECRET`, las variables `SMTP_*`, `EMAIL_VERIFICATION_URL` y `EMAIL_VERIFICATION_SECRET`. `PORT`, `JWT_ACCESS_TTL_SECONDS`, `JWT_IDLE_TIMEOUT_SECONDS` y `EMAIL_VERIFICATION_TTL_MINUTES` son opcionales.
-
-`JWT_SECRET` debe ser distinto en cada ambiente y contener al menos 32 bytes. No debe subirse en `.env`. `JWT_ACCESS_TTL_SECONDS` acepta entre 60 y 86400 segundos y utiliza 1800 segundos por defecto.
-
-`JWT_IDLE_TIMEOUT_SECONDS` acepta entre 60 y 86400 segundos y utiliza 1800 segundos por defecto. La expiración del token es absoluta; la sesión también deja de aceptarse si pasa ese tiempo sin actividad.
-
-`EMAIL_VERIFICATION_SECRET` también debe ser aleatorio, distinto por ambiente y contener al menos 32 bytes. Se utiliza para proteger los tokens almacenados. `EMAIL_VERIFICATION_URL` corresponde a la pantalla Web o Móvil que recibe el token del enlace y llama al endpoint de confirmación. Los tokens duran 30 minutos por defecto.
-
-Para una base nueva y vacía:
-
-```powershell
-npm run db:migrate
-npm run start:dev
-```
-
-La primera migración crea las tablas base. La migración `20260927000100_sesiones_jwt` agrega la tabla de sesiones requerida para validar y revocar JWT. Si las tablas base ya existen y coinciden con `20260916000100_esquema_inicial`, respaldar y comprobar el esquema antes de marcar esa migración como aplicada mediante `npx prisma migrate resolve --applied 20260916000100_esquema_inicial`; después ejecutar `npm run db:migrate` para crear la tabla de sesiones.
-
-Para probar el login manualmente debe existir un usuario con una contraseña almacenada como hash Argon2. La creación de ese usuario corresponde al registro de tu compañero. El verificador actual usa Argon2; se debe mantener el mismo algoritmo en ambos flujos al integrarlos.
-
-## POST /auth/login
-
-```json
-{
-  "correo_institucional": "estudiante@alu.uct.cl",
-  "password": "contraseña del usuario existente"
-}
-```
-
-Devuelve `200` con `usuario`, `access_token`, `token_type: "Bearer"`, `expires_in` y el mensaje `Autenticación exitosa.`. `usuario` contiene id como texto, nombre, correo, estado de cuenta, indicador de verificación y roles. Nunca se devuelve la contraseña ni su hash.
-
-El JWT usa HS256 e incluye `sub`, `jti`, `correo_institucional` y `roles`, además de las marcas estándar de emisión, expiración, emisor y audiencia. La expiración es absoluta y cada token queda asociado a una sesión persistida, que también puede vencer por inactividad o revocarse al cerrar sesión.
-
-Credenciales incorrectas producen `401` con el código `AUTH_INVALID_CREDENTIALS`. Los datos inválidos producen `400` con `AUTH_INVALID_REQUEST` y una lista de detalles. Ambos casos evitan revelar si el correo existe.
-
-Los clientes consumirán este endpoint mediante el API Gateway. Los endpoints protegidos verifican el token y su sesión activa; la autorización por rol se define en una tarea separada.
-
-## Protección de endpoints y cierre de sesión
-
-Las rutas `GET/POST /usuarios`, `GET/POST /roles`, `GET/POST /usuario-rol` y `GET/POST /verificacion-correo` requieren el encabezado `Authorization: Bearer <access_token>`. Login, verificación y reenvío de correo permanecen disponibles sin token.
-
-`POST /auth/logout` requiere un token vigente y responde `204`. Revoca la sesión asociada; los siguientes usos del mismo JWT reciben `401 AUTH_SESSION_INVALID`. Las sesiones también dejan de aceptarse después del tiempo máximo sin actividad. El guard valida algoritmo HS256, emisor y audiencia antes de consultar la sesión.
-
-Esta protección valida autenticación. Las reglas de autorización por rol, y la integración con suspensión de cuentas, corresponden a trabajos separados.
-
-## POST /auth/reenviar-verificacion
-
-```json
-{
-  "correo_institucional": "estudiante@alu.uct.cl"
-}
-```
-
-Devuelve `202` con un mensaje genérico, tanto si la cuenta no existe como si ya se encuentra verificada. Para una cuenta existente no verificada genera un token aleatorio, guarda únicamente su HMAC y envía el enlace mediante SMTP. El método interno `solicitarVerificacion(idUsuario, correo)` queda disponible para que el registro lo invoque cuando esa tarea se integre.
-
-## POST /auth/verificar-correo
-
-```json
-{
-  "token": "token-de-64-caracteres-recibido-en-el-enlace"
-}
-```
-
-Un token válido marca `correo_verificado` como `true`. Si la cuenta se encuentra `INACTIVO`, la habilita como `ACTIVO`; no reactiva cuentas con otros estados. La confirmación y el consumo del token se ejecutan en una transacción para impedir su reutilización.
-
-Los tokens inválidos, vencidos o utilizados producen errores controlados. Un fallo de entrega SMTP devuelve `503 EMAIL_DELIVERY_FAILED` y elimina el token que no pudo enviarse.
-
-## Comprobación
-
-```powershell
+npm run prisma:generate
 npm run build
 npm run lint
 npm test -- --runInBand
 npm run test:e2e -- --runInBand
 ```
 
-Las pruebas HTTP usan los controladores, servicios y guard reales con persistencia y entrega SMTP simuladas. Comprueban login, firma JWT, emisión y confirmación de tokens de correo, errores controlados, rechazo de solicitudes sin sesión, expiración por inactividad y logout sin afectar otras sesiones. También comprueban que los CRUD originales sigan aceptando sus contratos con autenticación. No generan contraseñas, no escriben datos reales y no envían correos externos. No sustituyen una prueba manual contra PostgreSQL y un servidor SMTP configurado.
+Si la base todavía no tiene la tabla de sesiones, aplicar las migraciones pendientes mediante `npm run db:migrate`. El rol ESTUDIANTE debe existir para registrar usuarios; su inicialización está en `prisma/seed.ts`.
 
-Se mantiene `.gitignore` para secretos, dependencias, compilados y cachés. Se conservan las plantillas y `package-lock.json`.
+Las pruebas HTTP usan validación global, controladores, adaptadores y guards reales con Prisma y SMTP simulados. Cubren login, sesiones, logout, inactividad, suspensión/reactivación y credenciales internas. Las pruebas de AuthService permiten sustituir adaptadores y comprueban que no se entregue un token si falla la creación de su sesión.
+
+Quedan pendientes las pruebas contra PostgreSQL y SMTP reales y la integración completa con Reportes.

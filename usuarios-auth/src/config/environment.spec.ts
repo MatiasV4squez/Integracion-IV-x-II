@@ -4,6 +4,7 @@ describe('Configuración básica de autenticación', () => {
   const base = {
     DATABASE_URL: 'postgresql://test@localhost/stp_test',
     JWT_SECRET: 'secreto-de-prueba-con-al-menos-32-bytes',
+    INTERNAL_SERVICE_API_KEY: 'clave-interna-de-prueba-con-al-menos-32-bytes',
     SMTP_HOST: 'smtp.example.test',
     SMTP_USER: 'usuario-smtp',
     SMTP_PASSWORD: 'secreto-smtp',
@@ -34,6 +35,8 @@ describe('Configuración básica de autenticación', () => {
     { PORT: '0' },
     { JWT_SECRET: undefined },
     { JWT_SECRET: 'secreto-corto' },
+    { INTERNAL_SERVICE_API_KEY: undefined },
+    { INTERNAL_SERVICE_API_KEY: 'clave-corta' },
     { JWT_ACCESS_TTL_SECONDS: '59' },
     { JWT_ACCESS_TTL_SECONDS: '86401' },
     { JWT_ACCESS_TTL_SECONDS: 'media-hora' },

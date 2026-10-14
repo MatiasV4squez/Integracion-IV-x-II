@@ -19,7 +19,9 @@ export class InternalServiceGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<InternalRequest>();
     const header = request.headers['x-internal-service-key'];
     const providedKey = Array.isArray(header) ? undefined : header;
-    const expectedKey = this.config.getOrThrow<string>('INTERNAL_SERVICE_API_KEY');
+    const expectedKey = this.config.getOrThrow<string>(
+      'INTERNAL_SERVICE_API_KEY',
+    );
 
     if (!providedKey || !this.matches(providedKey, expectedKey)) {
       throw new UnauthorizedException({
