@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import { TutoresController } from './infrastructure/http/tutores.controller.js';
+import { TutoresController } from './infraestructura/http/tutores.controller.js';
 import { DatabaseModule } from '../database/database.module.js';
-import { BuscarTutoresPorMateriaUseCase } from './application/buscar-tutores-por-materia.use-case.js';
-import { TUTORES_REPOSITORY, type TutoresRepository } from './application/ports/tutores.repository.js';
-import { PrismaTutoresRepository } from './infrastructure/prisma-tutores.repository.js';
+import { BuscarTutoresPorMateriaUseCase } from './aplicacion/buscar-tutores-por-materia.use-case.js';
+import { TUTORES_REPOSITORY, type TutoresRepository } from './aplicacion/puertos/tutores.repository.js';
+import { PrismaTutoresRepository } from './infraestructura/prisma-tutores.repository.js';
 import { DisponibilidadModule } from '../disponibilidad/disponibilidad.module.js';
-import { DisponibilidadTutoresAdapter } from './infrastructure/disponibilidad-tutores.adapter.js';
-import { DISPONIBILIDAD_TUTORES, type DisponibilidadTutoresPort } from './application/ports/disponibilidad-tutores.port.js';
+import { DisponibilidadTutoresAdapter } from './infraestructura/disponibilidad-tutores.adapter.js';
+import { DISPONIBILIDAD_TUTORES, type DisponibilidadTutoresPort } from './aplicacion/puertos/disponibilidad-tutores.port.js';
 
 @Module({
   imports: [DatabaseModule, DisponibilidadModule],

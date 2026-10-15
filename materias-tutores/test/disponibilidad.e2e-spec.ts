@@ -61,6 +61,7 @@ describe('DisponibilidadController (e2e)', () => {
   });
 
   it('crea un bloque para el tutor identificado por el token', async () => {
+    prismaMock.bloqueHorario.findMany.mockResolvedValue([]);
     prismaMock.bloqueHorario.create.mockResolvedValue(bloqueDisponible);
 
     await request(app.getHttpServer())

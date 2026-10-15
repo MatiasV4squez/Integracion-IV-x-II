@@ -272,7 +272,7 @@ La respuesta `201` y la consulta `GET /tutores/10/reputacion` utilizan la misma 
 
 La consulta requiere un JWT válido. Un tutor habilitado sin perfil de calificaciones devuelve `200` con cantidad `0`, promedio `null` y estado `ACTIVO`; un tutor desconocido devuelve `404`. Entradas inválidas devuelven `400`, una clave interna o JWT inválido `401`, y una nota bajo otro rol, un tutor no habilitado o un evento contradictorio `409`.
 
-El dominio contiene el cálculo y las reglas sin importar Nest ni Prisma. Los casos de uso coordinan el registro y la consulta mediante el port `ReputacionRepository`, que expone una transacción con operaciones del negocio. El adaptador Prisma implementa ese contrato y los reintentos. Los controllers validan HTTP, aplican los guards y traducen los errores del dominio a respuestas HTTP. `IntegracionesService` conserva el contrato existente de reserva y liberación de bloques; el cálculo de reputación se gestiona en `src/reputacion/`.
+El dominio contiene el cálculo y las reglas sin importar Nest ni Prisma. Los casos de uso coordinan el registro y la consulta mediante el puerto `ReputacionRepository`, que expone una transacción con operaciones del negocio. El adaptador Prisma implementa ese contrato y los reintentos. Los controllers validan HTTP, aplican los guards y traducen los errores del dominio a respuestas HTTP. `IntegracionesService` conserva el contrato existente de reserva y liberación de bloques; el cálculo de reputación se gestiona en `src/reputacion/`.
 
 Agendamiento conserva la responsabilidad de comprobar que la sesión esté Completada, que el evaluador sea un participante y que exista una sola calificación por participante. Debe enviar únicamente calificaciones recibidas por el tutor y reutilizar el mismo identificador al reintentar una entrega. No se accede a su base de datos ni se modifica su código. El receptor se probó con eventos de prueba; queda verificar el envío desde el microservicio real. Auth y Moderación no son dependencias del cálculo; la consulta mantiene la comprobación local de JWT existente, con las limitaciones de revocación ya documentadas.
 
@@ -288,13 +288,17 @@ npm test
 npm run test:e2e
 ```
 
-Para las pruebas de reputación con PostgreSQL real:
+Para las pruebas de materias, disponibilidad y reputación con PostgreSQL real:
 
 ```sh
 npm run test:reputacion:postgres
+npm run test:materias:postgres
+npm run test:disponibilidad:postgres
 ```
 
 Este comando carga `TEST_DATABASE_URL` si está definida; de lo contrario, utiliza `DATABASE_URL` del entorno o de `.env`. Solo permite servidores locales. Necesita permisos para crear y eliminar un esquema: crea `test_reputacion_<uuid>`, aplica allí el SQL de las migraciones existentes y lo elimina al finalizar. No requiere migraciones nuevas ni instala dependencias. Los registros de prueba no se insertan en `public` y se comprueba que sus tablas no hayan cambiado.
+
+La suite de Materias utiliza `test_materias_<uuid>` y comprueba el catálogo HTTP con Prisma/PostgreSQL reales; elimina su esquema y compara el contenido de `public.materia`.
 
 Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tokens exclusivos de pruebas. Verifican el umbral, su igualdad exacta, duplicados, eventos contradictorios, rollback, entregas simultáneas, conservación de BIGINT y consultas sin notas. No necesitan iniciar Auth ni Agendamiento.
 
@@ -306,12 +310,12 @@ Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tok
 - `src/app.service.ts`: servicio inicial, separado del controlador.
 - `src/config/environment.ts`: validación de configuración al arrancar.
 - `src/database/`: módulo que exporta una instancia de `PrismaService`, con conexión al iniciar y desconexión al cerrar.
-- `src/materias/`: módulo HTTP del catálogo de materias, con controlador, servicio y DTO de respuesta.
-- `src/disponibilidad/`: gestión HTTP de bloques propios y consulta de horarios disponibles de un tutor.
+- `src/materias/`: catálogo hexagonal; dominio y caso de uso con puerto de repositorio, adaptadores HTTP/Prisma y módulo de composición.
+- `src/disponibilidad/`: dominio de bloques/horarios, cinco casos de uso, puertos de repositorio/reloj y adaptadores HTTP/Prisma.
 - `src/auth/`: verificación local del JWT y lectura segura del ID del tutor.
-- `src/tutores/application/`: caso de uso, modelos y ports de búsqueda sin dependencias de HTTP ni Prisma.
-- `src/tutores/infrastructure/`: adaptadores de Prisma y disponibilidad; `http/` contiene el controller y los DTO y validadores de consulta.
-- `src/reputacion/`: dominio, casos de uso, port de repositorio y adaptadores HTTP/Prisma para el cálculo de reputación.
+- `src/tutores/aplicacion/`: caso de uso, modelos y puertos de búsqueda sin dependencias de HTTP ni Prisma.
+- `src/tutores/infraestructura/`: adaptadores de Prisma y disponibilidad; `http/` contiene el controller y los DTO y validadores de consulta.
+- `src/reputacion/`: dominio, casos de uso, puerto de repositorio y adaptadores HTTP/Prisma para el cálculo de reputación.
 - `prisma/schema.prisma`: modelos de materia, bloque, postulación, habilitación y reputación.
 - `prisma/migrations/`: historial versionado de cambios de esquema.
 - `prisma/seed.ts`: datos iniciales idempotentes del catálogo.
@@ -320,13 +324,13 @@ Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tok
 
 El proyecto tiene sus propias dependencias y compilación. Según el SRS, se integra mediante HTTP/REST con otros servicios y gestiona su propio esquema o base de datos PostgreSQL, sin acceso directo a las bases ajenas.
 
-Tutores y Reputación separan casos de uso, ports y adaptadores. Materias, Disponibilidad y Postulaciones conservan la estructura de módulos, controllers y services de NestJS, con acceso directo a Prisma desde los services; su adaptación a arquitectura hexagonal sigue pendiente. La organización del proyecto completo todavía no es hexagonal.
+Materias, Disponibilidad, Tutores y Reputación separan casos de uso, puertos y adaptadores. Postulaciones conserva la estructura de módulo, controller y service de NestJS, con acceso directo a Prisma desde el service; su adaptación a arquitectura hexagonal sigue pendiente. La organización del proyecto completo todavía no es hexagonal.
 
 La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos importan `DatabaseModule` e inyectan `PrismaService`. Están implementados el catálogo, la gestión de bloques, las postulaciones, la revisión y los contratos internos; falta conectarlos y probarlos contra los otros microservicios reales.
 
 No se crean tablas al arrancar. Las migraciones crean y aplican los cambios de esquema en desarrollo. `npm run prisma:deploy` aplica migraciones existentes en el entorno de despliegue.
 
-`npm ci` genera automáticamente el cliente Prisma; tras modificar el esquema, ejecuta `npm run prisma:generate`. Las pruebas unitarias y `test:e2e` usan sustitutos de la conexión y no requieren PostgreSQL; no demuestran que las credenciales locales sean válidas. `test:reputacion:postgres` es la verificación separada con la base real.
+`npm ci` genera automáticamente el cliente Prisma; tras modificar el esquema, ejecuta `npm run prisma:generate`. Las pruebas unitarias y `test:e2e` usan sustitutos de la conexión y no requieren PostgreSQL; no demuestran que las credenciales locales sean válidas. `test:reputacion:postgres`, `test:materias:postgres` y `test:disponibilidad:postgres` son verificaciones separadas con la base real.
 
 ## Archivos locales
 

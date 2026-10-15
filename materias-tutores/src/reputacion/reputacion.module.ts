@@ -4,12 +4,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../database/database.module.js';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
 import { IntegracionSecretGuard } from '../auth/integracion-secret.guard.js';
-import { RegistrarCalificacionUseCase } from './application/registrar-calificacion.use-case.js';
-import { ConsultarReputacionUseCase } from './application/consultar-reputacion.use-case.js';
-import { REPUTACION_REPOSITORY, type ReputacionRepository } from './application/ports/reputacion.repository.js';
-import { PrismaReputacionRepository } from './infrastructure/prisma-reputacion.repository.js';
-import { CalificacionesController } from './infrastructure/http/calificaciones.controller.js';
-import { ReputacionController } from './infrastructure/http/reputacion.controller.js';
+import { RegistrarCalificacionUseCase } from './aplicacion/registrar-calificacion.use-case.js';
+import { ConsultarReputacionUseCase } from './aplicacion/consultar-reputacion.use-case.js';
+import { REPUTACION_REPOSITORY, type ReputacionRepository } from './aplicacion/puertos/reputacion.repository.js';
+import { PrismaReputacionRepository } from './infraestructura/prisma-reputacion.repository.js';
+import { CalificacionesController } from './infraestructura/http/calificaciones.controller.js';
+import { ReputacionController } from './infraestructura/http/reputacion.controller.js';
 
 @Module({
   imports: [

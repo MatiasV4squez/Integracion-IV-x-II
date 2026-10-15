@@ -25,8 +25,8 @@ No se necesita un servidor Nest escuchando ni los micros Auth/Agendamiento para 
 Para ejecutar únicamente una suite:
 
 ```powershell
-npm.cmd test -- src/materias/materias.service.spec.ts
-npm.cmd test -- src/tutores/application/buscar-tutores-por-materia.use-case.spec.ts
+npm.cmd test -- src/materias/aplicacion/listar-materias.use-case.spec.ts
+npm.cmd test -- src/tutores/aplicacion/buscar-tutores-por-materia.use-case.spec.ts
 npm.cmd run test:e2e -- test/tutores.e2e-spec.ts
 ```
 
@@ -36,12 +36,14 @@ npm.cmd run test:e2e -- test/tutores.e2e-spec.ts
 
 ### Materias (RF05)
 
-Consulta con selección de código/nombre y orden por código; respuesta HTTP del catálogo con Prisma simulado.
+Caso de uso independiente de Nest/Prisma, consulta con selección de código/nombre y orden por código, catálogo vacío, exclusión de campos internos y errores HTTP. La suite PostgreSQL prueba el recorrido real del módulo con datos aislados.
 
 Archivos:
 
-- `src/materias/materias.service.spec.ts`
+- `src/materias/aplicacion/listar-materias.use-case.spec.ts`
+- `src/materias/infraestructura/prisma-materias.repository.spec.ts`
 - `test/materias.e2e-spec.ts`
+- `test/materias.postgres-spec.ts`
 
 ### Disponibilidad (RF08)
 
@@ -49,7 +51,10 @@ Creación, formatos de día/hora, inicio anterior al fin, listado propio, horari
 
 Archivos:
 
-- `src/disponibilidad/disponibilidad.service.spec.ts`
+- `src/disponibilidad/dominio/bloque-horario.spec.ts`
+- `src/disponibilidad/aplicacion/disponibilidad.use-cases.spec.ts`
+- `src/disponibilidad/infraestructura/prisma-disponibilidad.repository.spec.ts`
+- `test/disponibilidad.postgres-spec.ts`
 - `test/disponibilidad.e2e-spec.ts`
 
 ### Postulaciones (RF06/RF07)
@@ -64,14 +69,14 @@ Archivos:
 
 ### Búsqueda (parte de RF09)
 
-Coordinación de ports, paginación, validación, perfiles/horarios de la página, respuestas vacías, páginas consecutivas y precisión de IDs BIGINT. La suite HTTP integra controller/caso de uso/adaptadores con Prisma simulado.
+Coordinación de puertos, paginación, validación, perfiles/horarios de la página, respuestas vacías, páginas consecutivas y precisión de IDs BIGINT. La suite HTTP integra controller/caso de uso/adaptadores con Prisma simulado.
 
 Archivos:
 
-- `src/tutores/application/buscar-tutores-por-materia.use-case.spec.ts`
-- `src/tutores/infrastructure/prisma-tutores.repository.spec.ts`
-- `src/tutores/infrastructure/disponibilidad-tutores.adapter.spec.ts`
-- `src/tutores/infrastructure/http/dto/validar-paginacion.spec.ts`
+- `src/tutores/aplicacion/buscar-tutores-por-materia.use-case.spec.ts`
+- `src/tutores/infraestructura/prisma-tutores.repository.spec.ts`
+- `src/tutores/infraestructura/disponibilidad-tutores.adapter.spec.ts`
+- `src/tutores/infraestructura/http/dto/validar-paginacion.spec.ts`
 - `test/tutores.e2e-spec.ts`
 
 ### Reputación (parte de RF25, BR07/BR08)
@@ -80,9 +85,9 @@ Notas 1–5, umbral y promedio exacto, revisión persistente, consultas, duplica
 
 Archivos:
 
-- `src/reputacion/domain/reputacion.spec.ts`
-- `src/reputacion/application/reputacion.use-cases.spec.ts`
-- `src/reputacion/infrastructure/prisma-reputacion.repository.spec.ts`
+- `src/reputacion/dominio/reputacion.spec.ts`
+- `src/reputacion/aplicacion/reputacion.use-cases.spec.ts`
+- `src/reputacion/infraestructura/prisma-reputacion.repository.spec.ts`
 - `test/reputacion.e2e-spec.ts`
 
 ### Reputación con PostgreSQL
@@ -134,7 +139,28 @@ La prueba crea `test_reputacion_<uuid>`, aplica allí las migraciones existentes
 
 Esta suite cubre 10 casos, incluidos promedio exactamente `2.5`, notas bajas que activan revisión, aumento posterior del promedio, entregas simultáneas iguales y distintas, rollback provocado por fallo y conservación de identificadores grandes.
 
-## Resultado de la última verificación
+Para el catálogo real, ejecuta `npm.cmd run test:materias:postgres`. Su configuración es `vitest.config.materias-postgres.ts`; utiliza las mismas variables de conexión local y un esquema propio `test_materias_<uuid>`. Aplica las migraciones allí, comprueba catálogo vacío, orden real, caracteres Unicode, exclusión del ID BIGINT y lectura de cambios persistidos. Elimina su esquema y comprueba que `public.materia` conserve su contenido. No ejecuta la semilla sobre tus datos habituales.
+
+## Verificación de la adaptación hexagonal de Materias
+
+Revisión local del 14 de octubre de 2026:
+
+- Prisma validate, build y TypeScript sin emisión: correctos.
+- Lint: 0 errores y 0 advertencias.
+- Unitarias: 16 archivos, 125 casos aprobados.
+- HTTP: 6 archivos, 82 casos aprobados.
+- PostgreSQL de Materias: 4 casos aprobados.
+- PostgreSQL de Reputación: 10 casos aprobados.
+
+La prueba real del catálogo verifica que `public.materia` no cambió y que el esquema temporal fue eliminado. La suite HTTP de Disponibilidad necesitaba actualizar un mock de su consulta de solapamientos; su fallo se observó antes de cambiar Materias. No se modificó su lógica productiva.
+
+## Disponibilidad con PostgreSQL real
+
+Tras la adaptación hexagonal, el 14 de octubre de 2026, pasaron 161 casos unitarios en 18 archivos y 82 casos HTTP en 6 archivos. Las suites PostgreSQL pasaron 12 casos de Disponibilidad, 4 de Materias y 10 de Reputación. Prisma validate, build, TypeScript y lint también pasaron; lint no reportó errores ni advertencias. Las pruebas comprobaron la limpieza de sus esquemas y la conservación de los datos públicos correspondientes.
+
+Ejecuta `npm.cmd run test:disponibilidad:postgres`. Usa un esquema aislado `test_disponibilidad_<uuid>` y la conexión local de `TEST_DATABASE_URL` o `DATABASE_URL`. Sus 12 casos recorren HTTP/guards/casos de uso/Prisma y comprueban CRUD, formatos, propietario, estado, horarios futuros, BIGINT, solapamientos secuenciales y escritura condicionada. El reloj se sustituye por un instante fijo; no requiere login real. Al terminar elimina el esquema y compara los datos de `public.bloque_horario`.
+
+## Resultado histórico anterior a la adaptación de Materias
 
 En la verificación previa al commit de reputación `2d2c6d3`, después de incorporar las pruebas de búsqueda del compañero:
 
@@ -152,7 +178,7 @@ Este resultado corresponde a esa revisión y no reemplaza una nueva ejecución d
 - Que la búsqueda tenga nombre y autenticación: ambas funciones siguen pendientes y no deben presentarse como aprobadas.
 - Que la aprobación asigne el rol mediante el endpoint real de Auth: las pruebas sustituyen la llamada.
 - Que Agendamiento reserve/libere correctamente los bloques y entregue calificaciones de sesiones completadas. Las pruebas del receptor no prueban el emisor.
-- Que el catálogo/semilla, certificados, postulaciones y disponibilidad pasen todas sus reglas contra PostgreSQL y el sistema de archivos reales: no tienen una suite automática integral equivalente a la de reputación. La comprobación manual anterior de paginación fue puntual.
+- Que la semilla, certificados y postulaciones pasen todas sus reglas contra PostgreSQL y el sistema de archivos reales: las suites de Materias y Disponibilidad no verifican esas operaciones. La comprobación manual anterior de paginación fue puntual.
 - Que exista cobertura exhaustiva de seguridad, rendimiento o todos los criterios de aceptación del SRS.
 
 La documentación de las funciones actuales puede completarse ahora. Si la tarea Scrum exige pruebas entre microservicios, esa parte debe quedar pendiente hasta integrar y comprobar los contratos reales.
