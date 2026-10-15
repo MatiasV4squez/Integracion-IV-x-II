@@ -1,15 +1,13 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { crearAplicacion } from './crear-aplicacion';
 
 async function iniciarGateway() {
-  const aplicacion = await NestFactory.create(AppModule);
+  const aplicacion = await crearAplicacion();
   const configuracion = aplicacion.get(ConfigService);
   const puerto = configuracion.getOrThrow<number>('PORT');
 
-  aplicacion.setGlobalPrefix('api');
   aplicacion.enableShutdownHooks();
   await aplicacion.listen(puerto);
   Logger.log(
