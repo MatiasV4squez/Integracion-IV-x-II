@@ -1,0 +1,32 @@
+{
+  "name": "api-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Base del API Gateway de STUDIA",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "oxlint src/"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.2",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.2",
+    "@nestjs/platform-express": "^12.0.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.1",
+    "@types/node": "^24.13.4",
+    "oxlint": "^1.83.0",
+    "typescript": "~6.0.3"
+  }
+}
