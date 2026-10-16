@@ -8,8 +8,6 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { validateEnvironment } from './config/environment';
 import { UsuariosModule } from './usuarios/usuarios.module';
-import { RolesModule } from './roles/roles.module';
-import { UsuarioRolModule } from './usuario-rol/usuario-rol.module';
 import { VerificacionCorreoModule } from './verificacion-correo/verificacion-correo.module';
 
 @Module({
@@ -20,8 +18,6 @@ import { VerificacionCorreoModule } from './verificacion-correo/verificacion-cor
     }),
     PrismaModule,
     UsuariosModule,
-    RolesModule,
-    UsuarioRolModule,
     VerificacionCorreoModule,
     AuthModule,
   ],
