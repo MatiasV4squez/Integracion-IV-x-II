@@ -8,27 +8,20 @@ import { ProcesarSesiones } from '../aplicacion/casos-de-uso/procesar-sesiones';
 import { EntregarReputacion } from '../aplicacion/casos-de-uso/entregar-reputacion';
 import { LiberarBloques } from '../aplicacion/casos-de-uso/liberar-bloques';
 import { EntregarAvisosModeracion } from '../aplicacion/casos-de-uso/entregar-avisos-moderacion';
-import { GestionarDisponibilidadTutor } from '../aplicacion/casos-de-uso/gestionar-disponibilidad-tutor';
 import type { ContextoTransaccion } from '../aplicacion/puertos/unidad-de-trabajo.puerto';
-import type { RepositorioDisponibilidadTutor } from '../aplicacion/puertos/repositorio-disponibilidad-tutor.puerto';
 import { SessionsController } from './http/sessions.controller';
-import { DisponibilidadTutorController } from './http/disponibilidad-tutor.controller';
 import { SesionesCron } from './tareas/sesiones-cron';
 import { ReputacionHttp } from './integraciones/reputacion-http';
 import { ModeracionHttp } from './integraciones/moderacion-http';
 import { DisponibilidadTutoresHttp } from './integraciones/disponibilidad-tutores-http';
 import { crearRepositoriosPrisma, UnidadDeTrabajoPrisma } from './persistencia/unidad-de-trabajo-prisma';
-import { RepositorioDisponibilidadTutorPrisma } from './persistencia/repositorio-disponibilidad-tutor-prisma';
 
 const REPOSITORIOS_SESIONES = Symbol('REPOSITORIOS_SESIONES');
-const REPOSITORIO_DISPONIBILIDAD_TUTOR = Symbol(
-  'REPOSITORIO_DISPONIBILIDAD_TUTOR',
-);
 const RELOJ = { ahora: () => new Date() };
 
 @Module({
   imports: [DatabaseModule, AuthModule, ConfigModule],
-  controllers: [SessionsController, DisponibilidadTutorController],
+  controllers: [SessionsController],
   providers: [
     {
       provide: REPOSITORIOS_SESIONES,
@@ -43,19 +36,6 @@ const RELOJ = { ahora: () => new Date() };
     ReputacionHttp,
     ModeracionHttp,
     DisponibilidadTutoresHttp,
-    {
-      provide: REPOSITORIO_DISPONIBILIDAD_TUTOR,
-      inject: [PrismaService],
-      useFactory: (prisma: PrismaService) =>
-        new RepositorioDisponibilidadTutorPrisma(prisma),
-    },
-    {
-      provide: GestionarDisponibilidadTutor,
-      inject: [REPOSITORIO_DISPONIBILIDAD_TUTOR],
-      useFactory: (
-        disponibilidad: RepositorioDisponibilidadTutor,
-      ) => new GestionarDisponibilidadTutor(disponibilidad),
-    },
     {
       provide: LiberarBloques,
       inject: [REPOSITORIOS_SESIONES, DisponibilidadTutoresHttp],

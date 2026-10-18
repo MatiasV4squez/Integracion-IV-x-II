@@ -134,22 +134,3 @@ enum sesion_estado_sesion_enum {
   INASISTENCIA
   EN_CONFLICTO
 }
-
-enum disponibilidad_estado_enum {
-  DISPONIBLE
-  RESERVADO
-  NO_DISPONIBLE
-}
-
-model disponibilidad_tutor {
-  id_disponibilidad   BigInt               @id @default(autoincrement())
-  id_tutor            BigInt
-  inicio              DateTime             @db.Timestamptz(3)
-  fin                 DateTime             @db.Timestamptz(3)
-  estado              disponibilidad_estado_enum @default(DISPONIBLE)
-  fecha_creacion      DateTime             @default(now()) @db.Timestamp(6)
-  fecha_actualizacion DateTime             @default(now()) @updatedAt @db.Timestamp(6)
-
-  @@index([id_tutor, estado])
-  @@index([id_tutor, inicio])
-}
