@@ -11,9 +11,10 @@ import { useTutorMode } from '@/hooks/use-tutor-mode';
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 function tabIcon(active: IconName, inactive: IconName) {
-  return ({ focused, color }: { focused: boolean; color: ColorValue }) => (
-    <Ionicons name={focused ? active : inactive} size={26} color={color} />
-  );
+  function TabIcon({ focused, color }: { focused: boolean; color: ColorValue }) {
+    return <Ionicons name={focused ? active : inactive} size={26} color={color} />;
+  }
+  return TabIcon;
 }
 
 export default function TabsLayout() {

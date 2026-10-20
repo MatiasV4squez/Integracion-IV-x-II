@@ -79,7 +79,7 @@ export default function TuteeProfileScreen() {
       <SectionHeader title="Materias en las que recibes tutoría" />
       {subjects.length === 0 ? (
         <Txt variant="small" color="muted">
-          Aún no has tomado tutorías. Ve a "Buscar" para reservar la primera.
+          Aún no has tomado tutorías. Ve a &quot;Buscar&quot; para reservar la primera.
         </Txt>
       ) : (
         <View style={styles.chipRow}>

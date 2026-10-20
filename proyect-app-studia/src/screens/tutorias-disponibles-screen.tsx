@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
@@ -35,9 +35,13 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
   const [subjectCode, setSubjectCode] = useState<string | null>(initialSubject ?? null);
   const [feedback, setFeedback] = useState<Record<string, { ok: boolean; text: string; sessionId?: string }>>({});
 
-  useEffect(() => {
+  // Sincronizado durante el render, no en un efecto, siguiendo el patrón de
+  // React para "adjusting state when a prop changes".
+  const [prevInitialSubject, setPrevInitialSubject] = useState(initialSubject);
+  if (initialSubject !== prevInitialSubject) {
+    setPrevInitialSubject(initialSubject);
     if (initialSubject && getSubject(initialSubject)) setSubjectCode(initialSubject);
-  }, [initialSubject]);
+  }
 
   const subject = subjectCode ? getSubject(subjectCode) : undefined;
   const limitReached = pendingCount >= MAX_PENDING_REQUESTS;

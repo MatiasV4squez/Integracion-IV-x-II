@@ -20,7 +20,7 @@ import { useUI } from '@/hooks/use-ui';
 import { useSessions } from '@/state/sessions-context';
 import type { AvailabilityBlock } from '@/types/session';
 import { formatDate, formatTimeRange, plural } from '@/utils/format';
-import { blockOccupancy, isBlockFull } from '@/utils/session-machine';
+import { blockOccupancy } from '@/utils/session-machine';
 
 type Tab = 'resumen' | 'resenas' | 'horarios' | 'historial';
 
@@ -194,7 +194,6 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
             <Card key={day}>
               <Txt variant="h3">{day}</Txt>
               {blocks.map((block) => {
-                const full = isBlockFull(block, reserved);
                 return (
                   <View key={block.id} style={[styles.blockRow, { borderColor: ui.border }]}>
                     <View style={styles.flex}>

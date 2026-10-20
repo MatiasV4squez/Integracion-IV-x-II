@@ -80,8 +80,12 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
     if (session) setLastViewed(session.id);
   }, [session, setLastViewed]);
 
-  // Al cambiar de sesión se limpian los formularios.
-  useEffect(() => {
+  // Al cambiar de sesión se limpian los formularios (sincronizado durante el
+  // render, no en un efecto, siguiendo el patrón de React para "adjusting
+  // state when a prop changes").
+  const [formsSessionId, setFormsSessionId] = useState(session?.id);
+  if (session?.id !== formsSessionId) {
+    setFormsSessionId(session?.id);
     setFeedback(null);
     setRating(0);
     setComment('');
@@ -89,7 +93,7 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
     setShowReport(false);
     setReason(null);
     setDescription('');
-  }, [session?.id]);
+  }
 
   if (!session) {
     return (
@@ -102,7 +106,6 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
 
   const id = session.id;
   const iAmTutee = session.myRole === 'tutee';
-  const counterpart = iAmTutee ? session.tutor : session.tutee;
   const tutorProfile = getTutorById(session.tutor.id);
   const actions = getAvailableActions({
     status: session.status,

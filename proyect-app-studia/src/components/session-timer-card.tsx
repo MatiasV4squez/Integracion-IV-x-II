@@ -80,10 +80,15 @@ export function SessionTimerCard({ session, now }: Props) {
   const ui = useUI();
   const [tick, setTick] = useState(0);
 
-  // El reloj simulado de la app cambia con cada acción: se reinicia el conteo local.
-  useEffect(() => {
+  // El reloj simulado de la app cambia con cada acción: se reinicia el conteo local
+  // (sincronizado durante el render, no en un efecto, siguiendo el patrón de React
+  // para "adjusting state when a prop changes").
+  const resetKey = `${now}|${session.status}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     setTick(0);
-  }, [now, session.status]);
+  }
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
