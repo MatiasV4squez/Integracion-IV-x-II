@@ -1,0 +1,107 @@
+.tutor-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  min-height: 132px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 6px 16px rgb(23 42 72 / 6%);
+}
+
+.tutor-card__avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
+}
+
+.tutor-card__avatar svg {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.tutor-card__informacion {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tutor-card h3 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.tutor-card__calificacion {
+  margin: 0 0 5px;
+  color: var(--color-primary-text);
+  font-size: 14px;
+}
+
+.tutor-card__horario {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.tutor-card__perfil {
+  flex-shrink: 0;
+  min-width: 156px;
+  min-height: 48px;
+  margin-inline-start: auto;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tutor-card__perfil:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.tutor-card__perfil:disabled {
+  background: #dce7f7;
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.tutor-card__solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .tutor-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .tutor-card__avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .tutor-card__perfil {
+    grid-column: 2;
+    justify-self: end;
+    min-width: 0;
+    max-width: 100%;
+  }
+}

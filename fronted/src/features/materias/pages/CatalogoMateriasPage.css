@@ -1,0 +1,95 @@
+.catalogo-materias {
+  width: min(100%, 1296px);
+  margin-inline: auto;
+  padding: 38px 40px 80px;
+  line-height: 1.5;
+}
+
+.catalogo-materias h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1.25;
+  letter-spacing: -0.8px;
+}
+
+.catalogo-materias__subtitulo {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+.catalogo-materias__resumen {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+
+.catalogo-materias__resumen h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.catalogo-materias__cantidad {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.catalogo-materias__limpiar {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-primary-text);
+  background: transparent;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.catalogo-materias__limpiar:hover {
+  background: var(--color-primary-soft);
+}
+
+.catalogo-materias__lista {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 1024px) {
+  .catalogo-materias {
+    padding-inline: 28px;
+  }
+
+  .catalogo-materias__lista {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .catalogo-materias {
+    padding: 28px 20px 48px;
+  }
+
+  .catalogo-materias__lista {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .catalogo-materias__limpiar {
+    margin-left: 0;
+  }
+}

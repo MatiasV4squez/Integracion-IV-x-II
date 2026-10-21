@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router';
+import { BrowserRouter, Route } from 'react-router';
+import { AppRoutes } from './app/AppRoutes';
 import { SeleccionTutoriaView } from './views/SeleccionTutoriaView';
 import './App.css';
 import AuthLayout from './components/AuthLayout';
@@ -177,7 +178,7 @@ const styles: { [key: string]: React.CSSProperties } = {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AppRoutes>
         <Route
           path="/solicitudes/nueva"
           element={
@@ -189,7 +190,7 @@ export default function App() {
         />
         <Route path="/disponibilidad" element={<AvailabilityScreen />} />
         <Route path="/*" element={<PantallasEquipo />} />
-      </Routes>
+      </AppRoutes>
     </BrowserRouter>
   );
 }

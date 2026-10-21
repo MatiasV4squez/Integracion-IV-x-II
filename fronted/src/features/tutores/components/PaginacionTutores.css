@@ -1,0 +1,35 @@
+.paginacion-tutores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.paginacion-tutores p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.paginacion-tutores button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-primary-text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.paginacion-tutores button:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+}
+
+.paginacion-tutores button:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}

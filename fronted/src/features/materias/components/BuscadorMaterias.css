@@ -1,0 +1,88 @@
+.buscador-materias {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 156px;
+  align-items: center;
+  gap: 7px 16px;
+  margin-block: 28px 30px;
+}
+
+.buscador-materias label {
+  grid-column: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.buscador-materias__entrada {
+  grid-column: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.buscador-materias__entrada svg {
+  position: absolute;
+  top: 15px;
+  left: 16px;
+  color: var(--color-text-muted);
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.buscador-materias__entrada input {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 16px 12px 46px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.buscador-materias__entrada input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.buscador-materias__boton {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 50px;
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.buscador-materias__boton:hover {
+  background: var(--color-primary-hover);
+}
+
+.buscador-materias__ayuda {
+  grid-column: 1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .buscador-materias {
+    grid-template-columns: minmax(0, 1fr);
+    margin-block: 24px 28px;
+  }
+
+  .buscador-materias__ayuda {
+    grid-row: 3;
+  }
+
+  .buscador-materias__boton {
+    grid-column: 1;
+    grid-row: 4;
+    margin-top: 7px;
+  }
+}

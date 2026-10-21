@@ -1,0 +1,44 @@
+.estado-consulta-materias {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 300px;
+  margin-top: 28px;
+  padding: 40px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.estado-consulta-materias h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.estado-consulta-materias p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.estado-consulta-materias button {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 24px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.estado-consulta-materias button:hover {
+  background: var(--color-primary-hover);
+}

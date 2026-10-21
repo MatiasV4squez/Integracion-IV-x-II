@@ -1,0 +1,32 @@
+.tutorias-layout {
+  --color-primary: #1467d5;
+  --color-primary-hover: #1056b4;
+  --color-primary-text: #135ab8;
+  --color-primary-soft: #edf4ff;
+  --color-text: #172a48;
+  --color-text-muted: #526785;
+  --color-border: #d6e2f2;
+  --color-surface: #fff;
+  min-height: 100svh;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--color-text);
+  background: #f7f9fc;
+  color-scheme: light;
+  accent-color: var(--color-primary);
+}
+
+.tutorias-layout :focus-visible {
+  outline: 3px solid var(--color-primary-text);
+  outline-offset: 4px;
+}
+
+.tutorias-layout ::selection {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.tutorias-layout button,
+.tutorias-layout a,
+.tutorias-layout input {
+  -webkit-tap-highlight-color: transparent;
+}
