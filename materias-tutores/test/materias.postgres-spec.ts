@@ -97,27 +97,27 @@ describe('Catálogo de materias con PostgreSQL real', () => {
   it('ordena por código aunque se inserten en otro orden y conserva Unicode', async () => {
     await prisma!.materia.createMany({
       data: [
-        { codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
-        { codigo: 'INFO1157', nombre: 'SISTEMAS INTELIGENTES' },
-        { codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
+        { idMateria: 300n, codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
+        { idMateria: 200n, codigo: 'INFO1157', nombre: 'SISTEMAS INTELIGENTES' },
+        { idMateria: 100n, codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
       ],
     });
     await request(app!.getHttpServer())
       .get('/materias')
       .expect(200)
       .expect([
-        { codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
-        { codigo: 'INFO1157', nombre: 'SISTEMAS INTELIGENTES' },
-        { codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
+        { idMateria: '100', codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
+        { idMateria: '200', codigo: 'INFO1157', nombre: 'SISTEMAS INTELIGENTES' },
+        { idMateria: '300', codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
       ]);
   });
 
-  it('no expone el ID BIGINT almacenado en PostgreSQL', async () => {
+  it('expone el ID BIGINT como texto sin perder precisión', async () => {
     await prisma!.materia.create({ data: { idMateria: 9007199254740993n, codigo: 'TEST_BIGINT', nombre: 'Prueba de identificador' } });
     await request(app!.getHttpServer())
       .get('/materias')
       .expect(200)
-      .expect([{ codigo: 'TEST_BIGINT', nombre: 'Prueba de identificador' }]);
+      .expect([{ idMateria: '9007199254740993', codigo: 'TEST_BIGINT', nombre: 'Prueba de identificador' }]);
   });
 
   it('refleja cambios persistidos sin usar un catálogo fijo o cacheado', async () => {
@@ -127,6 +127,6 @@ describe('Catálogo de materias con PostgreSQL real', () => {
     await request(app!.getHttpServer())
       .get('/materias')
       .expect(200)
-      .expect([{ codigo: 'TEST_CAMBIO', nombre: 'Nombre actualizado' }]);
+      .expect([{ idMateria: materia.idMateria.toString(), codigo: 'TEST_CAMBIO', nombre: 'Nombre actualizado' }]);
   });
 });

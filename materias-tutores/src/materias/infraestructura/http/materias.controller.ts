@@ -9,6 +9,6 @@ export class MateriasController {
   @Get()
   async listar(): Promise<MateriaListItemResponseDto[]> {
     const materias = await this.listarMaterias.ejecutar();
-    return materias.map(({ codigo, nombre }) => ({ codigo, nombre }));
+    return materias.map(({ idMateria, codigo, nombre }) => ({ idMateria: idMateria.toString(), codigo, nombre }));
   }
 }

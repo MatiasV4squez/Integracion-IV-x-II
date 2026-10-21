@@ -8,6 +8,7 @@ import { PrismaService } from '../src/database/prisma.service.js';
 describe('Busqueda de tutores por materia (HTTP)', () => {
   let app: INestApplication<Server>;
   const prisma = {
+    materia: { findMany: vi.fn() },
     tutorMateria: { findMany: vi.fn(), count: vi.fn() },
     perfilTutor: { findMany: vi.fn() },
     bloqueHorario: { findMany: vi.fn() },
@@ -99,6 +100,25 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
   it('devuelve una lista vacia cuando no hay tutores habilitados', async () => {
     await request(app.getHttpServer()).get('/tutores?materiaId=1').expect(200).expect({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
     expect(prisma.bloqueHorario.findMany).not.toHaveBeenCalled();
+  });
+
+  it('permite buscar tutores con el identificador recibido del catálogo sin convertirlo a Number', async () => {
+    prisma.materia.findMany.mockResolvedValue([{ idMateria: 9007199254740993n, codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
+    prisma.tutorMateria.findMany.mockResolvedValue([{ idUsuario: 10n }]);
+    prisma.tutorMateria.count.mockResolvedValue(1);
+
+    const catalogo = await request(app.getHttpServer()).get('/materias').expect(200);
+    const materias = catalogo.body as { idMateria: string }[];
+    expect(materias[0].idMateria).toBe('9007199254740993');
+    const respuesta = await request(app.getHttpServer())
+      .get('/tutores')
+      .query({ materiaId: materias[0].idMateria, page: 1, limit: 10 })
+      .expect(200);
+
+    expect(respuesta.body).toMatchObject({ items: [{ idTutor: '10' }], total: 1 });
+    expect(prisma.tutorMateria.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { idMateria: 9007199254740993n, vigente: true },
+    }));
   });
 
   it.each([

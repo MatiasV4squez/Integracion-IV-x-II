@@ -6,8 +6,8 @@ import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/database/prisma.service.js';
 
 const materiasEsperadas = [
-  { codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
-  { codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
+  { idMateria: '7', codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' },
+  { idMateria: '3', codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' },
 ];
 
 const prismaMock = {
@@ -21,7 +21,7 @@ describe('MateriasController (e2e)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    prismaMock.materia.findMany.mockResolvedValue(materiasEsperadas);
+    prismaMock.materia.findMany.mockResolvedValue(materiasEsperadas.map((materia) => ({ ...materia, idMateria: BigInt(materia.idMateria) })));
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -38,12 +38,12 @@ describe('MateriasController (e2e)', () => {
     await request(app.getHttpServer()).get('/materias').expect(200).expect([]);
   });
 
-  it('no expone campos de persistencia ni falla al serializar BIGINT', async () => {
-    prismaMock.materia.findMany.mockResolvedValue([{ idMateria: 9007199254740993n, codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
+  it('serializa el identificador BIGINT como texto sin perder precisión ni exponer campos adicionales', async () => {
+    prismaMock.materia.findMany.mockResolvedValue([{ idMateria: 9007199254740993n, codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO', campoInterno: 'privado' }]);
     await request(app.getHttpServer())
       .get('/materias')
       .expect(200)
-      .expect([{ codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
+      .expect([{ idMateria: '9007199254740993', codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
   });
 
   it('un fallo de consulta devuelve 500 sin filtrar el error interno', async () => {

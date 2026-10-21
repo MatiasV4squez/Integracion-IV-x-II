@@ -7,10 +7,10 @@ describe('PrismaMateriasRepository', () => {
 
   beforeEach(() => vi.resetAllMocks());
 
-  it('selecciona código/nombre y solicita el orden por código', async () => {
+  it('selecciona identificador, código y nombre sin perder precisión y solicita el orden por código', async () => {
     prisma.materia.findMany.mockResolvedValue([{ codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO', idMateria: 9007199254740993n }]);
-    await expect(repositorio.listarCatalogo()).resolves.toEqual([{ codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
-    expect(prisma.materia.findMany).toHaveBeenCalledWith({ select: { codigo: true, nombre: true }, orderBy: { codigo: 'asc' } });
+    await expect(repositorio.listarCatalogo()).resolves.toEqual([{ idMateria: 9007199254740993n, codigo: 'MAT1188', nombre: 'CÁLCULO INTERMEDIO' }]);
+    expect(prisma.materia.findMany).toHaveBeenCalledWith({ select: { idMateria: true, codigo: true, nombre: true }, orderBy: { codigo: 'asc' } });
   });
 
   it('devuelve una lista vacía si no hay registros', async () => {

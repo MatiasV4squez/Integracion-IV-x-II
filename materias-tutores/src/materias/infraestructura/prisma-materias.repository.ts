@@ -9,9 +9,9 @@ export class PrismaMateriasRepository implements MateriasRepository {
 
   async listarCatalogo(): Promise<Materia[]> {
     const materias = await this.prisma.materia.findMany({
-      select: { codigo: true, nombre: true },
+      select: { idMateria: true, codigo: true, nombre: true },
       orderBy: { codigo: 'asc' },
     });
-    return materias.map(({ codigo, nombre }) => ({ codigo, nombre }));
+    return materias.map(({ idMateria, codigo, nombre }) => ({ idMateria, codigo, nombre }));
   }
 }

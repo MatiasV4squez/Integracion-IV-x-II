@@ -53,7 +53,7 @@ La aplicación expone `GET /materias`, que devuelve el catálogo ordenado por c�
 
 ## Catálogo de materias
 
-El catálogo implementa RF05 del SRS. Cada materia tiene un identificador interno, un código académico único y un nombre. La API pública devuelve solamente `codigo` y `nombre`.
+El catálogo implementa RF05 del SRS. Cada materia tiene un identificador, un código académico único y un nombre. La API pública devuelve `idMateria`, `codigo` y `nombre`. `idMateria` se serializa como texto decimal para conservar la precisión de BIGINT. La web utiliza ese valor como parámetro `materiaId` al consultar `GET /tutores?materiaId=...&page=1&limit=10`; el código académico se conserva para mostrarlo y buscarlo en el catálogo. No se debe convertir el identificador a `Number`.
 
 ```sh
 # Crear y aplicar una migración durante el desarrollo

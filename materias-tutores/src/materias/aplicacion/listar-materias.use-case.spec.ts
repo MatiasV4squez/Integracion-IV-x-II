@@ -3,7 +3,7 @@ import type { MateriasRepository } from './puertos/materias.repository.js';
 
 describe('ListarMateriasUseCase', () => {
   it('consulta el catálogo usando un repositorio sin Nest ni Prisma', async () => {
-    const materias = [{ codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' }];
+    const materias = [{ idMateria: 1n, codigo: 'INFO1126', nombre: 'PROGRAMACIÓN III' }];
     const listarCatalogo = vi.fn().mockResolvedValue(materias);
     const repositorio: MateriasRepository = { listarCatalogo };
     const casoDeUso = new ListarMateriasUseCase(repositorio);
