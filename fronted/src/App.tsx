@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import { BrowserRouter, Route, Routes } from 'react-router';
+import { SeleccionTutoriaView } from './views/SeleccionTutoriaView';
 import './App.css';
 import AuthLayout from './components/AuthLayout';
 import { AvailabilityScreen } from './components/AvailabilityScreen';
 import ProtectedRoute from './components/ProtectedRoute';
 import TutorApplicationForm from './components/TutorApplicationForm';
 
-export default function App() {
+function PantallasEquipo() {
   const [currentView, setCurrentView] = useState<'login' | 'register' | 'apply' | 'availability'>('login');
 
   return (
@@ -171,3 +173,23 @@ const styles: { [key: string]: React.CSSProperties } = {
     marginTop: '6px',
   },
 };
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/solicitudes/nueva"
+          element={
+            <SeleccionTutoriaView
+              idMateria="1"
+              nombreMateria="Cálculo intermedio"
+            />
+          }
+        />
+        <Route path="/disponibilidad" element={<AvailabilityScreen />} />
+        <Route path="/*" element={<PantallasEquipo />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
