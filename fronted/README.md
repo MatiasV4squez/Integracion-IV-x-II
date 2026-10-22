@@ -152,6 +152,18 @@ HTTP_TIMEOUT_MS=5000
 
 CORS debe coincidir con el origen exacto de la web. Usa `localhost:5173` al abrirla con la configuración anterior.
 
+## Paginación compartida
+
+`src/shared/components/Paginacion.tsx` recibe `page` (desde 1), `totalPages` y
+`onCambiarPagina`. Admite `etiqueta` para identificar el listado y `deshabilitada`
+para bloquear ambos botones. Muestra Anterior, Siguiente y la página actual;
+se oculta con menos de dos páginas o parámetros inválidos.
+
+El componente presenta controles; cada pantalla administra sus datos y su página.
+Solicitudes recibidas lo utiliza con su paginación local. `PaginacionTutores`
+conserva la interfaz existente y delega en el control compartido, manteniendo
+las consultas y los parámetros de URL del buscador.
+
 ## Organización de la consulta
 
 - `src/config/api.ts` obtiene la dirección del Gateway.

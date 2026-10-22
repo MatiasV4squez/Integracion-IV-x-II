@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Paginacion } from '../../../shared/components/Paginacion'
 import type { Materia } from '../../materias/models/materia'
 import { EstadoSolicitudes } from '../components/EstadoSolicitudes'
 import { ListadoSolicitudes } from '../components/ListadoSolicitudes'
@@ -54,13 +55,7 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
           : solicitudes.length === 0 ? <EstadoSolicitudes estado="vacio" />
           : <>
             <ListadoSolicitudes solicitudes={solicitudes.slice((paginaVisible - 1) * POR_PAGINA, paginaVisible * POR_PAGINA)} materias={materias} ahora={ahora} />
-            {totalPaginas > 1 && (
-              <nav className="solicitudes-recibidas__paginacion" aria-label="Páginas de solicitudes">
-                <button type="button" className="solicitudes-recibidas__boton solicitudes-recibidas__boton--secundario" disabled={paginaVisible === 1} onClick={() => setPagina(paginaVisible - 1)}>Anterior</button>
-                <p aria-live="polite">Página {paginaVisible} de {totalPaginas}</p>
-                <button type="button" className="solicitudes-recibidas__boton solicitudes-recibidas__boton--secundario" disabled={paginaVisible === totalPaginas} onClick={() => setPagina(paginaVisible + 1)}>Siguiente</button>
-              </nav>
-            )}
+            <Paginacion page={paginaVisible} totalPages={totalPaginas} onCambiarPagina={setPagina} etiqueta="Páginas de solicitudes" />
           </>}
       </section>
     </main>

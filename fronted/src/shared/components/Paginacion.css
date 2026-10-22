@@ -1,4 +1,4 @@
-.paginacion-tutores {
+.paginacion {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -7,13 +7,13 @@
   margin-top: 24px;
 }
 
-.paginacion-tutores p {
+.paginacion p {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 14px;
 }
 
-.paginacion-tutores button {
+.paginacion button {
   min-height: 44px;
   padding: 10px 16px;
   border: 1px solid var(--color-border);
@@ -25,11 +25,11 @@
   cursor: pointer;
 }
 
-.paginacion-tutores button:hover:not(:disabled) {
+.paginacion button:hover:not(:disabled) {
   background: var(--color-primary-soft);
 }
 
-.paginacion-tutores button:disabled {
+.paginacion button:disabled {
   color: var(--color-text-muted);
   cursor: not-allowed;
 }
