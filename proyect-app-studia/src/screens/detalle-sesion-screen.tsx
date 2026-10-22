@@ -80,12 +80,8 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
     if (session) setLastViewed(session.id);
   }, [session, setLastViewed]);
 
-  // Al cambiar de sesión se limpian los formularios (sincronizado durante el
-  // render, no en un efecto, siguiendo el patrón de React para "adjusting
-  // state when a prop changes").
-  const [formsSessionId, setFormsSessionId] = useState(session?.id);
-  if (session?.id !== formsSessionId) {
-    setFormsSessionId(session?.id);
+  // Al cambiar de sesión se limpian los formularios.
+  useEffect(() => {
     setFeedback(null);
     setRating(0);
     setComment('');
@@ -93,19 +89,20 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
     setShowReport(false);
     setReason(null);
     setDescription('');
-  }
+  }, [session?.id]);
 
   if (!session) {
     return (
       <ScreenContainer>
-        <EmptyState icon="📄" title="No hay sesiones para mostrar" message="Reserva una tutoría y aparecerá aquí." />
-        <AppButton label="Buscar tutorías disponibles" onPress={() => router.navigate('/buscar')} />
+        <EmptyState icon="📄" title="No hay sesiones para mostrar" message="Solicita una tutoría y aparecerá aquí." />
+        <AppButton label="Solicitar tutoría" onPress={() => router.navigate('/solicitud')} />
       </ScreenContainer>
     );
   }
 
   const id = session.id;
   const iAmTutee = session.myRole === 'tutee';
+  const counterpart = iAmTutee ? session.tutor : session.tutee;
   const tutorProfile = getTutorById(session.tutor.id);
   const actions = getAvailableActions({
     status: session.status,
@@ -171,7 +168,7 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
   return (
     <View style={[styles.flex, { backgroundColor: ui.bg }]}>
       <TicketHeader title="Detalle de sesión" subtitle={`Tutoría · ${session.subject.code}`} status={session.status} onBack={goBack} />
-      <ScreenContainer topInset={false}>
+      <ScreenContainer>
         {/* Ticket: materia, rol, lugar y horario */}
         <TicketCard
           overline={`UCT Tutorías · ${session.subject.code}`}
@@ -391,14 +388,14 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
             <Txt variant="h3">¿Qué sigue?</Txt>
             {tutorProfile ? (
               <AppButton
-                label={`Reservar otra hora con ${session.tutor.name.split(' ')[0]}`}
-                onPress={() => router.navigate({ pathname: '/buscar', params: { tutor: session.tutor.id, subject: session.subject.code } })}
+                label={`Solicitar otra tutoría con ${session.tutor.name.split(' ')[0]}`}
+                onPress={() => router.navigate({ pathname: '/solicitud', params: { tutor: session.tutor.id, subject: session.subject.code } })}
               />
             ) : null}
             <AppButton
               label={`Buscar otro tutor de ${session.subject.name}`}
               variant="secondary"
-              onPress={() => router.navigate({ pathname: '/buscar', params: { subject: session.subject.code } })}
+              onPress={() => router.navigate({ pathname: '/solicitud', params: { subject: session.subject.code } })}
             />
             <AppButton label="Volver al historial" variant="ghost" onPress={() => router.navigate('/historial')} />
           </Card>

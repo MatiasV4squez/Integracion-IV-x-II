@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppButton } from '@/components/app-button';
 import { Avatar } from '@/components/avatar';
 import { Card } from '@/components/card';
+import { PreferencesCard } from '@/components/preferences-card';
 import { RatingStars } from '@/components/rating-stars';
 import { ScreenContainer } from '@/components/screen-container';
 import { SectionHeader } from '@/components/section-header';
@@ -24,8 +25,8 @@ export default function TuteeProfileScreen() {
   const { logout } = useAuth();
   const { sessions } = useSessions();
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await logout();
     router.replace('/login');
   };
 
@@ -90,6 +91,8 @@ export default function TuteeProfileScreen() {
           ))}
         </View>
       )}
+
+      <PreferencesCard />
 
       <AppButton label="Cerrar sesión" variant="secondary" onPress={signOut} />
     </ScreenContainer>

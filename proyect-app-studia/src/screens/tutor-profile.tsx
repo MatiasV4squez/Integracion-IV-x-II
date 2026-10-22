@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PreferencesCard } from '@/components/preferences-card';
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
 import { initials } from '@/constants/tutorias';
 import { useAuth } from '@/hooks/use-auth';
@@ -40,8 +41,8 @@ export default function TutorProfileScreen() {
   const { logout } = useAuth();
   const styles = createStyles(colors);
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await logout();
     router.replace('/login');
   };
 
@@ -112,6 +113,10 @@ export default function TutorProfileScreen() {
             <Text style={styles.availabilityTime}>{slot.time}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={{ marginBottom: Spacing.lg }}>
+        <PreferencesCard />
       </View>
 
       <Pressable

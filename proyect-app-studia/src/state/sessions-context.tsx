@@ -1,11 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { MOCK_NOW, MOCK_SESSIONS } from '@/mocks/sessions';
-import type { MyAvailabilityBlock, Session } from '@/types/session';
+import type { Session } from '@/types/session';
 import { countPendingRequests, type FlowResult, type FlowState } from '@/utils/session-machine';
-
-export type PublishAvailabilityInput = { subjectCode: string; startsAt: string; endsAt: string; capacity: number };
-export type PublishAvailabilityResult = { ok: true } | { ok: false; error: string };
 
 type Store = {
   sessions: Session[];
@@ -19,10 +16,6 @@ type Store = {
   setLastViewed: (id: string) => void;
   /** Ejecuta una operación pura de session-machine y actualiza el estado si fue válida. */
   run: (op: (state: FlowState) => FlowResult) => FlowResult;
-  /** Horarios que el usuario actual publicó como Tutor. */
-  myAvailability: MyAvailabilityBlock[];
-  /** Reserva (publica) un nuevo horario propio para dictar tutoría. */
-  publishAvailability: (input: PublishAvailabilityInput) => PublishAvailabilityResult;
 };
 
 const SessionsContext = createContext<Store | null>(null);
@@ -34,7 +27,6 @@ const SessionsContext = createContext<Store | null>(null);
 export function SessionsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<FlowState>({ sessions: MOCK_SESSIONS, clock: MOCK_NOW, reserved: {} });
   const [lastViewedId, setLastViewedId] = useState<string | null>(null);
-  const [myAvailability, setMyAvailability] = useState<MyAvailabilityBlock[]>([]);
   const ref = useRef(state);
 
   const run = useCallback((op: (s: FlowState) => FlowResult) => {
@@ -46,21 +38,6 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  const publishAvailability = useCallback((input: PublishAvailabilityInput): PublishAvailabilityResult => {
-    if (!input.subjectCode) return { ok: false, error: 'Elige una materia.' };
-    if (new Date(input.endsAt).getTime() <= new Date(input.startsAt).getTime()) {
-      return { ok: false, error: 'La hora de término debe ser posterior al inicio.' };
-    }
-    if (!Number.isInteger(input.capacity) || input.capacity < 1) {
-      return { ok: false, error: 'La capacidad debe ser un entero de al menos 1.' };
-    }
-    setMyAvailability((prev) => [
-      { id: `my-${prev.length + 1}-${Date.now()}`, enrolled: 0, ...input },
-      ...prev,
-    ]);
-    return { ok: true };
-  }, []);
-
   const value = useMemo<Store>(
     () => ({
       sessions: state.sessions,
@@ -70,10 +47,8 @@ export function SessionsProvider({ children }: { children: ReactNode }) {
       lastViewedId,
       setLastViewed: setLastViewedId,
       run,
-      myAvailability,
-      publishAvailability,
     }),
-    [state, lastViewedId, run, myAvailability, publishAvailability],
+    [state, lastViewedId, run],
   );
 
   return <SessionsContext.Provider value={value}>{children}</SessionsContext.Provider>;

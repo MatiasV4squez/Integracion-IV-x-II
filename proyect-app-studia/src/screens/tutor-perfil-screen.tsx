@@ -20,7 +20,7 @@ import { useUI } from '@/hooks/use-ui';
 import { useSessions } from '@/state/sessions-context';
 import type { AvailabilityBlock } from '@/types/session';
 import { formatDate, formatTimeRange, plural } from '@/utils/format';
-import { blockOccupancy } from '@/utils/session-machine';
+import { blockOccupancy, isBlockFull } from '@/utils/session-machine';
 
 type Tab = 'resumen' | 'resenas' | 'horarios' | 'historial';
 
@@ -49,7 +49,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
     return [...map.entries()];
   }, [tutor]);
 
-  const back = () => (router.canGoBack() ? router.back() : router.navigate('/buscar'));
+  const back = () => (router.canGoBack() ? router.back() : router.navigate('/solicitud'));
 
   if (!tutor) {
     return (
@@ -62,7 +62,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
 
   const requestWithTutor = () =>
     router.navigate({
-      pathname: '/buscar',
+      pathname: '/solicitud',
       params: { tutor: tutor.id, subject: subjectCode ?? tutor.subjectCodes[0] },
     });
 
@@ -110,7 +110,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
             )}
           </View>
         </View>
-        <AppButton label="Ver horarios disponibles" onPress={requestWithTutor} />
+        <AppButton label="Solicitar tutoría con este tutor" onPress={requestWithTutor} />
       </Card>
 
       <View style={styles.tiles}>
@@ -150,10 +150,10 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
                     </Txt>
                   </View>
                   <AppButton
-                    label="Ver horarios"
+                    label="Solicitar"
                     size="sm"
                     variant="secondary"
-                    onPress={() => router.navigate({ pathname: '/buscar', params: { tutor: tutor.id, subject: code } })}
+                    onPress={() => router.navigate({ pathname: '/solicitud', params: { tutor: tutor.id, subject: code } })}
                   />
                 </View>
               );
@@ -194,6 +194,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
             <Card key={day}>
               <Txt variant="h3">{day}</Txt>
               {blocks.map((block) => {
+                const full = isBlockFull(block, reserved);
                 return (
                   <View key={block.id} style={[styles.blockRow, { borderColor: ui.border }]}>
                     <View style={styles.flex}>

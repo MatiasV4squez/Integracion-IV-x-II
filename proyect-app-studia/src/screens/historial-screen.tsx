@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { Avatar } from '@/components/avatar';
@@ -36,7 +35,6 @@ const matchesStatus = (s: Session, f: StatusFilter) =>
 export default function HistorialScreen() {
   const router = useRouter();
   const ui = useUI();
-  const insets = useSafeAreaInsets();
   const { sessions, now, run, setLastViewed } = useSessions();
 
   const [query, setQuery] = useState('');
@@ -163,7 +161,7 @@ export default function HistorialScreen() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: ui.bg, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: ui.bg }]}>
       {/* FlatList = lista virtualizada (NFR18) */}
       <FlatList
         data={visible}
@@ -200,8 +198,8 @@ export default function HistorialScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Spacing.lg, paddingBottom: 64 },
-  header: { gap: Spacing.lg, marginBottom: Spacing.lg },
+  content: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Spacing.three, paddingBottom: Spacing.six },
+  header: { gap: Spacing.three, marginBottom: Spacing.three },
   tiles: { flexDirection: 'row', gap: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   separator: { height: 12 },

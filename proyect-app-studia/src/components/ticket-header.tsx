@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Txt } from '@/components/txt';
 import { STATUS_META } from '@/constants/session-status';
@@ -13,13 +12,12 @@ type Props = { title: string; subtitle: string; status: SessionStatus; onBack: (
 /** Cabecera azul marino del ticket: volver, título y estado de la sesión con punto de color. */
 export function TicketHeader({ title, subtitle, status, onBack }: Props) {
   const ui = useUI();
-  const insets = useSafeAreaInsets();
   const meta = STATUS_META[status];
   const dot = TONE_DOT[meta.tone];
 
   return (
     <View style={[styles.wrap, { backgroundColor: ui.navy }]}>
-      <View style={[styles.inner, { paddingTop: insets.top + 6 }]}>
+      <View style={styles.inner}>
         <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={onBack} hitSlop={8} style={styles.back}>
           <Txt variant="h2" style={{ color: '#FFFFFF' }}>
             ‹
@@ -53,6 +51,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: 16,
+    paddingTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

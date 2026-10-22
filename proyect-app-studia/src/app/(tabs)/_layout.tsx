@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTutorMode } from '@/hooks/use-tutor-mode';
+import { getVisibleTabs, type TabName } from '@/navigation/access';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -21,6 +22,8 @@ export default function TabsLayout() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { isTutor } = useTutorMode();
+  const visibleTabs = getVisibleTabs(isTutor ? 'tutor' : 'tutee');
+  const hrefFor = (tab: TabName) => (visibleTabs.includes(tab) ? undefined : null);
 
   return (
     <Tabs
@@ -48,23 +51,23 @@ export default function TabsLayout() {
       }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Inicio', tabBarIcon: tabIcon('home', 'home-outline') }}
+        options={{ title: 'Inicio', tabBarIcon: tabIcon('home', 'home-outline'), href: hrefFor('index') }}
       />
       <Tabs.Screen
         name="buscar"
         options={{
           title: 'Buscar',
           tabBarIcon: tabIcon('search', 'search-outline'),
-          href: isTutor ? null : undefined,
+          href: hrefFor('buscar'),
         }}
       />
       <Tabs.Screen
         name="historial"
-        options={{ title: 'Historial', tabBarIcon: tabIcon('calendar', 'calendar-outline') }}
+        options={{ title: 'Historial', tabBarIcon: tabIcon('calendar', 'calendar-outline'), href: hrefFor('historial') }}
       />
       <Tabs.Screen
         name="perfil"
-        options={{ title: 'Perfil', tabBarIcon: tabIcon('person', 'person-outline') }}
+        options={{ title: 'Perfil', tabBarIcon: tabIcon('person', 'person-outline'), href: hrefFor('perfil') }}
       />
     </Tabs>
   );

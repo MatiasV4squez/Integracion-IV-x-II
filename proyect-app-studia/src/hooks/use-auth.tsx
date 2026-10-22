@@ -1,32 +1,28 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useStore } from 'zustand';
 
-type AuthContextValue = {
-  isAuthenticated: boolean;
-  login: () => void;
-  logout: () => void;
-};
+import { authStore, preferencesStore } from '@/store';
+import type { AuthState } from '@/store/create-auth-store';
 
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      isAuthenticated,
-      login: () => setIsAuthenticated(true),
-      logout: () => setIsAuthenticated(false),
-    }),
-    [isAuthenticated],
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+/** Estado global de la sesión (Zustand). Con `selector` solo se re-renderiza cuando cambia lo que se pide. */
+export function useAuthStore<T>(selector: (state: AuthState) => T): T {
+  return useStore(authStore, selector);
 }
 
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+/**
+ * Sesión del usuario. Mantiene `isAuthenticated`, `login` y `logout` que ya usaban las pantallas,
+ * y agrega los datos del usuario, el estado de carga y los mensajes.
+ */
+export function useAuth() {
+  const state = useStore(authStore);
+  return {
+    ...state,
+    isAuthenticated: state.status === 'authenticated',
+    isHydrating: state.status === 'hydrating',
+    roles: state.user?.roles ?? [],
+    async logout() {
+      await state.logout();
+      // Al cerrar sesión se vuelve al modo Tutee: la próxima persona que entre no hereda el modo.
+      preferencesStore.getState().setTutorMode(false);
+    },
+  };
 }

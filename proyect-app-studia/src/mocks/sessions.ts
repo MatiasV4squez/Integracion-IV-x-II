@@ -11,15 +11,7 @@ export const MOCK_NOW = d('09-28', '12:00');
 
 /** Usuario actual de la demo. */
 export const ME: Person = { id: 'u-me', name: 'Alumno Demo' };
-/** El mismo usuario, visto como Tutor: quien pide una tutoría y quien la dicta son la misma persona. */
-export const ME_AS_TUTOR = { ...ME, reputation: 4.5, ratingsCount: 12 };
-/** Datos académicos de ejemplo, compartidos por el perfil de Tutee y el de Tutor (es la misma persona). */
-export const ME_PROFILE = {
-  university: 'Universidad Católica de Temuco',
-  career: 'Ingeniería Civil Informática',
-  year: '4° año',
-  gpa: '6.1',
-};
+const ME_AS_TUTOR = { ...ME, reputation: 4.5, ratingsCount: 12 };
 
 const STUDENTS: Record<string, Person> = {
   's1': { id: 'u-s1', name: 'Javier Pino' },

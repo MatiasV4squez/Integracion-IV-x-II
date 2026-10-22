@@ -68,7 +68,7 @@ export default function HomeScreen() {
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isTutor, setIsTutor } = useTutorMode();
+  const { isTutor, setIsTutor, canBeTutor } = useTutorMode();
 
   const [query, setQuery] = useState('');
   const [reservation, setReservation] = useState(ACTIVE_RESERVATION);
@@ -112,17 +112,19 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <Text style={styles.kicker}>{isTutor ? 'MODO TUTOR' : 'BIENVENIDA DE VUELTA'}</Text>
             <View style={styles.headerActions}>
-              <View style={styles.modeSwitch}>
-                <Text style={styles.modeSwitchLabel}>Tutor</Text>
-                <Switch
-                  value={isTutor}
-                  onValueChange={setIsTutor}
-                  trackColor={{ false: 'rgba(255,255,255,0.25)', true: colors.primary }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor="rgba(255,255,255,0.25)"
-                  accessibilityLabel="Cambiar a inicio de tutor"
-                />
-              </View>
+              {canBeTutor ? (
+                <View style={styles.modeSwitch}>
+                  <Text style={styles.modeSwitchLabel}>Tutor</Text>
+                  <Switch
+                    value={isTutor}
+                    onValueChange={setIsTutor}
+                    trackColor={{ false: 'rgba(255,255,255,0.25)', true: colors.primary }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor="rgba(255,255,255,0.25)"
+                    accessibilityLabel="Cambiar a inicio de tutor"
+                  />
+                </View>
+              ) : null}
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initials(USER.name)}</Text>
               </View>

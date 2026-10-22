@@ -84,9 +84,6 @@ export type AvailabilityBlock = {
   enrolled: number;
 };
 
-/** Horario que el propio Tutor publica (reserva) para dictar tutoría. */
-export type MyAvailabilityBlock = AvailabilityBlock & { subjectCode: string };
-
 export type Review = {
   id: string;
   author: string;

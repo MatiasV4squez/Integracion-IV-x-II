@@ -2,12 +2,12 @@
 
 Reglas de negocio (BR01-BR20 involucradas, check-in, cuenta regresiva): `npm test` (35 pruebas)
 
-Pruebas manuales de UI: `npx expo start`.
+Pruebas manuales de UI: `npx expo start` (la app abre en Historial).
 
 ## Navegación
-- [ ] Tab "Historial": mis sesiones (Tutee y Tutor)
-- [ ] Tab "Buscar": tutorías disponibles para reservar (Tutee)
-- [ ] Tarjeta "Publicar disponibilidad" en el inicio del Tutor
+- [ ] La barra superior muestra Historial / Solicitar / Detalle y marca la pestaña activa
+- [ ] El contador "n/4 pendientes" lleva a Solicitar y se pone rojo con 4/4
+- [ ] "Detalle" abre la última sesión visitada
 - [ ] Botón ‹ del detalle vuelve a la pantalla anterior (o al Historial si no hay)
 
 ## Historial
@@ -28,19 +28,14 @@ Pruebas manuales de UI: `npx expo start`.
 - [ ] Completada: calificar 1-5 con comentario, una sola vez (BR04/BR19); el promedio del tutor se actualiza
 - [ ] Reportar usuario solo si la sesión llegó a Confirmada (BR10); no se repite
 - [ ] Subir guías/ejercicios (confirmada, pendiente de cierre o completada) y abrirlos
-- [ ] "Ver perfil" abre al tutor; "¿Qué sigue?" lleva a Buscar con materia/tutor pre-cargados
+- [ ] "Ver perfil" abre al tutor; "¿Qué sigue?" pre-carga la solicitud
 
-## Tutorías disponibles (Tutee, tab Buscar)
-- [ ] Elegir materia muestra los tutores que la enseñan con sus horarios
-- [ ] Horarios con cupos (máximo / actuales); bloque lleno o ya reservado no se puede elegir
-- [ ] "Reservar" crea la sesión "Pendiente" y suma al contador de solicitudes
-- [ ] Con 4/4 pendientes no se puede reservar (BR05)
-- [ ] "Ver perfil" abre al tutor: reseñas, historial y horarios
-
-## Publicar disponibilidad (Tutor)
-- [ ] Elegir materia, día, hora de inicio y cupos
-- [ ] "Publicar horario" valida término > inicio y cupos ≥ 1
-- [ ] El horario publicado aparece en "Mis horarios publicados"
+## Solicitar tutoría
+- [ ] Materia -> Tutor -> Horario, con búsqueda y filtros
+- [ ] Horarios con cupos (máximo / actuales); bloque lleno no se puede elegir
+- [ ] Enviar solicitud: crea "Pendiente", suma al contador y al "Historial de solicitudes"
+- [ ] Con 4/4 pendientes el envío se bloquea (BR05)
+- [ ] Perfil del tutor: reseñas, historial, horarios y solicitar
 
 ## Ajustes de UI
 - [ ] Modo claro y oscuro
