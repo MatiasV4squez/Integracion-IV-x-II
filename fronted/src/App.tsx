@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Route } from 'react-router';
+import { BrowserRouter, Route, useLocation, useNavigate } from 'react-router';
 import { AppRoutes } from './app/AppRoutes';
 import { SeleccionTutoriaView } from './views/SeleccionTutoriaView';
 import './App.css';
@@ -8,39 +8,49 @@ import { AvailabilityScreen } from './components/AvailabilityScreen';
 import ProtectedRoute from './components/ProtectedRoute';
 import TutorApplicationForm from './components/TutorApplicationForm';
 
-function PantallasEquipo() {
-  const [currentView, setCurrentView] = useState<'login' | 'register' | 'apply' | 'availability'>('login');
+function PantallasEquipo({ vistaInicial = 'login' }: { vistaInicial?: 'login' | 'register' }) {
+  const [currentView, setCurrentView] = useState<'login' | 'register' | 'apply' | 'availability'>(vistaInicial);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const mostrarVistas = import.meta.env.DEV && new URLSearchParams(location.search).get('vistas') === '1';
 
   return (
     <div className="app-container">
       {/* Botones flotantes de cambio rápido de vista */}
-      <div style={styles.devBar}>
+      {mostrarVistas && <div style={styles.devBar}>
         <button onClick={() => setCurrentView('login')} style={styles.devBtn}>Vista Auth</button>
         <button onClick={() => setCurrentView('apply')} style={styles.devBtn}>Vista Postulación Tutor</button>
         <button onClick={() => setCurrentView('availability')} style={styles.devBtn}>Vista Disponibilidad (Compañero)</button>
-      </div>
+      </div>}
 
       {/* VISTAS DE AUTENTICACIÓN (LOGIN Y REGISTRO) */}
       {(currentView === 'login' || currentView === 'register') && (
         <AuthLayout 
           activeTab={currentView} 
-          onTabChange={(tab) => setCurrentView(tab)}
+          onTabChange={(tab) => {
+            setCurrentView(tab);
+            navigate(tab === 'login' ? '/login' : '/registro');
+          }}
         >
           {currentView === 'login' ? (
             <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Correo institucional</label>
+                <label htmlFor="login-correo" style={styles.label}>Correo institucional</label>
                 <input 
                   type="email" 
+                  id="login-correo"
+                  autoComplete="username"
                   placeholder="nombre@alu.uct.cl" 
                   style={styles.input} 
                 />
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Contraseña</label>
+                <label htmlFor="login-password" style={styles.label}>Contraseña</label>
                 <input 
                   type="password" 
+                  id="login-password"
+                  autoComplete="current-password"
                   placeholder="••••••••••••" 
                   style={styles.input} 
                 />
@@ -69,36 +79,44 @@ function PantallasEquipo() {
           ) : (
             <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Nombre completo</label>
+                <label htmlFor="registro-nombre" style={styles.label}>Nombre completo</label>
                 <input 
                   type="text" 
+                  id="registro-nombre"
+                  autoComplete="name"
                   placeholder="Ej. Camila González" 
                   style={styles.input} 
                 />
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Correo institucional</label>
+                <label htmlFor="registro-correo" style={styles.label}>Correo institucional</label>
                 <input 
                   type="email" 
+                  id="registro-correo"
+                  autoComplete="email"
                   placeholder="nombre@universidad.cl" 
                   style={styles.input} 
                 />
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Contraseña</label>
+                <label htmlFor="registro-password" style={styles.label}>Contraseña</label>
                 <input 
                   type="password" 
+                  id="registro-password"
+                  autoComplete="new-password"
                   placeholder="Mínimo 8 caracteres" 
                   style={styles.input} 
                 />
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Confirmar contraseña</label>
+                <label htmlFor="registro-confirmacion" style={styles.label}>Confirmar contraseña</label>
                 <input 
                   type="password" 
+                  id="registro-confirmacion"
+                  autoComplete="new-password"
                   placeholder="Repite tu contraseña" 
                   style={styles.input} 
                 />
@@ -107,7 +125,10 @@ function PantallasEquipo() {
               <button 
                 type="button" 
                 style={styles.submitBtn}
-                onClick={() => setCurrentView('login')}
+                onClick={() => {
+                  setCurrentView('login');
+                  navigate('/login');
+                }}
               >
                 Crear cuenta
               </button>
@@ -154,16 +175,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
   label: { fontSize: '12px', fontWeight: '600', color: '#334155' },
   input: {
-    padding: '10px 12px',
+    padding: '12px 14px',
+    minHeight: '50px',
     borderRadius: '8px',
     border: '1px solid #E2E8F0',
     fontSize: '13px',
-    outline: 'none',
     backgroundColor: '#FFFFFF',
+    color: '#172a48',
   },
   rememberRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   submitBtn: {
-    backgroundColor: '#1D4ED8',
+    backgroundColor: '#1467d5',
     color: '#FFFFFF',
     padding: '12px',
     border: 'none',
@@ -172,6 +194,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: '600',
     cursor: 'pointer',
     marginTop: '6px',
+    minHeight: '50px',
   },
 };
 
@@ -189,7 +212,8 @@ export default function App() {
           }
         />
         <Route path="/disponibilidad" element={<AvailabilityScreen />} />
-        <Route path="/*" element={<PantallasEquipo />} />
+        <Route path="/registro" element={<PantallasEquipo key="registro" vistaInicial="register" />} />
+        <Route path="/*" element={<PantallasEquipo key="login" />} />
       </AppRoutes>
     </BrowserRouter>
   );

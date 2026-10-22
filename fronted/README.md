@@ -2,6 +2,85 @@
 
 Aplicación React + TypeScript. Las consultas al backend pasan por la API Gateway.
 
+## Layout global y verificación visual
+
+Las rutas comparten encabezado, navegación y pie. El layout sigue los mockups de
+Inicio, Autenticación y Registro. `/verificar-cuenta` reutiliza el panel azul y
+la tarjeta blanca. La confirmación del correo y la solicitud de un nuevo enlace
+se conectan a Auth exclusivamente mediante el Gateway.
+
+Para revisar esta parte visual no necesitas Gateway ni microservicios:
+
+```powershell
+npm.cmd run dev -- --port 5173 --strictPort
+```
+
+Abre `http://localhost:5173/login`, `/registro` o `/verificar-cuenta`.
+En desarrollo, prueba `/verificar-cuenta?vista=verificada` cambiando el valor por
+`pendiente`, `verificando`, `vencida`, `invalida`, `utilizada` o `error`. Son demostraciones:
+no validan tokens, no llaman a la API ni modifican cuentas. En producción se ignora
+el parámetro de demostración. Un token real siempre prevalece sobre `vista`.
+La barra de vistas del equipo se habilita
+solo en desarrollo con `/login?vistas=1`.
+
+Comprueba el menú a 320, 375 y 768 px, la distribución a 1440 y 1920 px, el foco
+con Tab y los enlaces de regreso. Cada pantalla debe tener una sola cabecera y pie.
+Disponibilidad conserva su tema y formularios; la sesión existente configura el
+menú por rol. Soporte y Privacidad se muestran sin destino hasta su implementación.
+
+La presentación permanece en `shared/layout` y `features/verificacion-cuenta`.
+El contenedor lee la URL y coordina las acciones mediante `VerificacionCuentaPuerto`;
+la página presenta mensajes y formularios. El adaptador HTTP implementa el puerto
+y `AppRoutes` lo conecta. Las validaciones de negocio permanecen en Auth.
+
+### Probar la verificación de correo
+
+Configura estas variables en los archivos locales correspondientes (conserva los
+demás valores; usa un puerto libre para Auth):
+
+```dotenv
+# Web: fronted/.env.local
+VITE_API_BASE_URL=http://localhost:8080/api
+# Gateway: api-gateway/.env
+USUARIOS_AUTH_URL=http://localhost:3002
+CORS_ORIGIN=http://localhost:5173
+# Auth: usuarios-auth/.env
+PORT=3002
+EMAIL_VERIFICATION_URL=http://localhost:5173/verificar-cuenta
+```
+
+Auth necesita además su base de datos, SMTP y secretos ya configurados. El enlace
+del correo debe apuntar a la web; las peticiones de la web apuntan al Gateway.
+Reinicia los procesos después de cambiar sus variables.
+
+1. Inicia Auth, Gateway y la web. Abre `/verificar-cuenta`, introduce el correo de
+   una cuenta de prueba sin verificar y pulsa **Solicitar nuevo enlace**.
+2. En Red del navegador comprueba `POST /api/usuarios-auth/auth/reenviar-verificacion`,
+   cuerpo `{ "correo_institucional": "..." }` y respuesta `202`. El mensaje es
+   neutro tanto si la cuenta existe como si no; no garantiza la entrega del correo.
+3. Abre el enlace recibido (`/verificar-cuenta?token=...`) y pulsa **Confirmar correo**.
+   Debe salir un único `POST /api/usuarios-auth/auth/verificar-correo`, cuerpo
+   `{ "token": "..." }`, sin JWT. El `200` muestra la confirmación; la pantalla no
+   inicia sesión automáticamente.
+4. Recarga el mismo enlace y vuelve a confirmar: `409` muestra enlace utilizado.
+   Un token inexistente da `400`; uno vencido da `410`. Usa cuentas y enlaces de
+   prueba para estos casos. Apaga Auth para comprobar el error de comunicación.
+
+Las llamadas tienen un límite de 15 segundos, se cancelan al salir y no se
+reintentan automáticamente. Abrir o recargar el enlace no consume el token: se
+requiere pulsar Confirmar. Tras solicitar otro enlace hay que abrir el más reciente.
+Las vistas `?vista=...` sin token solo permiten revisar el diseño en desarrollo y
+deshabilitan las acciones. El login y registro del equipo conservan su integración
+pendiente: esta tarea conecta únicamente la verificación y el reenvío.
+
+Se comprobó el recorrido desde Chrome con el Gateway y el controlador/servicio
+reales de Auth, sustituyendo persistencia y SMTP por datos en memoria. Esto cubre
+confirmación, reenvío y errores; no comprueba la entrega con un proveedor SMTP real.
+
+Para ejecutar las pruebas sin servicios, configura la base pública utilizada por
+sus respuestas HTTP simuladas: `$env:VITE_API_BASE_URL = 'http://localhost:8080/api'`;
+después ejecuta `npm.cmd test`, `npm.cmd run build` y `npm.cmd run lint`.
+
 ## Requisitos e instalación de la web
 
 Requiere **Node.js 22.22.0 o superior**; se recomienda Node.js 24 LTS. React Router exige ese mínimo. Comprueba tu versión con `node --version`.
@@ -33,9 +112,9 @@ Abre **http://localhost:5173/materias**. La raíz `/` conserva las pantallas de 
 
 El buscador está en `/tutores`: carga el catálogo para seleccionar una materia y consulta sus tutores al pulsar Buscar. Las tarjetas del catálogo abren directamente `/tutores?materiaId=...&page=1`. La materia y la página quedan en la URL para compartir la búsqueda y navegar con Atrás/Adelante.
 
-La pantalla de disponibilidad incorporada desde la rama del equipo se conserva en `/disponibilidad`, con sus estilos originales. El layout de materias y tutores mantiene sus estilos separados y no añade cabecera ni pie.
+La pantalla de disponibilidad incorporada desde la rama del equipo se conserva en `/disponibilidad`, con su tema, lógica y componentes existentes. El layout compartido añade una sola cabecera y un solo pie a todas las rutas.
 
-Las pantallas del equipo permanecen en `App.tsx`, junto con su `BrowserRouter` y sus rutas originales de selección en `/solicitudes/nueva`, disponibilidad en `/disponibilidad` y acceso general mediante `/*` (incluidos `/` y `/login`). El registro y la postulación se abren con los controles originales de esas pantallas. `app/AppRoutes.tsx` añade las rutas de materias, tutores y solicitudes recibidas, y recibe las rutas del equipo desde `App.tsx`.
+Las pantallas del equipo permanecen en `App.tsx`, junto con su `BrowserRouter` y sus rutas originales de selección en `/solicitudes/nueva`, disponibilidad en `/disponibilidad` y acceso general mediante `/*` (incluidos `/` y `/login`). El registro tiene además la ruta `/registro`; la postulación conserva su acceso desde los controles del equipo. `app/AppRoutes.tsx` reúne las rutas de materias, tutores, solicitudes recibidas y verificación, y recibe las rutas del equipo desde `App.tsx`, todas bajo `TutoriasLayout`.
 
 El login incorporado desde Web todavía es una demostración: guarda `fake-jwt-token` en `localStorage` y no consulta Auth. Ese valor no sirve para operaciones autenticadas reales. La selección de tutoría conserva el identificador de materia fijo del código del equipo; su adaptación a una materia seleccionada requiere una integración posterior.
 
@@ -103,7 +182,7 @@ Los controles de disponibilidad, orden y calificación permanecen visibles pero 
 
 ### Solicitudes recibidas por el tutor
 
-La pantalla está en `/solicitudes/recibidas`. Usa el contenido de `12T-S · Tutor / Solicitudes recibidas` de Figma, sin agregar cabecera ni pie. Sus componentes están en `features/sesiones`: el servicio consulta, el hook gestiona el ciclo de carga, el contenedor conecta la sesión y el catálogo, y la página presenta los datos.
+La pantalla está en `/solicitudes/recibidas`. Usa el contenido de `12T-S · Tutor / Solicitudes recibidas` de Figma; la cabecera y el pie los proporciona el layout común. Sus componentes están en `features/sesiones`: el servicio consulta, el hook gestiona el ciclo de carga, el contenedor conecta la sesión y el catálogo, y la página presenta los datos.
 
 El recorrido es `GET /api/agendamiento-sesiones/sessions/history` en el Gateway hacia `GET /sessions/history` de Sesiones. El token se toma de la clave `token` de `localStorage`, que utiliza la autenticación existente. `shared/auth` interpreta `sub`, `roles` y vencimiento para presentar la interfaz; la firma, la identidad y el acceso a los datos se verifican en el backend. No se utiliza `userRole` como fuente de permisos. Al guardar o retirar un token en la misma pestaña, el login puede emitir `window.dispatchEvent(new Event('stp:sesion'))` para notificar el cambio.
 

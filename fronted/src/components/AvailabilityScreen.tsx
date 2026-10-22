@@ -51,31 +51,7 @@ export function AvailabilityScreen() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar__inner">
-          <div className="brand">
-            <span className="brand-mark">
-              <Icon name="calendar" size={18} />
-            </span>
-            <span className="brand-name">Tutoría</span>
-          </div>
-
-          <div className="topbar__right">
-            <span className="topbar-badge">Panel del tutor</span>
-            <div className="profile">
-              <span className="avatar" aria-hidden="true">
-                AM
-              </span>
-              <div className="profile__info">
-                <strong>Ana Martínez</strong>
-                <span>Tutora de Matemáticas</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="disponibilidad-contenido">
       <main className="page">
         <section className="page-heading">
           <p className="eyebrow">

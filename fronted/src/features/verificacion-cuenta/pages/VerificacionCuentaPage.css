@@ -1,0 +1,67 @@
+.verificacion-tarjeta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.verificacion-tarjeta__aviso {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-primary-soft);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.estado-verificacion__detalle {
+  margin-top: 18px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.estado-verificacion__spinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 24px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: giro-verificacion 1s linear infinite;
+}
+
+@keyframes giro-verificacion {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.verificacion-reenvio {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.verificacion-reenvio input {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-text);
+}
+
+.verificacion-reenvio p {
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.verificacion-tarjeta button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
