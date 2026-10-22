@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
+import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
 let vite
 let interpretarSesion
@@ -161,12 +162,12 @@ test('muestra datos reales disponibles, plazos y acciones futuras desacopladas',
   assert.match(renderPagina({ estado: 'listo', solicitudes: [solicitud] }), /Materia #3/)
 })
 
-test('limita a diez filas la página y registra la ruta privada de solicitudes recibidas', () => {
+test('limita a diez filas la página y registra la ruta privada de solicitudes recibidas', async () => {
   const solicitudes = Array.from({ length: 11 }, (_, index) => ({ ...solicitud, id_sesion: String(index + 1) }))
   const html = renderPagina({ estado: 'listo', solicitudes })
   assert.equal((html.match(/<tr>/g) ?? []).length, 11)
   assert.match(html, /11 solicitudes por responder/)
   assert.match(html, /Página 1 de 2/)
-  const ruta = (path) => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [path] }, createElement(AppRoutes)))
-  assert.match(ruta('/solicitudes/recibidas'), /Inicia sesión para ver tus solicitudes/)
+  const ruta = (path) => renderizarRuta(createElement(MemoryRouter, { initialEntries: [path] }, createElement(AppRoutes)))
+  assert.match(await ruta('/solicitudes/recibidas'), /Inicia sesión para ver tus solicitudes/)
 })

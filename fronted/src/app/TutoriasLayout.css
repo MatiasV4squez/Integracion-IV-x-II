@@ -26,6 +26,13 @@
   outline: none;
 }
 
+.carga-pagina {
+  min-height: 200px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
 .disponibilidad-contenido {
   background: var(--bg);
   color: var(--text);

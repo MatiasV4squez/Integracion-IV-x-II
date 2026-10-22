@@ -152,6 +152,26 @@ HTTP_TIMEOUT_MS=5000
 
 CORS debe coincidir con el origen exacto de la web. Usa `localhost:5173` al abrirla con la configuración anterior.
 
+## Carga diferida de páginas
+
+`App.tsx` y `app/AppRoutes.tsx` usan `React.lazy` para descargar las páginas al
+visitar sus rutas. Login y registro comparten `components/PantallasEquipo.tsx`;
+la postulación y disponibilidad se descargan cuando se abren. `TutoriasLayout`
+mantiene la cabecera y el pie mientras `Suspense` muestra «Cargando página…».
+Las consultas a la API y los controles de acceso conservan su comportamiento.
+
+Para comprobar las descargas, ejecuta `npm.cmd run build` y después
+`npm.cmd run preview -- --port 5173 --strictPort`, con el servidor de desarrollo
+detenido. En el navegador abre `/login`, activa Network, deshabilita la caché y
+recarga. Filtra los archivos JS: debe descargarse `PantallasEquipo`, mientras
+que los módulos de catálogo, tutores y disponibilidad esperan a visitar sus rutas.
+Los módulos compartidos también pueden descargarse como dependencias.
+Al navegar a Materias debe aparecer `CatalogoMateriasContainer`; Atrás y Adelante
+reutilizan los módulos ya cargados durante esa sesión. Recarga directamente
+`/materias`, `/tutores`, `/solicitudes/recibidas`, `/verificar-cuenta`,
+`/disponibilidad` y `/solicitudes/nueva` para comprobar sus accesos directos.
+Con una conexión lenta debe poder verse el indicador durante la descarga.
+
 ## Paginación compartida
 
 `src/shared/components/Paginacion.tsx` recibe `page` (desde 1), `totalPages` y

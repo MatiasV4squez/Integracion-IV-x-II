@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route } from 'react-router'
 import { createServer } from 'vite'
+import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
 let server
 let buscarTutores
@@ -201,14 +202,14 @@ test('las tarjetas pueden enlazar a una búsqueda por ID', () => {
   assert.match(html, /href="\/tutores\?materiaId=9007199254740993&amp;page=1"/)
 })
 
-test('conserva el acceso del equipo en la raíz y sus rutas generales al integrar las nuevas pantallas', () => {
-  const renderRuta = (ruta) => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [ruta] },
+test('conserva el acceso del equipo en la raíz y sus rutas generales al integrar las nuevas pantallas', async () => {
+  const renderRuta = (ruta) => renderizarRuta(createElement(MemoryRouter, { initialEntries: [ruta] },
     createElement(AppRoutes, null,
       createElement(Route, { path: '/ruta-equipo', element: createElement('p', null, 'Pantalla del equipo') }),
       createElement(Route, { path: '/*', element: createElement('p', null, 'Acceso del equipo') }),
     )))
-  assert.match(renderRuta('/ruta-equipo'), /Pantalla del equipo/)
-  assert.match(renderRuta('/login'), /Acceso del equipo/)
-  assert.match(renderRuta('/'), /Acceso del equipo/)
-  assert.doesNotMatch(renderRuta('/solicitudes/recibidas'), /Acceso del equipo/)
+  assert.match(await renderRuta('/ruta-equipo'), /Pantalla del equipo/)
+  assert.match(await renderRuta('/login'), /Acceso del equipo/)
+  assert.match(await renderRuta('/'), /Acceso del equipo/)
+  assert.doesNotMatch(await renderRuta('/solicitudes/recibidas'), /Acceso del equipo/)
 })

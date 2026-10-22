@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { createElement } from 'react'
+import { createElement, lazy } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route } from 'react-router'
 import { createServer } from 'vite'
+import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
 let vite
 let AppRoutes
@@ -27,15 +28,27 @@ function renderizar(elemento, ruta = '/') {
   return renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [ruta] }, elemento))
 }
 
-test('las rutas existentes y la verificación comparten una sola cabecera y un solo pie', () => {
+test('las rutas existentes y la verificación comparten una sola cabecera y un solo pie', async () => {
   for (const ruta of ['/materias', '/tutores', '/solicitudes/recibidas', '/verificar-cuenta', '/ruta-equipo']) {
-    const html = renderizar(createElement(AppRoutes, null,
+    const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: [ruta] }, createElement(AppRoutes, null,
       createElement(Route, { path: '/ruta-equipo', element: createElement('main', null, 'Contenido del equipo') }),
-    ), ruta)
+    )))
     assert.equal((html.match(/<header\b/g) ?? []).length, 1, ruta)
     assert.equal((html.match(/<footer\b/g) ?? []).length, 1, ruta)
     assert.equal((html.match(/<main\b/g) ?? []).length, 1, ruta)
     assert.match(html, /Saltar al contenido/)
+  }
+})
+
+test('mantiene el layout y anuncia la carga mientras una página está pendiente', () => {
+  const Pendiente = lazy(() => new Promise(() => {}))
+  const html = renderizar(createElement(AppRoutes, null,
+    createElement(Route, { path: '/pendiente', element: createElement(Pendiente) }),
+  ), '/pendiente')
+  assert.match(html, /Cargando página…/)
+  assert.match(html, /role="status" aria-live="polite" aria-busy="true"/)
+  for (const etiqueta of ['header', 'main', 'footer']) {
+    assert.equal((html.match(new RegExp('<' + etiqueta + '\\b', 'g')) ?? []).length, 1)
   }
 })
 

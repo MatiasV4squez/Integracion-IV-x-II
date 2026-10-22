@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { Outlet } from 'react-router'
 import { Encabezado } from '../shared/layout/Encabezado'
 import { PiePagina } from '../shared/layout/PiePagina'
@@ -12,7 +13,9 @@ export function TutoriasLayout() {
       <a className="saltar-contenido" href="#contenido-principal">Saltar al contenido</a>
       <Encabezado enlaces={obtenerNavegacion(sesion?.roles)} usuario={obtenerUsuarioEncabezado(sesion)} />
       <div id="contenido-principal" className="tutorias-layout__contenido" tabIndex={-1}>
-        <Outlet />
+        <Suspense fallback={<main className="carga-pagina" role="status" aria-live="polite" aria-busy="true">Cargando página…</main>}>
+          <Outlet />
+        </Suspense>
       </div>
       <PiePagina />
     </div>

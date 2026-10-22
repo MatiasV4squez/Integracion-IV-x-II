@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
+import { lazy, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
-import CatalogoMateriasContainer from '../features/materias/containers/CatalogoMateriasContainer'
-import BuscarTutoresContainer from '../features/tutores/containers/BuscarTutoresContainer'
-import SolicitudesRecibidasContainer from '../features/sesiones/containers/SolicitudesRecibidasContainer'
 import { TutoriasLayout } from './TutoriasLayout'
-import VerificacionCuentaContainer from '../features/verificacion-cuenta/containers/VerificacionCuentaContainer'
 import { verificacionCuentaHttp } from '../features/verificacion-cuenta/services/verificacion-cuenta-http'
+
+const CatalogoMateriasContainer = lazy(() => import('../features/materias/containers/CatalogoMateriasContainer'))
+const BuscarTutoresContainer = lazy(() => import('../features/tutores/containers/BuscarTutoresContainer'))
+const SolicitudesRecibidasContainer = lazy(() => import('../features/sesiones/containers/SolicitudesRecibidasContainer'))
+const VerificacionCuentaContainer = lazy(() => import('../features/verificacion-cuenta/containers/VerificacionCuentaContainer'))
 
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
