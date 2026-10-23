@@ -31,6 +31,11 @@
 .listado-solicitudes td p { margin: 4px 0 0; }
 .listado-solicitudes td strong { font-weight: 600; }
 .listado-solicitudes__pendiente { color: var(--color-primary-text); font-weight: 600; }
+.listado-solicitudes__aceptar { width: 100%; padding-inline: 8px; }
+.solicitudes-recibidas__aviso { margin: 0 0 20px; padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-primary-soft); color: var(--color-text); overflow-wrap: anywhere; }
+.solicitudes-recibidas__aviso p { margin: 0; }
+.solicitudes-recibidas__aviso--error { border-left: 4px solid var(--color-primary-text); background: var(--color-surface); }
+.solicitudes-recibidas__aviso a { display: inline-block; margin-top: 8px; color: var(--color-primary-text); }
 .solicitudes-recibidas__solo-lectores { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 600px) {

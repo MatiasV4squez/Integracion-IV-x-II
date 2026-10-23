@@ -1,31 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
-import type { ConsultaSolicitudes } from '../models/sesion'
-import { consultarSolicitudesRecibidas, ErrorConsultaSesiones } from '../services/sesiones-api'
+import { crearBandejaSolicitudes } from '../aplicacion/bandeja-solicitudes'
+import { aceptarSolicitud } from '../services/aceptar-solicitud-api'
+import { consultarSolicitudesRecibidas } from '../services/sesiones-api'
 
 export function useSolicitudesRecibidas(sesion: SesionUsuario) {
-  const [intento, setIntento] = useState(0)
-  const clave = JSON.stringify([sesion.token, sesion.idUsuario, intento])
-  const [respuesta, setRespuesta] = useState<{ clave: string; consulta: ConsultaSolicitudes }>({ clave, consulta: { estado: 'cargando' } })
-  if (respuesta.clave !== clave) setRespuesta({ clave, consulta: { estado: 'cargando' } })
+  const bandeja = useMemo(() => crearBandejaSolicitudes({
+    consultar: (signal) => consultarSolicitudesRecibidas(sesion, signal),
+    aceptar: (idSesion, signal) => aceptarSolicitud(idSesion, sesion, signal),
+  }), [sesion])
+  const estado = useSyncExternalStore(bandeja.suscribir, bandeja.obtenerEstado, bandeja.obtenerEstado)
 
   useEffect(() => {
-    const controlador = new AbortController()
-    consultarSolicitudesRecibidas(sesion, controlador.signal)
-      .then((solicitudes) => {
-        if (!controlador.signal.aborted) setRespuesta({ clave, consulta: { estado: 'listo', solicitudes } })
-      })
-      .catch((error: unknown) => {
-        if (controlador.signal.aborted) return
-        const mensaje = error instanceof ErrorConsultaSesiones ? error.message : 'No pudimos cargar las solicitudes. Inténtalo de nuevo.'
-        const tipo = error instanceof ErrorConsultaSesiones ? error.tipo : 'consulta'
-        setRespuesta({ clave, consulta: { estado: 'error', mensaje, tipo } })
-      })
-    return () => controlador.abort()
-  }, [clave, sesion])
+    void bandeja.iniciar()
+    return () => bandeja.detener()
+  }, [bandeja])
 
-  const recargar = useCallback(() => setIntento((actual) => actual + 1), [])
-
-  return { consulta: respuesta.clave === clave ? respuesta.consulta : { estado: 'cargando' } as ConsultaSolicitudes,
-    recargar }
+  const errorDeAcceso = estado.aceptacion.estado === 'error'
+    && ['sesion', 'permiso'].includes(estado.aceptacion.tipo)
+  const bloqueada = estado.actualizando || estado.necesitaActualizar || errorDeAcceso || estado.aceptacion.estado === 'aceptando'
+  return { ...estado, bloqueada, recargar: bandeja.recargar, aceptar: bandeja.aceptar }
 }

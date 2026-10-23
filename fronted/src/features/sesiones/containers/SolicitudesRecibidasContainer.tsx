@@ -6,10 +6,11 @@ import { useSolicitudesRecibidas } from '../hooks/useSolicitudesRecibidas'
 import SolicitudesRecibidasPage from '../pages/SolicitudesRecibidasPage'
 
 function SolicitudesDelTutor({ sesion }: { sesion: SesionUsuario }) {
-  const { consulta, recargar } = useSolicitudesRecibidas(sesion)
+  const { consulta, recargar, aceptar, aceptacion, bloqueada, actualizando, errorActualizacion } = useSolicitudesRecibidas(sesion)
   const { consulta: catalogo } = useMaterias()
   const [ahora, setAhora] = useState(Date.now)
-  const puedeActualizar = consulta.estado !== 'error' || consulta.tipo === 'consulta'
+  const puedeActualizar = (consulta.estado !== 'error' || consulta.tipo === 'consulta')
+    && !(aceptacion.estado === 'error' && ['sesion', 'permiso'].includes(aceptacion.tipo))
 
   useEffect(() => {
     if (!puedeActualizar) return
@@ -24,7 +25,9 @@ function SolicitudesDelTutor({ sesion }: { sesion: SesionUsuario }) {
     return () => { window.clearInterval(temporizador); window.removeEventListener('focus', alVolver) }
   }, [recargar, puedeActualizar])
 
-  return <SolicitudesRecibidasPage consulta={consulta} materias={catalogo.estado === 'listo' ? catalogo.materias : []} ahora={ahora} onRecargar={recargar} />
+  return <SolicitudesRecibidasPage consulta={consulta} materias={catalogo.estado === 'listo' ? catalogo.materias : []} ahora={ahora}
+    onRecargar={recargar} onAceptar={aceptar} aceptacion={aceptacion} bloqueada={bloqueada}
+    actualizando={actualizando} errorActualizacion={errorActualizacion} />
 }
 
 export default function SolicitudesRecibidasContainer() {

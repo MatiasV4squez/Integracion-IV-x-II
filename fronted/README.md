@@ -224,11 +224,17 @@ Los horarios se muestran en `America/Santiago`. El listado se actualiza manualme
 
 La API no incluye nombres de estudiantes: se muestra su identificador sin inventar nombres. Las materias se completan mediante el catálogo; si este no está disponible se muestra el ID de materia y el listado sigue funcionando. El servicio descarta campos adicionales de la respuesta.
 
-Aceptar, rechazar y el detalle de una sesión corresponden a otras tareas. `ListadoSolicitudes` admite un renderizador opcional de acciones para agregarlas después. Las pestañas Próximas e Historial permanecen deshabilitadas hasta implementar esas vistas.
+Cada fila permite aceptar la solicitud mediante `PATCH /api/agendamiento-sesiones/sessions/:id/accept`, sin cuerpo y con el mismo token Bearer del tutor. El servicio valida el identificador y exige una respuesta de la misma sesión y tutor en estado `CONFIRMADA`. El backend verifica la firma, la propiedad de la solicitud, su estado y los solapamientos. El rechazo, el detalle y las pestañas Próximas e Historial siguen pendientes de sus respectivas tareas.
+
+La aceptación muestra el estado Aceptando y bloquea acciones simultáneas, incluido el doble clic antes de que React vuelva a renderizar. Una confirmación válida elimina la fila de pendientes y actualiza el contador; después se consulta nuevamente el historial. Si ese refresco falla, se conserva la aceptación confirmada y se informa que el listado muestra los últimos datos conocidos. Las recargas manuales y automáticas no se ejecutan durante el PATCH.
+
+Los errores 401/403 detienen nuevas acciones hasta cambiar de sesión. Los conflictos 409, solicitudes ausentes 404, fallos de red, timeout o respuestas inesperadas no se interpretan como éxito: se consulta el historial sin repetir automáticamente el PATCH. Si esa consulta falla, la aceptación queda bloqueada hasta obtener un listado actualizado. Al salir o cambiar de sesión se cancelan las operaciones y se descartan respuestas antiguas. La coordinación se encuentra en `features/sesiones/aplicacion/bandeja-solicitudes.ts`; el hook conecta sus operaciones con los servicios HTTP y publica el estado a React.
 
 Para consultar datos reales, inicia Sesiones en 3001 con su base y configuración JWT, el Gateway en 8080 y la web. Se requiere un JWT vigente emitido por Auth con rol TUTOR. El login de demostración incorporado desde Web **todavía no obtiene ese token**, por lo que no permite validar el flujo completo de autenticación. La pantalla informa que hay que iniciar sesión si el token está ausente, es ficticio o venció; también distingue 401, 403, errores de consulta y lista vacía.
 
 Las pruebas automatizadas cubren filtrado por identidad/estado, contrato HTTP, precisión BIGINT, plazos, zona horaria, errores, cancelación, timeout, presentación y rutas. Se comprobó además el recorrido HTTP con los módulos reales de Gateway y Sesiones, un JWT firmado con un secreto exclusivo de prueba y Prisma sustituido por un fixture. Esa comprobación no valida el login real ni la apariencia en navegador.
+
+Para la aceptación, `test/aceptar-solicitud.test.mjs` cubre el contrato PATCH, la validación de la confirmación, doble clic, sincronización del listado, errores, resultados inciertos y cancelación. También se comprobó por HTTP el recorrido del frontend a través del Gateway hasta el controller, guard JWT y caso de uso reales de Sesiones, con persistencia sustituida por un repositorio de prueba: transición a CONFIRMADA, recarga y respuestas 401/403/409. No se utilizaron ni modificaron datos de PostgreSQL. Para validar el flujo con una cuenta real, debe existir una solicitud pendiente dirigida al tutor autenticado.
 
 ### Comandos
 

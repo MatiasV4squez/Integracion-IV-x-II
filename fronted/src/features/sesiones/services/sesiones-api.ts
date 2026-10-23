@@ -5,15 +5,9 @@ import type { Sesion } from '../models/sesion'
 import { seleccionarSesionesActivas } from '../utils/sesiones-activas'
 import { seleccionarSolicitudesRecibidas } from '../utils/solicitudes-recibidas'
 import { esSesion } from '../utils/validar-sesion'
+import { ErrorConsultaSesiones } from '../models/error-sesiones'
 
-export class ErrorConsultaSesiones extends Error {
-  readonly tipo: 'sesion' | 'permiso' | 'consulta'
-  constructor(mensaje: string, tipo: ErrorConsultaSesiones['tipo'] = 'consulta', options?: ErrorOptions) {
-    super(mensaje, options)
-    this.name = 'ErrorConsultaSesiones'
-    this.tipo = tipo
-  }
-}
+export { ErrorConsultaSesiones } from '../models/error-sesiones'
 
 type RecursoHistorial = 'solicitudes' | 'sesiones'
 
