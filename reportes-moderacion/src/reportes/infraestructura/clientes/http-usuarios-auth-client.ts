@@ -3,7 +3,7 @@ import type {
   CambioEstadoCuentaRespuesta,
   EstadoCuentaModerable,
   UsuariosAuthClient,
-} from '../ports/usuarios-auth-client.js';
+} from '../../dominio/ports/usuarios-auth-client.js';
 
 const TIMEOUT_MS = 5_000;
 

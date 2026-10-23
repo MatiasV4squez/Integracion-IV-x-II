@@ -1,5 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import type { SesionesReporteValidator } from '../ports/sesiones-reporte-validator.js';
+import type { SesionesReporteValidator } from '../../dominio/ports/sesiones-reporte-validator.js';
 
 const TIMEOUT_MS = 5_000;
 

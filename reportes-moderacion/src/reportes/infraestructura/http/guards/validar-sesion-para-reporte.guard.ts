@@ -10,22 +10,11 @@ import type { Request } from 'express';
 import {
   SESIONES_REPORTE_VALIDATOR,
   type SesionesReporteValidator,
-} from '../ports/sesiones-reporte-validator.js';
-
-const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+} from '../../../dominio/ports/sesiones-reporte-validator.js';
+import { normalizarIdEntidad } from '../../../dominio/identificadores.js';
 
 interface ReporteRequestBody {
   id_sesion?: unknown;
-}
-
-function idSesionValido(value: unknown): string | undefined {
-  if (typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value)) {
-    return BigInt(value) <= MAX_POSTGRES_BIGINT ? value : undefined;
-  }
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
-    return String(value);
-  }
-  return undefined;
 }
 
 @Injectable()
@@ -38,7 +27,7 @@ export class ValidarSesionParaReporteGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const body = request.body as ReporteRequestBody | undefined;
-    const idSesion = idSesionValido(body?.id_sesion);
+    const idSesion = normalizarIdEntidad(body?.id_sesion);
 
     if (!idSesion) {
       throw new BadRequestException({

@@ -8,9 +8,17 @@ datasource db {
 }
 
 model Reporte {
-  id          Int      @id @default(autoincrement())
-  titulo      String
-  descripcion String
-  estado      String   @default("PENDIENTE")
-  creadoEn    DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  titulo              String
+  descripcion         String
+  estado              String    @default("PENDIENTE")
+  idSesion            BigInt
+  usuarioReportadorId BigInt
+  usuarioReportadoId  BigInt
+  motivo              String?
+  resueltoPorId       BigInt?
+  resueltoEn          DateTime?
+  reactivadoPorId     BigInt?
+  reactivadoEn        DateTime?
+  creadoEn            DateTime  @default(now())
 }
