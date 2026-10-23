@@ -17,6 +17,15 @@ export interface Sesion {
   resultado_provisional: boolean
 }
 
+export const ESTADOS_ACTIVOS = [
+  'PENDIENTE', 'CONFIRMADA', 'PENDIENTE_CIERRE', 'EN_CONFLICTO',
+] as const satisfies readonly (typeof ESTADOS_SESION)[number][]
+
+export type ConsultaSesionesActivas =
+  | { estado: 'cargando' }
+  | { estado: 'listo'; sesiones: Sesion[] }
+  | { estado: 'error'; mensaje: string; tipo: 'sesion' | 'permiso' | 'consulta' }
+
 export type ConsultaSolicitudes =
   | { estado: 'cargando' }
   | { estado: 'listo'; solicitudes: Sesion[] }

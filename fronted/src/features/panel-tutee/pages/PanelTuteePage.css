@@ -1,0 +1,7 @@
+.panel-tutee { display: grid; gap: 24px; width: min(100%, 1440px); margin-inline: auto; padding: 32px clamp(16px, 6.667vw, 96px) 40px; line-height: 1.5; }
+.panel-tutee__encabezado h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.5; letter-spacing: -0.7px; }
+.panel-tutee__subtitulo { margin: 0; color: var(--color-text-muted); font-size: 14px; }
+
+@media (max-width: 600px) {
+  .panel-tutee { padding-inline: 16px; }
+}

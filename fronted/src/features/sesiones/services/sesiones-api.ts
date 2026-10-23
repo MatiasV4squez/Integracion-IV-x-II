@@ -2,6 +2,7 @@ import { obtenerUrlApi } from '../../../config/api'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import type { Sesion } from '../models/sesion'
+import { seleccionarSesionesActivas } from '../utils/sesiones-activas'
 import { seleccionarSolicitudesRecibidas } from '../utils/solicitudes-recibidas'
 import { esSesion } from '../utils/validar-sesion'
 
@@ -14,33 +15,37 @@ export class ErrorConsultaSesiones extends Error {
   }
 }
 
-export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
-  externa?.throwIfAborted()
+type RecursoHistorial = 'solicitudes' | 'sesiones'
+
+function exigirAcceso(sesion: SesionUsuario, rol: string, mensajePermiso: string) {
   if (!sesion.token || !esIdentificador(sesion.idUsuario) || sesion.expiraEn <= Date.now()) {
     throw new ErrorConsultaSesiones('Tu sesión no es válida o ha vencido. Inicia sesión nuevamente.', 'sesion')
   }
-  if (!sesion.roles.includes('TUTOR')) throw new ErrorConsultaSesiones('Esta sección está disponible para tutores.', 'permiso')
+  if (!sesion.roles.includes(rol)) throw new ErrorConsultaSesiones(mensajePermiso, 'permiso')
+}
+
+async function consultarHistorial(sesion: SesionUsuario, externa: AbortSignal | undefined, recurso: RecursoHistorial): Promise<Sesion[]> {
   const signal = AbortSignal.any([AbortSignal.timeout(10000), ...(externa ? [externa] : [])])
   try {
     const respuesta = await fetch(obtenerUrlApi('agendamiento-sesiones/sessions/history'), {
       signal, headers: { Accept: 'application/json', Authorization: 'Bearer ' + sesion.token },
     })
     if (respuesta.status === 401) throw new ErrorConsultaSesiones('Tu sesión no es válida o ha vencido. Inicia sesión nuevamente.', 'sesion')
-    if (respuesta.status === 403) throw new ErrorConsultaSesiones('No tienes permiso para consultar estas solicitudes.', 'permiso')
+    if (respuesta.status === 403) throw new ErrorConsultaSesiones(`No tienes permiso para consultar estas ${recurso}.`, 'permiso')
     if (!respuesta.ok) throw new ErrorConsultaSesiones(respuesta.status === 504
-      ? 'La consulta tardó demasiado. Inténtalo de nuevo.' : 'No pudimos cargar las solicitudes. Inténtalo de nuevo.')
+      ? 'La consulta tardó demasiado. Inténtalo de nuevo.' : `No pudimos cargar las ${recurso}. Inténtalo de nuevo.`)
 
     let datos: unknown
     try { datos = await respuesta.json() }
     catch (error) {
       if (signal.aborted) throw error
-      throw new ErrorConsultaSesiones('No pudimos leer las solicitudes. Inténtalo de nuevo.', 'consulta', { cause: error })
+      throw new ErrorConsultaSesiones(`No pudimos leer las ${recurso}. Inténtalo de nuevo.`, 'consulta', { cause: error })
     }
     if (!Array.isArray(datos) || !datos.every(esSesion)
       || new Set(datos.map((item) => item.id_sesion)).size !== datos.length) {
-      throw new ErrorConsultaSesiones('No pudimos leer las solicitudes. Inténtalo de nuevo.')
+      throw new ErrorConsultaSesiones(`No pudimos leer las ${recurso}. Inténtalo de nuevo.`)
     }
-    return seleccionarSolicitudesRecibidas(datos, sesion.idUsuario).map((item) => ({
+    return datos.map((item) => ({
       id_sesion: item.id_sesion, id_tutor: item.id_tutor, id_tutee: item.id_tutee,
       id_materia: item.id_materia, id_bloque: item.id_bloque, estado_sesion: item.estado_sesion,
       inicio: item.inicio, fin: item.fin, fecha_creacion: item.fecha_creacion,
@@ -50,6 +55,20 @@ export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, exter
     if (externa?.aborted) throw error
     if (error instanceof ErrorConsultaSesiones) throw error
     throw new ErrorConsultaSesiones(signal.aborted ? 'La consulta tardó demasiado. Inténtalo de nuevo.'
-      : 'No pudimos conectar para consultar las solicitudes. Inténtalo de nuevo.', 'consulta', { cause: error })
+      : `No pudimos conectar para consultar las ${recurso}. Inténtalo de nuevo.`, 'consulta', { cause: error })
   }
+}
+
+export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
+  externa?.throwIfAborted()
+  exigirAcceso(sesion, 'TUTOR', 'Esta sección está disponible para tutores.')
+  const historial = await consultarHistorial(sesion, externa, 'solicitudes')
+  return seleccionarSolicitudesRecibidas(historial, sesion.idUsuario)
+}
+
+export async function consultarSesionesActivas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
+  externa?.throwIfAborted()
+  exigirAcceso(sesion, 'ESTUDIANTE', 'Esta sección está disponible para estudiantes.')
+  const historial = await consultarHistorial(sesion, externa, 'sesiones')
+  return seleccionarSesionesActivas(historial, sesion.idUsuario)
 }
