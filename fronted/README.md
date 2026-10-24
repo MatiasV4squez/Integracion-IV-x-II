@@ -236,6 +236,32 @@ Las pruebas automatizadas cubren filtrado por identidad/estado, contrato HTTP, p
 
 Para la aceptación, `test/aceptar-solicitud.test.mjs` cubre el contrato PATCH, la validación de la confirmación, doble clic, sincronización del listado, errores, resultados inciertos y cancelación. También se comprobó por HTTP el recorrido del frontend a través del Gateway hasta el controller, guard JWT y caso de uso reales de Sesiones, con persistencia sustituida por un repositorio de prueba: transición a CONFIRMADA, recarga y respuestas 401/403/409. No se utilizaron ni modificaron datos de PostgreSQL. Para validar el flujo con una cuenta real, debe existir una solicitud pendiente dirigida al tutor autenticado.
 
+### Llamadas compartidas para revisar postulaciones
+
+`features/postulaciones/index.ts` expone `aprobarPostulacion`, `rechazarPostulacion`, el tipo `Postulacion` y `ErrorRevisionPostulacion`. Las acciones del panel administrativo pueden importarlos sin depender de un componente visual:
+
+```ts
+import {
+  aprobarPostulacion,
+  rechazarPostulacion,
+  ErrorRevisionPostulacion,
+} from '../features/postulaciones'
+
+const resultado = decision === 'aprobar'
+  ? await aprobarPostulacion(idPostulacion, notaAcreditada, sesion, controlador.signal)
+  : await rechazarPostulacion(idPostulacion, motivoRechazo, sesion, controlador.signal)
+```
+
+`sesion` es la identidad vigente obtenida de `shared/auth`. Las funciones comprueban sesión, identificadores y rol `ADMINISTRADOR`/`ADMIN` para la interfaz; el backend verifica el JWT y la autorización real. Los IDs se conservan como texto decimal. La aprobación exige una nota numérica entre 5,0 y 7,0, con un máximo de un decimal. El rechazo exige un motivo de 3 a 500 caracteres después de quitar espacios externos.
+
+Las peticiones se envían exclusivamente al Gateway como `PATCH /api/materias-tutores/postulaciones/:id/aprobar` con `{ notaAcreditada }`, o `PATCH /api/materias-tutores/postulaciones/:id/rechazar` con `{ motivoRechazo }`. Ambas incluyen Bearer y JSON. Solo se acepta como confirmación una respuesta pública válida de la postulación solicitada, revisada por ese administrador y con el estado y los datos de revisión correspondientes. Se descartan campos adicionales. No se añadieron pantallas, rutas ni cambios al formulario de postulación del equipo.
+
+`ErrorRevisionPostulacion` ofrece `tipo`, `decision`, `estadoHttp` y `requiereActualizar`. El panel debe presentar el mensaje y refrescar su consulta si `requiereActualizar` es `true`, antes de permitir otra decisión sobre esa postulación. Un 503 de aprobación puede ocurrir después de persistir `PENDIENTE_ROL`; no implica que no hubo cambios ni confirma una habilitación completa. La consulta administrativa existente es `GET /postulaciones/pendientes` del micro y también incluye `PENDIENTE_ROL`. En ese estado el backend dispone de `POST /postulaciones/:id/reintentar-rol`; repetir la aprobación no sustituye esa operación.
+
+Se limita la espera a diez segundos y se bloquean revisiones simultáneas de la misma postulación por el mismo administrador dentro de este cliente. No hay reintentos automáticos de PATCH. Las peticiones pueden cancelarse mediante `AbortSignal`; si la cancelación ocurre después del envío, no garantiza que el servidor haya revertido la operación: al volver al panel debe consultarse el estado. La concurrencia entre clientes se controla en el backend.
+
+`test/revision-postulaciones.test.mjs` verifica los contratos, BIGINT, datos y roles, respuestas, errores, cancelación, timeout y bloqueo de decisiones simultáneas. Se comprobó además el recorrido HTTP con el Gateway, el controller, el guard JWT y el servicio reales de materias-tutores, usando persistencia y asignación de roles de prueba. La aprobación y el rechazo se confirmaron; el caso 503 conservó `PENDIENTE_ROL` sin habilitar al tutor. Esa prueba no modifica cuentas ni bases reales y no sustituye la comprobación de la integración real de asignación de roles en Auth.
+
 ### Comandos
 
 ```powershell
