@@ -1,4 +1,5 @@
 import { obtenerUrlApi } from '../../../config/api'
+import { normalizarCorreo, validarCorreo } from '../../../shared/utils/validaciones-formulario'
 import { ErrorVerificacion, type VerificacionCuentaPuerto } from '../aplicacion/verificacion-cuenta.puerto'
 
 async function enviar(accion: string, cuerpo: object, estadoEsperado: number, signal: AbortSignal): Promise<void> {
@@ -26,5 +27,10 @@ async function enviar(accion: string, cuerpo: object, estadoEsperado: number, si
 // Ambos endpoints son públicos: no necesitan JWT ni credenciales de cookies.
 export const verificacionCuentaHttp: VerificacionCuentaPuerto = {
   confirmar: (token, signal) => enviar('verificar-correo', { token }, 200, signal),
-  reenviar: (correo, signal) => enviar('reenviar-verificacion', { correo_institucional: correo.trim().toLowerCase() }, 202, signal),
+  reenviar: async (correo, signal) => {
+    signal.throwIfAborted()
+    const error = validarCorreo(correo)
+    if (error) throw new Error(error)
+    await enviar('reenviar-verificacion', { correo_institucional: normalizarCorreo(correo) }, 202, signal)
+  },
 }

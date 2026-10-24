@@ -19,6 +19,13 @@ before(async () => {
 afterEach(() => { globalThis.fetch = fetchOriginal })
 after(async () => { await vite?.close() })
 
+test('un correo inválido no genera peticiones aunque se llame directamente al adaptador', async () => {
+  globalThis.fetch = () => { assert.fail('No debe enviar un correo inválido') }
+  for (const correo of ['', '  ', 'sin-arroba', 'sergio@', 'sergio@@universidad.cl', 'a'.repeat(256) + '@ejemplo.cl']) {
+    await assert.rejects(api.reenviar(correo, signal()), /correo/i)
+  }
+})
+
 test('confirma y reenvía exclusivamente por el Gateway con los contratos públicos de Auth', async () => {
   const llamadas = []
   globalThis.fetch = async (url, opciones) => {

@@ -61,6 +61,14 @@
   line-height: 1.6;
 }
 
+.verificacion-reenvio input[aria-invalid='true'] {
+  border-color: #b42318;
+}
+
+.verificacion-reenvio .verificacion-reenvio__error {
+  color: #b42318;
+}
+
 .verificacion-tarjeta button:disabled {
   opacity: 0.6;
   cursor: wait;
