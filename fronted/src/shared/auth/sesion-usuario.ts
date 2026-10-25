@@ -3,6 +3,7 @@ import { esIdentificador } from '../utils/identificadores'
 export interface SesionUsuario {
   token: string
   idUsuario: string
+  nombre?: string
   roles: string[]
   expiraEn: number
 }

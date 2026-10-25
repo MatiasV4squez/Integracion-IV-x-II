@@ -1,9 +1,4 @@
-import type { SeleccionTutoria } from '../types/seleccion-tutoria'
-
-export interface SesionCreada {
-  id_sesion: string
-  estado_sesion: string
-}
+import type { SeleccionTutoria, SesionCreada } from '../models/solicitud-tutoria'
 
 const urlApi = (
   import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'

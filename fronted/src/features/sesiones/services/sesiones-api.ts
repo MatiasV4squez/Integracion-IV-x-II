@@ -66,3 +66,20 @@ export async function consultarSesionesActivas(sesion: SesionUsuario, externa?: 
   const historial = await consultarHistorial(sesion, externa, 'sesiones')
   return seleccionarSesionesActivas(historial, sesion.idUsuario)
 }
+
+export async function consultarHistorialEstudiante(
+  sesion: SesionUsuario,
+  externa?: AbortSignal,
+): Promise<Sesion[]> {
+  externa?.throwIfAborted()
+
+  exigirAcceso(
+    sesion,
+    'ESTUDIANTE',
+    'Esta seccion está disponible para estudiantes',
+  )
+  const historial = await consultarHistorial(sesion, externa, 'sesiones')
+  return historial.filter(
+    (clase) => clase.id_tutee === sesion.idUsuario,
+  )
+}

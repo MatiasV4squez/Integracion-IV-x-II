@@ -1,4 +1,4 @@
-import type { TutorDisponible } from '../types/seleccion-tutoria'
+import type { TutorBusqueda } from '../models/tutor-busqueda'
 
 const urlApi = (
   import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'
@@ -7,7 +7,7 @@ const urlApi = (
 export async function obtenerTutores(
   idMateria: string,
   signal: AbortSignal,
-): Promise<TutorDisponible[]> {
+): Promise<TutorBusqueda[]> {
   const respuesta = await fetch(
     `${urlApi}/materias-tutores/tutores?materiaId=${encodeURIComponent(idMateria)}`,
     { signal },

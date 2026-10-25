@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import type { ConsultaSesionesActivas } from '../models/sesion'
-import { consultarSesionesActivas, ErrorConsultaSesiones } from '../services/sesiones-api'
+import { consultarHistorialEstudiante, ErrorConsultaSesiones } from '../services/sesiones-api'
+import { seleccionarSesionesActivas } from '../utils/sesiones-activas'
 
 export function useSesionesActivas(sesion: SesionUsuario) {
   const [intento, setIntento] = useState(0)
@@ -11,7 +12,7 @@ export function useSesionesActivas(sesion: SesionUsuario) {
 
   useEffect(() => {
     const controlador = new AbortController()
-    consultarSesionesActivas(sesion, controlador.signal)
+    consultarHistorialEstudiante(sesion, controlador.signal)
       .then((sesiones) => {
         if (!controlador.signal.aborted) setRespuesta({ clave, consulta: { estado: 'listo', sesiones } })
       })
@@ -25,9 +26,24 @@ export function useSesionesActivas(sesion: SesionUsuario) {
   }, [clave, sesion])
 
   const recargar = useCallback(() => setIntento((actual) => actual + 1), [])
+  const consultaHistorial: ConsultaSesionesActivas = respuesta.clave === clave
+    ? respuesta.consulta : {estado: 'cargando'}
+
+  const consulta: ConsultaSesionesActivas= consultaHistorial.estado === 'listo'
+    ? {
+      estado: 'listo',
+      sesiones: seleccionarSesionesActivas(
+        consultaHistorial.sesiones,
+        sesion.idUsuario,
+      ),
+    }
+  : consultaHistorial
 
   return {
-    consulta: respuesta.clave === clave ? respuesta.consulta : { estado: 'cargando' } as ConsultaSesionesActivas,
-    recargar,
+    consulta,
+    historial:
+      consultaHistorial.estado === 'listo'
+        ? consultaHistorial.sesiones
+        : [], recargar,
   }
 }

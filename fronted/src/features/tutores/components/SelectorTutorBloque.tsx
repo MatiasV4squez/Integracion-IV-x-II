@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SeleccionTutoria, TutorDisponible } from '../types/seleccion-tutoria'
+import type { SeleccionTutoria } from '../../sesiones/models/solicitud-tutoria'
+import type { TutorBusqueda } from '../models/tutor-busqueda'
 
 interface Propiedades {
   idMateria: string
-  tutores: TutorDisponible[]
+  tutores: TutorBusqueda[]
   alSeleccionar: (seleccion: SeleccionTutoria | null) => void
 }
 

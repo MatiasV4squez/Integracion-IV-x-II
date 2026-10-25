@@ -1,97 +1,31 @@
-import { useEffect, useState } from 'react'
-import './SeleccionTutoriaView.css'
-import { SelectorTutorBloque } from '../components/SelectorTutorBloque'
-import type { SeleccionTutoria, TutorDisponible } from '../types/seleccion-tutoria'
-import { crearSolicitudTutoria, type SesionCreada } from '../service/sesiones'
-import { obtenerTutores } from '../service/tutores'
+import { SelectorTutorBloque } from '../../tutores/components/SelectorTutorBloque'
+import type { TutorBusqueda } from '../../tutores/models/tutor-busqueda'
+import type { SeleccionTutoria, SesionCreada } from '../models/solicitud-tutoria'
+import './SolicitarTutoriaPage.css'
 
 interface Propiedades {
   idMateria: string
   nombreMateria: string
+  tutores: TutorBusqueda[]
+  seleccion: SeleccionTutoria | null
+  cargando: boolean
+  errorCarga: string | null
+  enviando: boolean
+  error: string | null
+  sesionCreada: SesionCreada | null
+  alSeleccionar: (seleccion: SeleccionTutoria | null) => void
+  alEnviar: () => void
 }
 
-export function SeleccionTutoriaView({ idMateria, nombreMateria }: Propiedades) {
-  const [tutores, establecerTutores] = useState<TutorDisponible[]>([])
-  const [cargando, establecerCargando] = useState(true)
-  const [errorCarga, establecerErrorCarga] = useState<string | null>(null)
-  const [seleccion, establecerSeleccion] = useState<SeleccionTutoria | null>(null)
-
-  useEffect(() => {
-    const controlador = new AbortController()
-
-    async function cargarTutores() {
-      establecerCargando(true)
-      establecerErrorCarga(null)
-      establecerTutores([])
-
-      try {
-        const datos = await obtenerTutores(idMateria, controlador.signal)
-        if (!controlador.signal.aborted) establecerTutores(datos)
-      } catch (fallo) {
-        if (!controlador.signal.aborted) {
-          establecerErrorCarga(
-            fallo instanceof TypeError
-              ? 'No se pudo conectar con el servidor.'
-              : fallo instanceof Error
-                ? fallo.message
-                : 'No se pudieron cargar los tutores.',
-          )
-        }
-      } finally {
-        if (!controlador.signal.aborted) establecerCargando(false)
-      }
-    }
-
-    void cargarTutores()
-    return () => controlador.abort()
-  }, [idMateria])
-
+export default function SolicitarTutoriaPage({
+  idMateria, nombreMateria, tutores, seleccion, cargando, errorCarga,
+  enviando, error, sesionCreada, alSeleccionar, alEnviar,
+}: Propiedades) {
   const seleccionVigente = seleccion?.id_materia === idMateria ? seleccion : null
   const tutorSeleccionado = tutores.find((tutor) => tutor.idTutor === seleccionVigente?.id_tutor)
-  const [enviando, establecerEnviando] = useState(false)
-  const [error, establecerError] = useState<string | null>(null)
-  const [sesionCreada, establecerSesionCreada] = useState<SesionCreada | null>(null)
   const bloqueSeleccionado = tutorSeleccionado?.horariosDisponibles.find(
     (bloque) => bloque.idBloque === seleccionVigente?.id_bloque,
   )
-
-  async function enviarSolicitud() {
-    if (
-      cargando ||
-      errorCarga ||
-      !seleccionVigente ||
-      !bloqueSeleccionado ||
-      enviando ||
-      sesionCreada
-    ) {
-      return
-    }
-
-    const token = localStorage.getItem('token')
-
-    if (!token) {
-      establecerError('Debes iniciar sesión para solicitar una tutoría.')
-      return
-    }
-
-    establecerError(null)
-    establecerEnviando(true)
-
-    try {
-      const sesion = await crearSolicitudTutoria(seleccionVigente, token)
-      establecerSesionCreada(sesion)
-    } catch (fallo) {
-      establecerError(
-        fallo instanceof TypeError
-          ? 'No se pudo conectar con el servidor.'
-          : fallo instanceof Error
-            ? fallo.message
-            : 'No se pudo enviar la solicitud.',
-      )
-    } finally {
-      establecerEnviando(false)
-    }
-  }
 
   return (
     <main className="seleccion-tutoria">
@@ -128,7 +62,7 @@ export function SeleccionTutoriaView({ idMateria, nombreMateria }: Propiedades) 
             <SelectorTutorBloque
               idMateria={idMateria}
               tutores={tutores}
-              alSeleccionar={establecerSeleccion}
+              alSeleccionar={alSeleccionar}
             />
           )}
         </fieldset>
@@ -152,7 +86,7 @@ export function SeleccionTutoriaView({ idMateria, nombreMateria }: Propiedades) 
 
           <button
             type="button"
-            onClick={enviarSolicitud}
+            onClick={alEnviar}
             disabled={
               cargando ||
               errorCarga !== null ||
