@@ -15,3 +15,8 @@ export interface Postulacion {
 }
 
 export type DecisionPostulacion = 'aprobar' | 'rechazar'
+
+export type ConsultaPostulaciones =
+  | { estado: 'cargando' }
+  | { estado: 'listo'; postulaciones: Postulacion[] }
+  | { estado: 'error'; mensaje: string }

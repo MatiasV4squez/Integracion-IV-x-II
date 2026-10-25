@@ -29,8 +29,15 @@ const TUTOR: readonly EnlaceNavegacion[] = [
   PUBLICOS[2],
 ]
 
+const ADMINISTRADOR: readonly EnlaceNavegacion[] = [
+  { etiqueta: 'Postulaciones', destino: '/administracion/postulaciones' },
+  PUBLICOS[1],
+  PUBLICOS[2],
+]
+
 // Solo configura la presentación; la API mantiene la autorización de cada operación.
 export function obtenerNavegacion(roles: readonly string[] = []): readonly EnlaceNavegacion[] {
+  if (roles.some((rol) => rol === 'ADMIN' || rol === 'ADMINISTRADOR')) return ADMINISTRADOR
   if (roles.includes('TUTOR')) return TUTOR
   return roles.length > 0 ? ESTUDIANTE : PUBLICOS
 }
