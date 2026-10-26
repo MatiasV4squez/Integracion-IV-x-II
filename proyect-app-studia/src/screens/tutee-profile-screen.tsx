@@ -5,15 +5,17 @@ import { StyleSheet, View } from 'react-native';
 import { AppButton } from '@/components/app-button';
 import { Avatar } from '@/components/avatar';
 import { Card } from '@/components/card';
+import { ErrorState } from '@/components/error-state';
+import { LoadingState } from '@/components/loading-state';
 import { RatingStars } from '@/components/rating-stars';
 import { ScreenContainer } from '@/components/screen-container';
 import { SectionHeader } from '@/components/section-header';
 import { StatTile } from '@/components/stat-tile';
 import { Txt } from '@/components/txt';
 import { useAuth } from '@/hooks/use-auth';
+import { usePerfil } from '@/hooks/use-perfil';
+import { useSesiones } from '@/hooks/use-sesiones';
 import { useUI } from '@/hooks/use-ui';
-import { ME, ME_PROFILE } from '@/mocks/sessions';
-import { useSessions } from '@/state/sessions-context';
 
 const ACTIVE_STATUSES = ['pendiente', 'confirmada', 'pendiente_cierre'];
 
@@ -22,14 +24,15 @@ export default function TuteeProfileScreen() {
   const ui = useUI();
   const router = useRouter();
   const { logout } = useAuth();
-  const { sessions } = useSessions();
+  const perfil = usePerfil();
+  const misSesiones = useSesiones({ role: 'tutee' });
 
   const signOut = () => {
     logout();
     router.replace('/login');
   };
 
-  const tuteeSessions = useMemo(() => sessions.filter((s) => s.myRole === 'tutee'), [sessions]);
+  const tuteeSessions = useMemo(() => misSesiones.data ?? [], [misSesiones.data]);
   const completed = useMemo(() => tuteeSessions.filter((s) => s.status === 'completada'), [tuteeSessions]);
   const activeCount = tuteeSessions.filter((s) => ACTIVE_STATUSES.includes(s.status)).length;
 
@@ -44,13 +47,32 @@ export default function TuteeProfileScreen() {
     return [...seen.entries()];
   }, [tuteeSessions]);
 
+  const me = perfil.data;
+  if (!me) {
+    return (
+      <ScreenContainer>
+        {perfil.isLoading || !perfil.error ? (
+          <LoadingState message="Cargando tu perfil…" />
+        ) : (
+          <ErrorState message={perfil.error.message} onRetry={perfil.refresh} />
+        )}
+        <AppButton label="Cerrar sesión" variant="secondary" onPress={signOut} />
+      </ScreenContainer>
+    );
+  }
+
+  const refresh = () => {
+    perfil.refresh();
+    misSesiones.refresh();
+  };
+
   return (
-    <ScreenContainer>
+    <ScreenContainer refreshing={perfil.isRefreshing || misSesiones.isRefreshing} onRefresh={refresh}>
       <View style={styles.header}>
-        <Avatar name={ME.name} size={76} />
-        <Txt variant="h1">{ME.name}</Txt>
+        <Avatar name={me.name} size={76} />
+        <Txt variant="h1">{me.name}</Txt>
         <Txt variant="small" color="muted">
-          {ME_PROFILE.career} · {ME_PROFILE.university}
+          {me.career} · {me.university}
         </Txt>
         {receivedAvg ? (
           <View style={styles.ratingRow}>
@@ -70,10 +92,10 @@ export default function TuteeProfileScreen() {
 
       <Card>
         <Txt variant="h3">Datos académicos</Txt>
-        <InfoRow label="Universidad" value={ME_PROFILE.university} />
-        <InfoRow label="Carrera" value={ME_PROFILE.career} />
-        <InfoRow label="Año" value={ME_PROFILE.year} />
-        <InfoRow label="Promedio (PPA)" value={ME_PROFILE.gpa} />
+        <InfoRow label="Universidad" value={me.university} />
+        <InfoRow label="Carrera" value={me.career} />
+        <InfoRow label="Año" value={me.year} />
+        <InfoRow label="Promedio (PPA)" value={me.gpa} />
       </Card>
 
       <SectionHeader title="Materias en las que recibes tutoría" />

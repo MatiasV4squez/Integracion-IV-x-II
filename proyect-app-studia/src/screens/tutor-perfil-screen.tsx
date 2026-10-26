@@ -7,6 +7,8 @@ import { Avatar } from '@/components/avatar';
 import { CapacityMeter } from '@/components/capacity-meter';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/error-state';
+import { LoadingState } from '@/components/loading-state';
 import { RatingStars } from '@/components/rating-stars';
 import { ReviewCard } from '@/components/review-card';
 import { ScreenContainer } from '@/components/screen-container';
@@ -14,8 +16,9 @@ import { SegmentedTabs } from '@/components/segmented-tabs';
 import { StatTile } from '@/components/stat-tile';
 import { Txt } from '@/components/txt';
 import { getSubject } from '@/mocks/subjects';
-import { getTutorById } from '@/mocks/tutors';
+import { ApiError } from '@/api/client';
 import { useTone } from '@/hooks/use-tone';
+import { useTutoria } from '@/hooks/use-tutorias';
 import { useUI } from '@/hooks/use-ui';
 import { useSessions } from '@/state/sessions-context';
 import type { AvailabilityBlock } from '@/types/session';
@@ -32,7 +35,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
   const ui = useUI();
   const success = useTone('success');
   const { reserved } = useSessions();
-  const tutor = getTutorById(tutorId);
+  const { data: tutor, error, isLoading, isRefreshing, refresh } = useTutoria(tutorId);
   const [tab, setTab] = useState<Tab>('resumen');
 
   const distribution = useMemo(
@@ -50,6 +53,23 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
   }, [tutor]);
 
   const back = () => (router.canGoBack() ? router.back() : router.navigate('/buscar'));
+
+  if (isLoading) {
+    return (
+      <ScreenContainer>
+        <LoadingState message="Cargando perfil del tutor…" />
+      </ScreenContainer>
+    );
+  }
+
+  if (!tutor && error && !(error instanceof ApiError && error.status === 404)) {
+    return (
+      <ScreenContainer>
+        <ErrorState message={error.message} onRetry={refresh} />
+        <AppButton label="Volver" variant="secondary" onPress={back} />
+      </ScreenContainer>
+    );
+  }
 
   if (!tutor) {
     return (
@@ -69,7 +89,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
   const maxSessions = Math.max(1, ...tutor.bySubject.map((s) => s.sessions));
 
   return (
-    <ScreenContainer>
+    <ScreenContainer refreshing={isRefreshing} onRefresh={refresh}>
       <Pressable accessibilityRole="button" onPress={back} hitSlop={8} style={styles.back}>
         <Txt variant="label" color="primary">
           ‹ Volver

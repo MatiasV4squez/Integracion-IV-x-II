@@ -6,10 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/error-state';
+import { LoadingState } from '@/components/loading-state';
 import { RatingStars } from '@/components/rating-stars';
 import { StatTile } from '@/components/stat-tile';
 import { Txt } from '@/components/txt';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useSesiones } from '@/hooks/use-sesiones';
 import { useUI } from '@/hooks/use-ui';
 import { useSessions } from '@/state/sessions-context';
 import type { Session } from '@/types/session';
@@ -20,15 +24,14 @@ export default function HistorialTuteeScreen() {
   const router = useRouter();
   const ui = useUI();
   const insets = useSafeAreaInsets();
-  const { sessions, setLastViewed } = useSessions();
+  const { setLastViewed } = useSessions();
+  const misSesiones = useSesiones({ role: 'tutee', status: 'completada' });
 
   const completed = useMemo(
-    () =>
-      sessions
-        .filter((s) => s.myRole === 'tutee' && s.status === 'completada')
-        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()),
-    [sessions],
+    () => [...(misSesiones.data ?? [])].sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()),
+    [misSesiones.data],
   );
+  const page = useClientPagination(completed);
 
   const average = useMemo(() => {
     const ratings = completed.flatMap((s) => (s.myRating ? [s.myRating] : []));
@@ -59,18 +62,29 @@ export default function HistorialTuteeScreen() {
     <View style={[styles.root, { backgroundColor: ui.bg, paddingTop: insets.top }]}>
       {/* FlatList = lista virtualizada (NFR18) */}
       <FlatList
-        data={completed}
+        data={page.items}
+        refreshing={misSesiones.isRefreshing}
+        onRefresh={misSesiones.refresh}
+        onEndReached={page.loadMore}
+        onEndReachedThreshold={0.4}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         ListHeaderComponent={header}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => <CompletedCard session={item} onPress={() => openDetail(item.id)} />}
         ListEmptyComponent={
-          <EmptyState
-            icon="🎓"
-            title="Aún no tienes tutorías completadas"
-            message="Cuando termines y califiques una tutoría, aparecerá aquí."
-          />
+          misSesiones.isLoading ? (
+            <LoadingState message="Cargando tus tutorías…" />
+          ) : misSesiones.error ? (
+            <ErrorState message={misSesiones.error.message} onRetry={misSesiones.refresh} />
+          ) : (
+            <EmptyState
+              icon="🎓"
+              title="Aún no tienes tutorías completadas"
+              message="Cuando termines y califiques una tutoría, aparecerá aquí."
+              action={{ label: 'Buscar tutorías', onPress: () => router.navigate('/buscar') }}
+            />
+          )
         }
       />
     </View>

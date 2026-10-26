@@ -7,6 +7,9 @@ import { Avatar } from '@/components/avatar';
 import { CapacityMeter } from '@/components/capacity-meter';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/error-state';
+import { LoadMore } from '@/components/load-more';
+import { LoadingState } from '@/components/loading-state';
 import { NoticeBanner } from '@/components/notice-banner';
 import { RatingStars } from '@/components/rating-stars';
 import { ScreenContainer } from '@/components/screen-container';
@@ -14,6 +17,7 @@ import { SectionHeader } from '@/components/section-header';
 import { TextField } from '@/components/text-field';
 import { Txt } from '@/components/txt';
 import { useTone } from '@/hooks/use-tone';
+import { useSolicitarTutoria, useTutorias } from '@/hooks/use-tutorias';
 import { useUI } from '@/hooks/use-ui';
 import { ME, ME_AS_TUTOR } from '@/mocks/sessions';
 import { getSubject, SUBJECTS } from '@/mocks/subjects';
@@ -21,7 +25,7 @@ import { tutorsForSubject } from '@/mocks/tutors';
 import { useSessions } from '@/state/sessions-context';
 import type { Tutor } from '@/types/session';
 import { formatDate, formatTimeRange, plural } from '@/utils/format';
-import { blockOccupancy, createRequest, isBlockFull, MAX_PENDING_REQUESTS } from '@/utils/session-machine';
+import { blockOccupancy, isBlockFull, MAX_PENDING_REQUESTS } from '@/utils/session-machine';
 
 type Props = { initialSubject?: string; initialTutor?: string };
 
@@ -29,7 +33,8 @@ type Props = { initialSubject?: string; initialTutor?: string };
 export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor }: Props) {
   const router = useRouter();
   const ui = useUI();
-  const { pendingCount, reserved, sessions, run, setLastViewed, myAvailability } = useSessions();
+  const { pendingCount, reserved, sessions, setLastViewed, myAvailability } = useSessions();
+  const { solicitar, pendingBlockId } = useSolicitarTutoria();
 
   const [query, setQuery] = useState('');
   const [subjectCode, setSubjectCode] = useState<string | null>(initialSubject ?? null);
@@ -44,6 +49,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
   }
 
   const subject = subjectCode ? getSubject(subjectCode) : undefined;
+  const tutorias = useTutorias(subject ? subject.code : null);
   const limitReached = pendingCount >= MAX_PENDING_REQUESTS;
 
   const filteredSubjects = SUBJECTS.filter((s) => {
@@ -79,12 +85,12 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
 
   const tutors = useMemo(() => {
     if (!subjectCode) return [];
-    const list = tutorsForSubject(subjectCode);
+    const list = tutorias.items ?? [];
     const withMe = meAsTutor ? [meAsTutor, ...list] : list;
     if (!initialTutor) return withMe;
     // El tutor pedido explícitamente (desde su perfil o "¿Qué sigue?") aparece primero.
     return [...withMe].sort((a, b) => (a.id === initialTutor ? -1 : b.id === initialTutor ? 1 : 0));
-  }, [subjectCode, initialTutor, meAsTutor]);
+  }, [subjectCode, initialTutor, meAsTutor, tutorias.items]);
 
   const alreadyRequested = (blockId: string) =>
     sessions.some((s) => s.blockId === blockId && s.myRole === 'tutee' && (s.status === 'pendiente' || s.status === 'confirmada'));
@@ -94,28 +100,25 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
     router.push({ pathname: '/detalle-sesion', params: { id } });
   };
 
-  const reserve = (tutor: Tutor, blockId: string) => {
+  const reserve = async (tutor: Tutor, blockId: string) => {
     if (!subject) return;
     const block = tutor.availability.find((b) => b.id === blockId);
     if (!block) return;
-    const res = run((state) =>
-      createRequest(state, {
-        tutor: { id: tutor.id, name: tutor.name, reputation: tutor.reputation, ratingsCount: tutor.ratingsCount },
-        me: ME,
-        subject: { code: subject.code, name: subject.name },
-        block,
-      }),
-    );
+    const res = await solicitar({
+      tutor: { id: tutor.id, name: tutor.name, reputation: tutor.reputation, ratingsCount: tutor.ratingsCount },
+      subject: { code: subject.code, name: subject.name },
+      block,
+    });
     setFeedback((f) => ({
       ...f,
       [blockId]: res.ok
-        ? { ok: true, text: `Reservado con ${tutor.name}. Quedó en estado Pendiente.`, sessionId: res.session.id }
+        ? { ok: true, text: `Reservado con ${tutor.name}. Quedó en estado Pendiente.`, sessionId: res.sessionId }
         : { ok: false, text: res.error },
     }));
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer refreshing={tutorias.isRefreshing} onRefresh={subject ? tutorias.refresh : undefined}>
       <View>
         <Txt variant="h1">Tutorías disponibles</Txt>
         <Txt variant="small" color="muted">
@@ -157,9 +160,13 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
 
       {subject ? (
         <>
-          <SectionHeader title="Tutores y horarios" subtitle={`${plural(tutors.length, 'tutor disponible', 'tutores disponibles')} en ${subject.name}`} />
+          <SectionHeader title="Tutores y horarios" subtitle={`${plural(Math.max(tutors.length, tutorias.total + (meAsTutor ? 1 : 0)), 'tutor disponible', 'tutores disponibles')} en ${subject.name}`} />
 
-          {tutors.length === 0 ? (
+          {tutorias.isLoading ? (
+            <LoadingState message="Buscando tutores…" />
+          ) : tutorias.items === undefined && tutorias.error ? (
+            <ErrorState message={tutorias.error.message} onRetry={tutorias.refresh} />
+          ) : tutors.length === 0 ? (
             <EmptyState icon="🌱" title="Sin tutores por ahora" message="Nadie ofrece esta materia todavía. Vuelve a revisar más tarde." />
           ) : (
             tutors.map((tutor) => {
@@ -227,7 +234,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
                             <AppButton
                               label="Reservar"
                               size="sm"
-                              disabled={disabled}
+                              disabled={disabled || pendingBlockId === block.id}
                               onPress={() => reserve(tutor, block.id)}
                             />
                           )}
@@ -253,6 +260,15 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
               );
             })
           )}
+          {tutorias.items !== undefined ? (
+            <LoadMore
+              hasMore={tutorias.hasMore}
+              isLoadingMore={tutorias.isLoadingMore}
+              onLoadMore={tutorias.loadMore}
+              error={tutorias.error}
+              label="Ver más tutores"
+            />
+          ) : null}
         </>
       ) : null}
     </ScreenContainer>

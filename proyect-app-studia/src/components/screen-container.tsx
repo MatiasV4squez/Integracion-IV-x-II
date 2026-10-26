@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -10,10 +10,13 @@ type Props = {
   scroll?: boolean;
   /** Desactiva el margen superior seguro cuando la pantalla ya tiene su propia cabecera (header nativo o uno propio). */
   topInset?: boolean;
+  /** Pull-to-refresh (solo con `scroll`): se muestra si se pasa `onRefresh`. */
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
 /** Fondo del rediseño + área segura (incluye el notch) + ancho máximo centrado (útil en web/tablet). */
-export function ScreenContainer({ children, scroll = true, topInset = true }: Props) {
+export function ScreenContainer({ children, scroll = true, topInset = true, refreshing = false, onRefresh }: Props) {
   const ui = useUI();
   const edges = topInset ? (['top', 'bottom', 'left', 'right'] as const) : (['bottom', 'left', 'right'] as const);
 
@@ -21,7 +24,12 @@ export function ScreenContainer({ children, scroll = true, topInset = true }: Pr
     <View style={[styles.root, { backgroundColor: ui.bg }]}>
       <SafeAreaView style={styles.root} edges={edges}>
         {scroll ? (
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.primary} colors={[ui.primary]} /> : undefined
+            }>
             <View style={styles.inner}>{children}</View>
           </ScrollView>
         ) : (

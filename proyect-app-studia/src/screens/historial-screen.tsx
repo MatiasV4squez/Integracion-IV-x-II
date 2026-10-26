@@ -7,7 +7,9 @@ import { AppButton } from '@/components/app-button';
 import { Avatar } from '@/components/avatar';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/error-state';
 import { FilterChip } from '@/components/filter-chip';
+import { LoadingState } from '@/components/loading-state';
 import { SectionHeader } from '@/components/section-header';
 import { SessionCard } from '@/components/session-card';
 import { StatTile } from '@/components/stat-tile';
@@ -15,6 +17,8 @@ import { StatusBadge } from '@/components/status-badge';
 import { TextField } from '@/components/text-field';
 import { Txt } from '@/components/txt';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useSesiones } from '@/hooks/use-sesiones';
 import { useUI } from '@/hooks/use-ui';
 import { useSessions } from '@/state/sessions-context';
 import type { Session, SessionStatus } from '@/types/session';
@@ -37,7 +41,9 @@ export default function HistorialScreen() {
   const router = useRouter();
   const ui = useUI();
   const insets = useSafeAreaInsets();
-  const { sessions, now, run, setLastViewed } = useSessions();
+  const { now, run, setLastViewed } = useSessions();
+  const misSesiones = useSesiones();
+  const sessions = useMemo(() => misSesiones.data ?? [], [misSesiones.data]);
 
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas');
@@ -88,6 +94,14 @@ export default function HistorialScreen() {
         return newestFirst ? diff : -diff;
       });
   }, [sessions, statusFilter, roleFilter, query, newestFirst]);
+
+  const page = useClientPagination(visible);
+
+  const clearFilters = () => {
+    setQuery('');
+    setStatusFilter('todas');
+    setRoleFilter('todos');
+  };
 
   const respond = (id: string, accept: boolean) => {
     const res = run((s) => respondToRequest(s, id, accept));
@@ -166,7 +180,11 @@ export default function HistorialScreen() {
     <View style={[styles.root, { backgroundColor: ui.bg, paddingTop: insets.top }]}>
       {/* FlatList = lista virtualizada (NFR18) */}
       <FlatList
-        data={visible}
+        data={page.items}
+        refreshing={misSesiones.isRefreshing}
+        onRefresh={misSesiones.refresh}
+        onEndReached={page.loadMore}
+        onEndReachedThreshold={0.4}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -191,7 +209,18 @@ export default function HistorialScreen() {
           />
         )}
         ListEmptyComponent={
-          <EmptyState icon="🔎" title="No hay sesiones con estos filtros" message="Prueba con otra búsqueda o cambia los filtros." />
+          misSesiones.isLoading ? (
+            <LoadingState message="Cargando tus sesiones…" />
+          ) : misSesiones.error ? (
+            <ErrorState message={misSesiones.error.message} onRetry={misSesiones.refresh} />
+          ) : (
+            <EmptyState
+              icon="🔎"
+              title="No hay sesiones con estos filtros"
+              message="Prueba con otra búsqueda o cambia los filtros."
+              action={{ label: 'Limpiar filtros', onPress: clearFilters }}
+            />
+          )
         }
       />
     </View>
