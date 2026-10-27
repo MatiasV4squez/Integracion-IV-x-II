@@ -11,9 +11,8 @@ const PanelTuteeContainer = lazy(() => import('../features/panel-tutee/container
 const PostulacionesAdminContainer = lazy(() => import('../features/postulaciones/containers/PostulacionesAdminContainer'))
 const DashboardEstudianteContainer = lazy(() => import('../features/estudiantes/containers/DashboardEstudianteContainer'))
 const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/containers/SolicitarTutoriaContainer'))
-const AvailabilityScreen = lazy(() => import('../components/AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })))
 const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
-
+const DisponibilidadContainer = lazy(() => import('../features/disponibilidad/containers/DisponibilidadContainer'))
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
     <Routes>
@@ -29,7 +28,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
           path="/solicitudes/nueva"
           element={<SolicitarTutoriaContainer idMateria="1" nombreMateria="Cálculo intermedio" />}
         />
-        <Route path="/disponibilidad" element={<AvailabilityScreen />} />
+        <Route path="/disponibilidad" element={<DisponibilidadContainer />} />
         <Route path="/registro" element={<PantallasEquipo key="registro" vistaInicial="register" />} />
         {children}
         <Route path="/*" element={<PantallasEquipo key="login" />} />
