@@ -79,6 +79,22 @@ export class SessionsController {
     }));
   }
 
+  @Get('active')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Consultar las sesiones activas del estudiante autenticado',
+    description:
+      'La identidad proviene del JWT. Devuelve sesiones propias como estudiante en estados PENDIENTE, CONFIRMADA, PENDIENTE_CIERRE y EN_CONFLICTO, ordenadas por inicio e identificador ascendentes.',
+  })
+  @ApiResponse({ status: 200, description: 'Listado de sesiones activas; vacío si no hay coincidencias.' })
+  @ApiResponse({ status: 401, description: 'Token JWT ausente, inválido o vencido.' })
+  async consultarSesionesActivas(@Req() request: AuthenticatedRequest) {
+    const sesiones = await this.sesiones.consultarSesionesActivas(
+      request.user.idUsuario,
+    );
+    return sesiones.map(aRespuestaSesion);
+  }
+
   @Get('tutors/:id/reputation')
   @ApiOperation({ summary: 'Obtener reputación de un tutor' })
   @ApiResponse({

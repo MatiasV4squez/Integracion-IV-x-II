@@ -87,6 +87,35 @@ con las credenciales locales y comprueba una consulta real mediante Prisma.
 excluidos por `.gitignore`. Se versionan `.env.example`, el esquema, las futuras
 migraciones y `package-lock.json` para reproducir las dependencias.
 
+## Consulta de sesiones activas
+
+`GET /sessions/active` requiere `Authorization: Bearer <JWT>`. A través del
+Gateway se consulta `GET /api/agendamiento-sesiones/sessions/active`.
+
+La identidad se obtiene de `sub` del JWT. La consulta devuelve únicamente las
+sesiones donde ese usuario participa como estudiante (`id_tutee`), en estados
+`PENDIENTE`, `CONFIRMADA`, `PENDIENTE_CIERRE` o `EN_CONFLICTO`. El filtrado se
+realiza en la base de datos. Los resultados se ordenan por `inicio` ascendente
+y, en caso de empate, por `id_sesion` ascendente. Los estados visibles del panel
+son independientes de los estados que ocupan un horario.
+
+Devuelve `200` con un arreglo, o `[]` cuando no hay coincidencias. Cada elemento
+contiene `id_sesion`, `id_tutee`, `id_tutor`, `id_materia`, `id_bloque`,
+`estado_sesion`, `inicio`, `fin`, `fecha_creacion`, `fecha_actualizacion` y
+`resultado_provisional`. Los identificadores son texto decimal, las fechas son
+ISO 8601 y `resultado_provisional` es booleano. No incluye calificaciones.
+Un JWT ausente, inválido o vencido devuelve `401`.
+
+La ruta no recibe identificadores de usuario ni filtros: cualquier parámetro
+adicional no cambia la identidad ni los estados consultados. `/sessions/history`
+conserva el historial completo de las sesiones donde el usuario es participante.
+La adaptación de Web para consumir `/sessions/active` queda para la segunda parte.
+
+Las pruebas están en `test/sessions.integration.e2e-spec.ts` y se ejecutan con
+`npm run test:sessions`. Requieren PostgreSQL, usando `TEST_DATABASE_URL` o la
+configuración local existente. Reutilizan el esquema aislado de esa suite,
+que se elimina al terminar, y verifican el filtrado y orden con consultas reales.
+
 ## Arquitectura hexagonal
 
 El dominio, los casos de uso y los adaptadores están organizados en

@@ -255,6 +255,12 @@ export class GestionarSesiones {
     );
   }
 
+  consultarSesionesActivas(idUsuario: string) {
+    return this.sesiones.consultarSesionesActivas(
+      interpretarIdentificador(idUsuario, 'id_usuario'),
+    );
+  }
+
   async resolverConflicto(
     idSesion: string,
     entrada: EntradaResolverConflicto,

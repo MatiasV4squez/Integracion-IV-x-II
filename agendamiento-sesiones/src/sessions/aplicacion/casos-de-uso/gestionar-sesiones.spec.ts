@@ -12,6 +12,7 @@ function crearContexto(): jest.Mocked<ContextoTransaccion> {
       crearPendiente: jest.fn(),
       buscarPorId: jest.fn(),
       consultarHistorial: jest.fn(),
+      consultarSesionesActivas: jest.fn(),
       existeSolapamiento: jest.fn(),
       haComenzado: jest.fn(),
       cambiarEstado: jest.fn(),

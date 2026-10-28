@@ -8,6 +8,13 @@ export const ESTADOS_OCUPADOS: EstadoSesion[] = [
   'PENDIENTE_CIERRE',
 ];
 
+export const ESTADOS_ACTIVOS: EstadoSesion[] = [
+  'PENDIENTE',
+  'CONFIRMADA',
+  'PENDIENTE_CIERRE',
+  'EN_CONFLICTO',
+];
+
 export const TRANSICIONES: Record<EstadoSesion, readonly EstadoSesion[]> = {
   PENDIENTE: ['CONFIRMADA', 'RECHAZADA', 'EXPIRADA'],
   CONFIRMADA: ['PENDIENTE_CIERRE', 'CANCELADA'],

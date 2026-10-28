@@ -2,7 +2,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import type { RepositorioSesiones } from '../../aplicacion/puertos/repositorio-sesiones.puerto';
 import type { Sesion } from '../../dominio/entidades/sesion';
 import type { EstadoSesion } from '../../dominio/tipos/estado-sesion';
-import { ESTADOS_OCUPADOS } from '../../dominio/reglas/reglas-sesion';
+import { ESTADOS_ACTIVOS, ESTADOS_OCUPADOS } from '../../dominio/reglas/reglas-sesion';
 import type { NuevaSesion } from '../../aplicacion/contratos/entradas-sesion';
 
 export class RepositorioSesionesPrisma implements RepositorioSesiones {
@@ -60,6 +60,16 @@ export class RepositorioSesionesPrisma implements RepositorioSesiones {
       where: { OR: [{ id_tutee: idUsuario }, { id_tutor: idUsuario }] },
       orderBy: { fecha_creacion: 'desc' },
       include: { calificaciones: true },
+    });
+  }
+
+  consultarSesionesActivas(idEstudiante: bigint) {
+    return this.cliente.sesion.findMany({
+      where: {
+        id_tutee: idEstudiante,
+        estado_sesion: { in: ESTADOS_ACTIVOS },
+      },
+      orderBy: [{ inicio: 'asc' }, { id_sesion: 'asc' }],
     });
   }
 

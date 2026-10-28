@@ -13,6 +13,7 @@ export interface RepositorioSesiones {
   consultarHistorial(
     idUsuario: bigint,
   ): Promise<Array<Sesion & { calificaciones: Calificacion[] }>>;
+  consultarSesionesActivas(idEstudiante: bigint): Promise<Sesion[]>;
   existeSolapamiento(sesion: Sesion): Promise<boolean>;
   haComenzado(inicio: Date): Promise<boolean>;
   cambiarEstado(

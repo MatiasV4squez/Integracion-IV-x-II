@@ -382,6 +382,48 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     });
   }
 
+  it('consulta las sesiones activas propias como estudiante, con orden estable y sin alterar el historial', async () => {
+    const confirmada = await fixture('CONFIRMADA', '2099-06-21');
+    const pendiente = await fixture('PENDIENTE', '2099-06-20');
+    const porCerrar = await fixture('PENDIENTE_CIERRE', '2099-06-20');
+    const conflicto = await fixture('EN_CONFLICTO', '2099-06-22');
+    for (const estado of ['COMPLETADA', 'CANCELADA', 'RECHAZADA', 'EXPIRADA', 'NO_REALIZADA', 'INASISTENCIA'] as const)
+      await fixture(estado);
+    await fixture('CONFIRMADA', '2099-06-20', outsider);
+    const comoTutor = await fixture('CONFIRMADA', '2099-06-20', outsider, tutee);
+
+    const respuesta = await request(app.getHttpServer())
+      .get(`/sessions/active?id_usuario=${outsider}&estado=COMPLETADA`)
+      .set('Authorization', `Bearer ${token(tutee)}`)
+      .expect(200);
+    expect(respuesta.body.map((fila: { id_sesion: string }) => fila.id_sesion)).toEqual(
+      [pendiente, porCerrar, confirmada, conflicto].map((fila) => fila.id_sesion.toString()),
+    );
+    expect(respuesta.body[0]).toMatchObject({
+      id_tutee: tutee, id_tutor: tutor, id_bloque: '9007199254741000',
+      estado_sesion: 'PENDIENTE', inicio: pendiente.inicio.toISOString(),
+    });
+    expect(respuesta.body[0]).not.toHaveProperty('calificaciones');
+
+    const historial = await request(app.getHttpServer()).get('/sessions/history')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(historial.body.some((fila: { estado_sesion: string }) => fila.estado_sesion === 'COMPLETADA')).toBe(true);
+    expect(historial.body.some((fila: { id_sesion: string }) => fila.id_sesion === comoTutor.id_sesion.toString())).toBe(true);
+  });
+
+  it('la consulta de activas devuelve una lista vacía si solo hay sesiones terminadas', async () => {
+    await fixture('COMPLETADA');
+    const respuesta = await request(app.getHttpServer()).get('/sessions/active')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.body).toEqual([]);
+  });
+
+  it.each([null, 'token-invalido'])('la consulta de activas rechaza el token %s', async (bearer) => {
+    const peticion = request(app.getHttpServer()).get('/sessions/active');
+    if (bearer) peticion.set('Authorization', `Bearer ${bearer}`);
+    await peticion.expect(401);
+  });
+
   it('solo los participantes pueden calificar una sesión completada', async () => {
     const completada = await fixture('COMPLETADA');
     const pendiente = await fixture('PENDIENTE_CIERRE');
