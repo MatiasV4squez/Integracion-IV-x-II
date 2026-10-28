@@ -1,29 +1,35 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
 import { Card } from '@/components/card';
 import { CapacityMeter } from '@/components/capacity-meter';
 import { EmptyState } from '@/components/empty-state';
-import { FilterChip } from '@/components/filter-chip';
+import { FormChipGroup } from '@/components/form-fields';
 import { NoticeBanner } from '@/components/notice-banner';
 import { ScreenContainer } from '@/components/screen-container';
 import { SectionHeader } from '@/components/section-header';
 import { Txt } from '@/components/txt';
-import { SUBJECTS, getSubject } from '@/mocks/subjects';
+import { AVAILABILITY } from '@/constants/app-config';
+import { useSubjects } from '@/hooks/use-subjects';
+import { getSubject } from '@/mocks/subjects';
 import { d } from '@/mocks/tutors';
+import { createAvailabilitySchema, type AvailabilityForm } from '@/schemas/availability-schema';
 import { useSessions } from '@/state/sessions-context';
+import { addMinutesToTime } from '@/utils/date-time';
 import { formatDate, formatTimeRange } from '@/utils/format';
 
 const DAYS = [
-  { label: 'Hoy', day: '09-28' },
-  { label: 'Mañana', day: '09-29' },
-  { label: 'Miér 30', day: '09-30' },
-  { label: 'Jue 01', day: '10-01' },
-  { label: 'Vie 02', day: '10-02' },
+  { label: 'Hoy', value: '09-28' },
+  { label: 'Mañana', value: '09-29' },
+  { label: 'Miér 30', value: '09-30' },
+  { label: 'Jue 01', value: '10-01' },
+  { label: 'Vie 02', value: '10-02' },
 ];
 
-const START_TIMES = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+const START_TIMES = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map((time) => ({ value: time, label: time }));
 
 const CAPACITIES = [
   { value: 1, label: 'Individual (1)' },
@@ -32,42 +38,36 @@ const CAPACITIES = [
   { value: 4, label: 'Grupal (4)' },
 ];
 
-function addHour(hm: string): string {
-  const [h, m] = hm.split(':').map(Number);
-  return `${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
 /** El Tutor reserva (publica) un horario propio; queda disponible para que un Tutee lo vea y lo reserve. */
 export default function PublicarDisponibilidadScreen() {
-  const { myAvailability, publishAvailability } = useSessions();
-
-  const [subjectCode, setSubjectCode] = useState<string | null>(null);
-  const [day, setDay] = useState<string | null>(null);
-  const [startTime, setStartTime] = useState<string | null>(null);
-  const [capacity, setCapacity] = useState(1);
+  const { now, myAvailability, publishAvailability } = useSessions();
+  const { subjects, fromCache } = useSubjects();
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // El horario no puede estar en el pasado: se valida contra el reloj de la app.
+  const schema = useMemo(() => createAvailabilitySchema({ now, toIso: d }), [now]);
+  const { control, handleSubmit, reset } = useForm<AvailabilityForm>({
+    resolver: zodResolver(schema),
+    defaultValues: { subjectCode: '', day: '', startTime: '', capacity: 1 },
+    reValidateMode: 'onChange',
+  });
+  const { subjectCode, day, startTime } = useWatch({ control });
   const subject = subjectCode ? getSubject(subjectCode) : undefined;
-  const canSubmit = !!(subject && day && startTime);
 
-  const submit = () => {
-    if (!subject || !day || !startTime) return;
+  const onSubmit = handleSubmit((values) => {
     const res = publishAvailability({
-      subjectCode: subject.code,
-      startsAt: d(day, startTime),
-      endsAt: d(day, addHour(startTime)),
-      capacity,
+      subjectCode: values.subjectCode,
+      startsAt: d(values.day, values.startTime),
+      endsAt: d(values.day, addMinutesToTime(values.startTime, AVAILABILITY.BLOCK_MINUTES)),
+      capacity: values.capacity,
     });
     setResult(
       res.ok
-        ? { ok: true, text: `Horario publicado. Ya está visible en "Tutorías disponibles" para ${subject.name}.` }
+        ? { ok: true, text: `Horario publicado. Ya está visible en "Tutorías disponibles" para ${getSubject(values.subjectCode)?.name ?? values.subjectCode}.` }
         : { ok: false, text: res.error },
     );
-    if (res.ok) {
-      setDay(null);
-      setStartTime(null);
-    }
-  };
+    if (res.ok) reset({ ...values, day: '', startTime: '' });
+  });
 
   return (
     <ScreenContainer topInset={false}>
@@ -79,45 +79,34 @@ export default function PublicarDisponibilidadScreen() {
       </View>
 
       <SectionHeader title="1. Materia" subtitle={subject ? `${subject.name} · ${subject.code}` : 'Elige qué materia vas a reforzar'} />
-      <View style={styles.wrapRow}>
-        {SUBJECTS.map((s) => (
-          <FilterChip key={s.code} label={s.name} selected={s.code === subjectCode} onPress={() => setSubjectCode(s.code)} />
-        ))}
-      </View>
+      <FormChipGroup control={control} name="subjectCode" options={subjects.map((s) => ({ value: s.code, label: s.name }))} />
+      {fromCache ? (
+        <Txt variant="caption" color="muted">
+          Catálogo cargado desde la memoria del dispositivo.
+        </Txt>
+      ) : null}
 
       <SectionHeader title="2. Día" />
-      <View style={styles.wrapRow}>
-        {DAYS.map((item) => (
-          <FilterChip key={item.day} label={item.label} selected={day === item.day} onPress={() => setDay(item.day)} />
-        ))}
-      </View>
+      <FormChipGroup control={control} name="day" options={DAYS} />
 
       <SectionHeader title="3. Hora de inicio" subtitle="El bloque dura 1 hora" />
-      <View style={styles.wrapRow}>
-        {START_TIMES.map((time) => (
-          <FilterChip key={time} label={time} selected={startTime === time} onPress={() => setStartTime(time)} />
-        ))}
-      </View>
+      <FormChipGroup control={control} name="startTime" options={START_TIMES} />
 
       <SectionHeader title="4. Cupos" />
-      <View style={styles.wrapRow}>
-        {CAPACITIES.map((item) => (
-          <FilterChip key={item.value} label={item.label} selected={capacity === item.value} onPress={() => setCapacity(item.value)} />
-        ))}
-      </View>
+      <FormChipGroup control={control} name="capacity" options={CAPACITIES} />
 
       {day && startTime ? (
         <Card>
           <Txt variant="h3">Resumen</Txt>
           <Txt variant="small">
-            📘 {subject?.name} · 📅 {formatDate(d(day, startTime))} · {formatTimeRange(d(day, startTime), d(day, addHour(startTime)))}
+            📘 {subject?.name} · 📅 {formatDate(d(day, startTime))} · {formatTimeRange(d(day, startTime), d(day, addMinutesToTime(startTime, AVAILABILITY.BLOCK_MINUTES)))}
           </Txt>
         </Card>
       ) : null}
 
       {result ? <NoticeBanner tone={result.ok ? 'success' : 'danger'} title={result.ok ? 'Horario publicado' : 'No se pudo publicar'} message={result.text} /> : null}
 
-      <AppButton label="Publicar horario" disabled={!canSubmit} onPress={submit} />
+      <AppButton label="Publicar horario" onPress={onSubmit} />
 
       <SectionHeader title="Mis horarios publicados" subtitle={`${myAvailability.length} en total`} />
       {myAvailability.length === 0 ? (

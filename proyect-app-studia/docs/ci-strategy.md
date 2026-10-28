@@ -12,7 +12,7 @@ Así cada feature branch recibe feedback apenas se sube, y toda integración hac
 En un solo job (`ubuntu-latest`), con `working-directory: proyect-app-studia`:
 
 1. `actions/checkout`
-2. `actions/setup-node` (Node 22, necesario para `--experimental-strip-types`) con `cache: npm` y `cache-dependency-path` apuntando al `package-lock.json` del proyecto, para no reinstalar node_modules en cada corrida.
+2. `actions/setup-node` (Node 22) con `cache: npm` y `cache-dependency-path` apuntando al `package-lock.json` del proyecto, para no reinstalar node_modules en cada corrida.
 3. `npm ci` — instala dependencias exactas del lockfile.
 4. `npm run lint` — `expo lint`.
 5. `npx tsc --noEmit` — type-check sin emitir archivos.

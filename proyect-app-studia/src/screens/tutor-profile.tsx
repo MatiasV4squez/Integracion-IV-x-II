@@ -1,16 +1,30 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ErrorState } from '@/components/error-state';
-import { LoadingState } from '@/components/loading-state';
+import { PreferencesCard } from '@/components/preferences-card';
 import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
 import { initials } from '@/constants/tutorias';
 import { useAuth } from '@/hooks/use-auth';
-import { usePerfil } from '@/hooks/use-perfil';
-import { useSesiones } from '@/hooks/use-sesiones';
 import { useTheme } from '@/hooks/use-theme';
+import { ME_AS_TUTOR, ME_PROFILE } from '@/mocks/sessions';
+
+// Mismo usuario que el resto de la app (@/mocks/sessions ME/ME_AS_TUTOR), solo con datos de perfil de ejemplo.
+const TUTOR = {
+  name: ME_AS_TUTOR.name,
+  career: ME_PROFILE.career,
+  university: ME_PROFILE.university,
+  year: ME_PROFILE.year,
+  gpa: ME_PROFILE.gpa,
+  rating: ME_AS_TUTOR.reputation,
+};
+
+const STATS = [
+  { icon: 'school-outline' as const, value: '32', label: 'Tutorías dadas' },
+  { icon: 'time-outline' as const, value: '48h', label: 'Horas totales' },
+  { icon: 'star-outline' as const, value: String(ME_AS_TUTOR.reputation), label: 'Calificación' },
+];
 
 const SUBJECTS = ['Cálculo I', 'Cálculo II', 'Álgebra Lineal', 'Programación I'];
 
@@ -26,55 +40,16 @@ export default function TutorProfileScreen() {
   const router = useRouter();
   const { logout } = useAuth();
   const styles = createStyles(colors);
-  const perfil = usePerfil();
-  const dadas = useSesiones({ role: 'tutor', status: 'completada' });
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await logout();
     router.replace('/login');
-  };
-
-  const me = perfil.data;
-  if (!me) {
-    return (
-      <View style={[styles.screen, styles.content, { paddingTop: insets.top + Spacing.lg }]}>
-        {perfil.isLoading || !perfil.error ? (
-          <LoadingState message="Cargando tu perfil…" />
-        ) : (
-          <ErrorState message={perfil.error.message} onRetry={perfil.refresh} />
-        )}
-      </View>
-    );
-  }
-
-  const TUTOR = { ...me, rating: me.reputation ?? '—' };
-  const hours = (dadas.data ?? []).reduce(
-    (sum, s) => sum + (new Date(s.endsAt).getTime() - new Date(s.startsAt).getTime()) / 3_600_000,
-    0,
-  );
-  const STATS = [
-    { icon: 'school-outline' as const, value: String(dadas.data?.length ?? '—'), label: 'Tutorías dadas' },
-    { icon: 'time-outline' as const, value: `${Math.round(hours)}h`, label: 'Horas totales' },
-    { icon: 'star-outline' as const, value: String(TUTOR.rating), label: 'Calificación' },
-  ];
-
-  const refresh = () => {
-    perfil.refresh();
-    dadas.refresh();
   };
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg }]}
-      refreshControl={
-        <RefreshControl
-          refreshing={perfil.isRefreshing || dadas.isRefreshing}
-          onRefresh={refresh}
-          tintColor={colors.primary}
-          colors={[colors.primary]}
-        />
-      }
       showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -138,6 +113,10 @@ export default function TutorProfileScreen() {
             <Text style={styles.availabilityTime}>{slot.time}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={{ marginBottom: Spacing.lg }}>
+        <PreferencesCard />
       </View>
 
       <Pressable
