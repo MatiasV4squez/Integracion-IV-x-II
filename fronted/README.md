@@ -70,8 +70,8 @@ Las llamadas tienen un límite de 15 segundos, se cancelan al salir y no se
 reintentan automáticamente. Abrir o recargar el enlace no consume el token: se
 requiere pulsar Confirmar. Tras solicitar otro enlace hay que abrir el más reciente.
 Las vistas `?vista=...` sin token solo permiten revisar el diseño en desarrollo y
-deshabilitan las acciones. El login y registro del equipo conservan su integración
-pendiente: esta tarea conecta únicamente la verificación y el reenvío.
+deshabilitan las acciones. El login del equipo conserva su integración pendiente:
+esta tarea conecta únicamente la verificación y el reenvío.
 
 Se comprobó el recorrido desde Chrome con el Gateway y el controlador/servicio
 reales de Auth, sustituyendo persistencia y SMTP por datos en memoria. Esto cubre
@@ -114,7 +114,7 @@ El buscador está en `/tutores`: carga el catálogo para seleccionar una materia
 
 La pantalla de disponibilidad incorporada desde la rama del equipo se conserva en `/disponibilidad`, con su tema, lógica y componentes existentes. El layout compartido añade una sola cabecera y un solo pie a todas las rutas.
 
-Las pantallas del equipo permanecen en `App.tsx`, junto con su `BrowserRouter` y sus rutas originales de selección en `/solicitudes/nueva`, disponibilidad en `/disponibilidad` y acceso general mediante `/*` (incluidos `/` y `/login`). El registro tiene además la ruta `/registro`; la postulación conserva su acceso desde los controles del equipo. `app/AppRoutes.tsx` reúne las rutas de materias, tutores, solicitudes recibidas y verificación, y recibe las rutas del equipo desde `App.tsx`, todas bajo `TutoriasLayout`.
+Las pantallas del equipo permanecen en `App.tsx`, junto con su `BrowserRouter` y sus rutas originales de selección en `/solicitudes/nueva`, disponibilidad en `/disponibilidad` y acceso general mediante `/*` (incluidos `/` y `/login`). La ruta `/registro` presenta el formulario de registro conectado a Auth; la postulación conserva su acceso desde los controles del equipo. `app/AppRoutes.tsx` reúne las rutas de materias, tutores, solicitudes recibidas y verificación, y recibe las rutas del equipo desde `App.tsx`, todas bajo `TutoriasLayout`.
 
 El login incorporado desde Web todavía es una demostración: guarda `fake-jwt-token` en `localStorage` y no consulta Auth. Ese valor no sirve para operaciones autenticadas reales. La selección de tutoría conserva el identificador de materia fijo del código del equipo; su adaptación a una materia seleccionada requiere una integración posterior.
 
@@ -155,7 +155,7 @@ CORS debe coincidir con el origen exacto de la web. Usa `localhost:5173` al abri
 ## Carga diferida de páginas
 
 `App.tsx` y `app/AppRoutes.tsx` usan `React.lazy` para descargar las páginas al
-visitar sus rutas. Login y registro comparten `components/PantallasEquipo.tsx`;
+visitar sus rutas. El login usa `components/PantallasEquipo.tsx`; el registro,
 la postulación y disponibilidad se descargan cuando se abren. `TutoriasLayout`
 mantiene la cabecera y el pie mientras `Suspense` muestra «Cargando página…».
 Las consultas a la API y los controles de acceso conservan su comportamiento.
@@ -211,6 +211,38 @@ La búsqueda por materia está conectada a la API. El endpoint actual entrega ID
 Los controles de disponibilidad, orden y calificación permanecen visibles pero deshabilitados, con una explicación, porque la API aún no admite esos filtros. No se filtra solamente la página actual ni se altera el total del servidor. La autenticación requiere su integración correspondiente; esta consulta utiliza el endpoint público actual y maneja respuestas 401/403 sin inventar credenciales.
 
 ## Verificación
+
+### Registro de cuenta
+
+El formulario está en `/registro` y reutiliza el panel azul y la tarjeta blanca de
+los mockups de Autenticación y Registro. Sigue la arquitectura hexagonal del resto
+de módulos: `features/registro-usuario/aplicacion/registro-usuario.puerto.ts`
+define `RegistroUsuarioPuerto` y `ErrorRegistro`; `services/registro-usuario-http.ts`
+es el adaptador HTTP; `containers/RegistroUsuarioContainer.tsx` coordina el envío,
+la cancelación y el estado del resultado; `pages/RegistroUsuarioPage.tsx` presenta
+el formulario, el resultado y los errores; `utils/validar-registro.ts` y `models/`
+contienen las validaciones y los mensajes. `AppRoutes` conecta el adaptador.
+
+La llamada es `POST /api/usuarios-auth/auth/registro` en el Gateway, con cuerpo
+`{ "nombre": "...", "correo_institucional": "...", "contrasena": "..." }`, sin JWT
+ni credenciales. Solo un `201` se considera cuenta creada; un `400` se presenta
+como datos rechazados, un `409` como correo ya registrado y cualquier otro estado,
+fallo de red o timeout como error genérico, sin exponer detalles internos. No hay
+reintentos automáticos, la espera está limitada a quince segundos, salir de la
+pantalla cancela la petición y el contenedor bloquea envíos simultáneos, incluido
+el doble clic.
+
+Antes de enviar, la web valida el nombre (obligatorio, hasta 120 caracteres), el
+correo (formato y hasta 254 caracteres), la contraseña (8 a 128 caracteres) y la
+confirmación coincidente; la validación definitiva de negocio permanece en Auth.
+El éxito no inicia sesión automáticamente: muestra la confirmación y enlaza a la
+verificación de correo y al login.
+
+`test/registro-usuario.test.mjs` cubre las validaciones, el contrato HTTP con
+normalización de nombre y correo, la distinción 400/409/fallos, la ausencia de
+reintentos, cancelación, timeout y la presentación de cada resultado. Para el
+recorrido real necesitas Auth, Gateway y la web en marcha, igual que la
+verificación de correo.
 
 ### Solicitudes recibidas por el tutor
 

@@ -1,0 +1,111 @@
+.registro-tarjeta {
+  display: flex;
+  flex-direction: column;
+}
+
+.registro-pestanas {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: var(--color-primary-soft);
+}
+
+.registro-pestanas a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px;
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.registro-pestanas a[aria-current='page'] {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.registro-tarjeta__spinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 18px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: giro-registro 1s linear infinite;
+}
+
+@keyframes giro-registro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.registro-resultado {
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #b42318;
+  border-radius: 9px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.registro-formulario {
+  display: grid;
+  gap: 14px;
+}
+
+.registro-campo {
+  display: grid;
+  gap: 4px;
+}
+
+.registro-campo label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.registro-campo input {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.registro-campo input[aria-invalid='true'] {
+  border-color: #b42318;
+}
+
+.registro-campo__error {
+  color: #b42318;
+  font-size: 12px;
+}
+
+.registro-formulario button {
+  min-height: 50px;
+  margin-top: 6px;
+}
+
+.registro-formulario button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.registro-tarjeta .acceso-enlace-verificacion {
+  margin-top: auto;
+  padding-top: 22px;
+}

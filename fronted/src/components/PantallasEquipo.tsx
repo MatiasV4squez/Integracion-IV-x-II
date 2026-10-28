@@ -6,143 +6,79 @@ import ProtectedRoute from './ProtectedRoute';
 const TutorApplicationForm = lazy(() => import('./TutorApplicationForm'));
 const AvailabilityScreen = lazy(() => import('./AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })));
 
-export default function PantallasEquipo({ vistaInicial = 'login' }: { vistaInicial?: 'login' | 'register' }) {
-  const [currentView, setCurrentView] = useState<'login' | 'register' | 'apply' | 'availability'>(vistaInicial);
+export default function PantallasEquipo() {
+  const [currentView, setCurrentView] = useState<'login' | 'apply' | 'availability'>('login');
   const navigate = useNavigate();
   const location = useLocation();
   const mostrarVistas = import.meta.env.DEV && new URLSearchParams(location.search).get('vistas') === '1';
 
   return (
     <div className="app-container">
-      {/* Botones flotantes de cambio rápido de vista */}
       {mostrarVistas && <div style={styles.devBar}>
         <button onClick={() => setCurrentView('login')} style={styles.devBtn}>Vista Auth</button>
         <button onClick={() => setCurrentView('apply')} style={styles.devBtn}>Vista Postulación Tutor</button>
         <button onClick={() => setCurrentView('availability')} style={styles.devBtn}>Vista Disponibilidad (Compañero)</button>
       </div>}
 
-      {/* VISTAS DE AUTENTICACIÓN (LOGIN Y REGISTRO) */}
-      {(currentView === 'login' || currentView === 'register') && (
+      {currentView === 'login' && (
         <AuthLayout
-          activeTab={currentView}
+          activeTab="login"
           onTabChange={(tab) => {
-            setCurrentView(tab);
-            navigate(tab === 'login' ? '/login' : '/registro');
+            navigate(tab === 'register' ? '/registro' : '/login');
           }}
         >
-          {currentView === 'login' ? (
-            <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
-              <div style={styles.inputGroup}>
-                <label htmlFor="login-correo" style={styles.label}>Correo institucional</label>
-                <input
-                  type="email"
-                  id="login-correo"
-                  autoComplete="username"
-                  placeholder="nombre@alu.uct.cl"
-                  style={styles.input}
-                />
-              </div>
+          <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
+            <div style={styles.inputGroup}>
+              <label htmlFor="login-correo" style={styles.label}>Correo institucional</label>
+              <input
+                type="email"
+                id="login-correo"
+                autoComplete="username"
+                placeholder="nombre@alu.uct.cl"
+                style={styles.input}
+              />
+            </div>
 
-              <div style={styles.inputGroup}>
-                <label htmlFor="login-password" style={styles.label}>Contraseña</label>
-                <input
-                  type="password"
-                  id="login-password"
-                  autoComplete="current-password"
-                  placeholder="••••••••••••"
-                  style={styles.input}
-                />
-              </div>
+            <div style={styles.inputGroup}>
+              <label htmlFor="login-password" style={styles.label}>Contraseña</label>
+              <input
+                type="password"
+                id="login-password"
+                autoComplete="current-password"
+                placeholder="••••••••••••"
+                style={styles.input}
+              />
+            </div>
 
-              <div style={styles.rememberRow}>
-                <label style={{ fontSize: '12px', color: '#64748B' }}>
-                  <input type="checkbox" style={{ marginRight: '6px' }} /> Recordarme
-                </label>
-                <a href="#forgot" style={{ fontSize: '12px', color: '#1D4ED8', textDecoration: 'none', fontWeight: '600' }}>
-                  ¿Olvidaste tu contraseña?
-                </a>
-              </div>
+            <div style={styles.rememberRow}>
+              <label style={{ fontSize: '12px', color: '#64748B' }}>
+                <input type="checkbox" style={{ marginRight: '6px' }} /> Recordarme
+              </label>
+              <a href="#forgot" style={{ fontSize: '12px', color: '#1D4ED8', textDecoration: 'none', fontWeight: '600' }}>
+                ¿Olvidaste tu contraseña?
+              </a>
+            </div>
 
-              <button
-                type="button"
-                style={styles.submitBtn}
-                onClick={() => {
-                  localStorage.setItem('token', 'fake-jwt-token');
-                  setCurrentView('apply');
-                }}
-              >
-                Iniciar sesión
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
-              <div style={styles.inputGroup}>
-                <label htmlFor="registro-nombre" style={styles.label}>Nombre completo</label>
-                <input
-                  type="text"
-                  id="registro-nombre"
-                  autoComplete="name"
-                  placeholder="Ej. Camila González"
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label htmlFor="registro-correo" style={styles.label}>Correo institucional</label>
-                <input
-                  type="email"
-                  id="registro-correo"
-                  autoComplete="email"
-                  placeholder="nombre@universidad.cl"
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label htmlFor="registro-password" style={styles.label}>Contraseña</label>
-                <input
-                  type="password"
-                  id="registro-password"
-                  autoComplete="new-password"
-                  placeholder="Mínimo 8 caracteres"
-                  style={styles.input}
-                />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label htmlFor="registro-confirmacion" style={styles.label}>Confirmar contraseña</label>
-                <input
-                  type="password"
-                  id="registro-confirmacion"
-                  autoComplete="new-password"
-                  placeholder="Repite tu contraseña"
-                  style={styles.input}
-                />
-              </div>
-
-              <button
-                type="button"
-                style={styles.submitBtn}
-                onClick={() => {
-                  setCurrentView('login');
-                  navigate('/login');
-                }}
-              >
-                Crear cuenta
-              </button>
-            </form>
-          )}
+            <button
+              type="button"
+              style={styles.submitBtn}
+              onClick={() => {
+                localStorage.setItem('token', 'fake-jwt-token');
+                setCurrentView('apply');
+              }}
+            >
+              Iniciar sesión
+            </button>
+          </form>
         </AuthLayout>
       )}
 
-      {/* VISTA 3: POSTULACIÓN A TUTOR */}
       {currentView === 'apply' && (
         <ProtectedRoute>
           <TutorApplicationForm />
         </ProtectedRoute>
       )}
 
-      {/* VISTA 4: DISPONIBILIDAD DE TU COMPAÑERO */}
       {currentView === 'availability' && <AvailabilityScreen />}
     </div>
   );
