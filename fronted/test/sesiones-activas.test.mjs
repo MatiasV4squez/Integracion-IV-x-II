@@ -8,8 +8,8 @@ import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
 let vite
 let consultarSesionesActivas
+let consultarHistorialEstudiante
 let ErrorConsultaSesiones
-let seleccionarSesionesActivas
 let etiquetarEstadoActivo
 let SesionesActivas
 let AppRoutes
@@ -29,41 +29,44 @@ const activa = {
 
 before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
-  ;({ consultarSesionesActivas, ErrorConsultaSesiones } = await vite.ssrLoadModule('/src/features/sesiones/services/sesiones-api.ts'))
-  ;({ seleccionarSesionesActivas, etiquetarEstadoActivo } = await vite.ssrLoadModule('/src/features/sesiones/utils/sesiones-activas.ts'))
+  ;({ consultarSesionesActivas, consultarHistorialEstudiante, ErrorConsultaSesiones } = await vite.ssrLoadModule('/src/features/sesiones/services/sesiones-api.ts'))
+  ;({ etiquetarEstadoActivo } = await vite.ssrLoadModule('/src/features/sesiones/utils/sesiones-activas.ts'))
   ;({ SesionesActivas } = await vite.ssrLoadModule('/src/features/sesiones/components/SesionesActivas.tsx'))
   ;({ AppRoutes } = await vite.ssrLoadModule('/src/app/AppRoutes.tsx'))
 })
 afterEach(() => { globalThis.fetch = originalFetch })
 after(async () => { await vite?.close() })
 
-test('selecciona solo las sesiones activas del estudiante y las ordena por inicio', () => {
-  const sesiones = [
-    { ...activa, id_sesion: '82', estado_sesion: 'PENDIENTE', inicio: '2026-10-24T18:00:00.000Z', fin: '2026-10-24T19:00:00.000Z' },
-    { ...activa, id_sesion: '83', estado_sesion: 'COMPLETADA' },
-    { ...activa, id_sesion: '84', id_tutee: '15' },
-    { ...activa, id_sesion: '85', estado_sesion: 'CANCELADA' },
-    activa,
-  ]
-  assert.deepEqual(seleccionarSesionesActivas(sesiones, tuteeId).map((item) => item.id_sesion), ['81', '82'])
+test('presenta las etiquetas de los estados de sesión', () => {
   assert.equal(etiquetarEstadoActivo('PENDIENTE_CIERRE'), 'Por cerrar')
   assert.equal(etiquetarEstadoActivo('COMPLETADA'), 'COMPLETADA')
 })
 
-test('consulta el historial por Gateway con Bearer, sin inventar una ruta propia del estudiante', async () => {
+test('consulta sesiones activas por Gateway con Bearer y conserva el orden del backend', async () => {
+  const siguiente = { ...activa, id_sesion: '82', estado_sesion: 'EN_CONFLICTO', inicio: '2026-10-24T18:00:00.000Z', fin: '2026-10-24T19:00:00.000Z' }
   globalThis.fetch = async (url, config) => {
-    assert.equal(String(url), vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/agendamiento-sesiones/sessions/history')
+    assert.equal(String(url), vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/agendamiento-sesiones/sessions/active')
     assert.equal(config.headers.Authorization, 'Bearer ' + token)
     assert.equal(config.headers.Accept, 'application/json')
     assert.equal(config.method, undefined)
-    return Response.json([activa, { ...activa, id_sesion: '86', estado_sesion: 'EXPIRADA' }, { ...activa, id_sesion: '87', id_tutee: '15' }])
+    return Response.json([{ ...activa, campoAdicional: 'no exponer' }, siguiente])
   }
-  assert.deepEqual(await consultarSesionesActivas(sesion), [activa])
+  assert.deepEqual(await consultarSesionesActivas(sesion), [activa, siguiente])
 })
 
-test('el historial vacío es un resultado válido', async () => {
+test('una lista vacía de sesiones activas es un resultado válido', async () => {
   globalThis.fetch = async () => Response.json([])
   assert.deepEqual(await consultarSesionesActivas(sesion), [])
+})
+
+test('conserva la consulta de historial para los últimos tutores del estudiante', async () => {
+  const completada = { ...activa, id_sesion: '83', estado_sesion: 'COMPLETADA' }
+  globalThis.fetch = async (url, config) => {
+    assert.equal(String(url), vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/agendamiento-sesiones/sessions/history')
+    assert.equal(config.headers.Authorization, 'Bearer ' + token)
+    return Response.json([activa, completada, { ...activa, id_sesion: '84', id_tutee: '15', id_tutor: tuteeId }])
+  }
+  assert.deepEqual(await consultarHistorialEstudiante(sesion), [activa, completada])
 })
 
 test('bloquea sesiones ausentes, vencidas o sin rol de estudiante antes de consultar', async () => {
@@ -75,7 +78,7 @@ test('bloquea sesiones ausentes, vencidas o sin rol de estudiante antes de consu
 })
 
 test('maneja 401, 403 y fallos de los servicios sin exponer detalles privados', async () => {
-  for (const [status, tipo] of [[401, 'sesion'], [403, 'permiso'], [500, 'consulta'], [504, 'consulta']]) {
+  for (const [status, tipo] of [[401, 'sesion'], [403, 'permiso'], [500, 'consulta'], [502, 'consulta'], [503, 'consulta'], [504, 'consulta']]) {
     globalThis.fetch = async () => new Response('detalle-privado', { status })
     await assert.rejects(consultarSesionesActivas(sesion), (error) => {
       assert.ok(error instanceof ErrorConsultaSesiones)
@@ -84,6 +87,21 @@ test('maneja 401, 403 y fallos de los servicios sin exponer detalles privados', 
       return true
     })
   }
+})
+
+test('cancela la consulta de activas y distingue timeout de fallos de red', async (t) => {
+  const controlador = new AbortController()
+  globalThis.fetch = (_url, config) => new Promise((_resolve, reject) => {
+    config.signal.addEventListener('abort', () => reject(config.signal.reason), { once: true })
+  })
+  const promesa = consultarSesionesActivas(sesion, controlador.signal)
+  controlador.abort()
+  await assert.rejects(promesa, { name: 'AbortError' })
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await assert.rejects(consultarSesionesActivas(sesion), /conectar para consultar/)
+  t.mock.method(AbortSignal, 'timeout', () => AbortSignal.abort(new DOMException('Timeout', 'TimeoutError')))
+  globalThis.fetch = async (_url, config) => { config.signal.throwIfAborted() }
+  await assert.rejects(consultarSesionesActivas(sesion), /tardó demasiado/)
 })
 
 test('rechaza respuestas inválidas, duplicados y fechas imposibles', async () => {

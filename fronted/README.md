@@ -268,6 +268,16 @@ Las pruebas automatizadas cubren filtrado por identidad/estado, contrato HTTP, p
 
 Para la aceptación, `test/aceptar-solicitud.test.mjs` cubre el contrato PATCH, la validación de la confirmación, doble clic, sincronización del listado, errores, resultados inciertos y cancelación. También se comprobó por HTTP el recorrido del frontend a través del Gateway hasta el controller, guard JWT y caso de uso reales de Sesiones, con persistencia sustituida por un repositorio de prueba: transición a CONFIRMADA, recarga y respuestas 401/403/409. No se utilizaron ni modificaron datos de PostgreSQL. Para validar el flujo con una cuenta real, debe existir una solicitud pendiente dirigida al tutor autenticado.
 
+### Sesiones activas del estudiante
+
+Los paneles `/panel` e `/inicio` consultan `GET /api/agendamiento-sesiones/sessions/active` a través del Gateway, con `Authorization: Bearer <JWT>`. El microservicio obtiene la identidad del token y devuelve únicamente las sesiones del estudiante en estados `PENDIENTE`, `CONFIRMADA`, `PENDIENTE_CIERRE` y `EN_CONFLICTO`, ordenadas por inicio e identificador ascendentes. La web conserva ese orden y no repite el filtrado de estados o identidad.
+
+`useSesionesActivas` usa esa consulta para el listado y la próxima clase. El dashboard `/inicio` mantiene una consulta independiente a `/sessions/history` para mostrar los últimos tutores de sesiones completadas. Un fallo en el historial no impide mostrar las sesiones activas, ni un fallo en activas borra el historial. El botón Actualizar del dashboard vuelve a consultar ambos recursos. Las solicitudes recibidas del tutor siguen usando el historial.
+
+Ambas consultas reutilizan el manejo de carga, cancelación, errores y reintento de `useConsultaSesiones`. La web valida la estructura de las respuestas, conserva los identificadores como texto y distingue una lista vacía de errores 401/403, fallos de comunicación y tiempo de espera agotado. `test/sesiones-activas.test.mjs` comprueba el nuevo contrato, el historial del estudiante, errores, cancelación y presentación.
+
+Para probar con datos reales se requiere el microservicio de Sesiones con el endpoint `/sessions/active` (commit `34ce377` o posterior), el Gateway con `AGENDAMIENTO_SESIONES_URL` apuntando a ese servicio y un JWT vigente de Auth con rol `ESTUDIANTE`. El login de demostración todavía no obtiene ese JWT.
+
 ### Llamadas compartidas para revisar postulaciones
 
 `features/postulaciones/index.ts` expone `aprobarPostulacion`, `rechazarPostulacion`, el tipo `Postulacion` y `ErrorRevisionPostulacion`. Las acciones del panel administrativo pueden importarlos sin depender de un componente visual:

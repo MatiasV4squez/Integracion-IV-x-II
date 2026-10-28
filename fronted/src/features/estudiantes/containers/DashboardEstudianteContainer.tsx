@@ -4,12 +4,16 @@ import DashboardEstudiantePage from '../pages/DashboardEstudiantePage'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useSesionesActivas } from '../../sesiones/hooks/useSesionesActivas'
+import { useConsultaSesiones } from '../../sesiones/hooks/useConsultaSesiones'
+import { consultarHistorialEstudiante } from '../../sesiones/services/sesiones-api'
 import { SesionesActivas } from '../../sesiones/components/SesionesActivas'
 import { formatearHorarioSesion } from '../../sesiones/utils/solicitudes-recibidas'
 import { useState } from 'react'
 
 function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
-  const { consulta, historial, recargar } = useSesionesActivas(sesion)
+  const { consulta, recargar } = useSesionesActivas(sesion)
+  const { consulta: consultaHistorial, recargar: recargarHistorial } = useConsultaSesiones(sesion, consultarHistorialEstudiante)
+  const historial = consultaHistorial.estado === 'listo' ? consultaHistorial.sesiones : []
   const { consulta: catalogo } = useMaterias()
   const [ahora, establecerAhora] = useState(Date.now)
   const materias = catalogo.estado === 'listo'
@@ -73,25 +77,26 @@ function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
   function actualizarSesiones() {
     establecerAhora(Date.now())
     recargar()
+    recargarHistorial()
   }
   return (
     <DashboardEstudiantePage
       nombreEstudiante={sesion.nombre}
       proximaClase={contenidoProximaClase}
       tutoresRecientes={
-        consulta.estado === 'cargando' ? (
+        consultaHistorial.estado === 'cargando' ? (
           <p
             className="dashboard-estudiante__tutores-vacios"
             role="status"
           >
             Cargando tus últimos tutores…
           </p>
-        ) : consulta.estado === 'error' ? (
+        ) : consultaHistorial.estado === 'error' ? (
           <p
             className="dashboard-estudiante__tutores-vacios"
             role="alert"
           >
-            {consulta.mensaje}
+            {consultaHistorial.mensaje}
           </p>
         ) : tutoresRecientes.length === 0 ? (
           <div className="dashboard-estudiante__vacio dashboard-estudiante__tutores-vacios">

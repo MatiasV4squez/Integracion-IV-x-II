@@ -2,14 +2,13 @@ import { obtenerUrlApi } from '../../../config/api'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import type { Sesion } from '../models/sesion'
-import { seleccionarSesionesActivas } from '../utils/sesiones-activas'
 import { seleccionarSolicitudesRecibidas } from '../utils/solicitudes-recibidas'
 import { esSesion } from '../utils/validar-sesion'
 import { ErrorConsultaSesiones } from '../models/error-sesiones'
 
 export { ErrorConsultaSesiones } from '../models/error-sesiones'
 
-type RecursoHistorial = 'solicitudes' | 'sesiones'
+type RecursoSesiones = 'solicitudes' | 'sesiones'
 
 function exigirAcceso(sesion: SesionUsuario, rol: string, mensajePermiso: string) {
   if (!sesion.token || !esIdentificador(sesion.idUsuario) || sesion.expiraEn <= Date.now()) {
@@ -18,10 +17,10 @@ function exigirAcceso(sesion: SesionUsuario, rol: string, mensajePermiso: string
   if (!sesion.roles.includes(rol)) throw new ErrorConsultaSesiones(mensajePermiso, 'permiso')
 }
 
-async function consultarHistorial(sesion: SesionUsuario, externa: AbortSignal | undefined, recurso: RecursoHistorial): Promise<Sesion[]> {
+async function consultarSesiones(sesion: SesionUsuario, externa: AbortSignal | undefined, recurso: RecursoSesiones, ruta: 'history' | 'active'): Promise<Sesion[]> {
   const signal = AbortSignal.any([AbortSignal.timeout(10000), ...(externa ? [externa] : [])])
   try {
-    const respuesta = await fetch(obtenerUrlApi('agendamiento-sesiones/sessions/history'), {
+    const respuesta = await fetch(obtenerUrlApi(`agendamiento-sesiones/sessions/${ruta}`), {
       signal, headers: { Accept: 'application/json', Authorization: 'Bearer ' + sesion.token },
     })
     if (respuesta.status === 401) throw new ErrorConsultaSesiones('Tu sesión no es válida o ha vencido. Inicia sesión nuevamente.', 'sesion')
@@ -56,15 +55,14 @@ async function consultarHistorial(sesion: SesionUsuario, externa: AbortSignal | 
 export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
   externa?.throwIfAborted()
   exigirAcceso(sesion, 'TUTOR', 'Esta sección está disponible para tutores.')
-  const historial = await consultarHistorial(sesion, externa, 'solicitudes')
+  const historial = await consultarSesiones(sesion, externa, 'solicitudes', 'history')
   return seleccionarSolicitudesRecibidas(historial, sesion.idUsuario)
 }
 
 export async function consultarSesionesActivas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
   externa?.throwIfAborted()
   exigirAcceso(sesion, 'ESTUDIANTE', 'Esta sección está disponible para estudiantes.')
-  const historial = await consultarHistorial(sesion, externa, 'sesiones')
-  return seleccionarSesionesActivas(historial, sesion.idUsuario)
+  return consultarSesiones(sesion, externa, 'sesiones', 'active')
 }
 
 export async function consultarHistorialEstudiante(
@@ -78,7 +76,7 @@ export async function consultarHistorialEstudiante(
     'ESTUDIANTE',
     'Esta seccion está disponible para estudiantes',
   )
-  const historial = await consultarHistorial(sesion, externa, 'sesiones')
+  const historial = await consultarSesiones(sesion, externa, 'sesiones', 'history')
   return historial.filter(
     (clase) => clase.id_tutee === sesion.idUsuario,
   )
