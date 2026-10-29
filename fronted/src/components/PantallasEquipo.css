@@ -1,0 +1,37 @@
+.login-preferencias {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.login-preferencias__recordar,
+.login-preferencias__recuperar {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.login-preferencias__recordar {
+  gap: 8px;
+  color: #526785;
+  cursor: pointer;
+}
+
+.login-preferencias__recordar input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.login-preferencias__recuperar {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-preferencias__recuperar:hover {
+  text-decoration: underline;
+}

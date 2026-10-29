@@ -1,14 +1,14 @@
 import React, { lazy, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import AuthLayout from './AuthLayout';
 import ProtectedRoute from './ProtectedRoute';
+import './PantallasEquipo.css';
 
 const TutorApplicationForm = lazy(() => import('./TutorApplicationForm'));
 const AvailabilityScreen = lazy(() => import('./AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })));
 
 export default function PantallasEquipo() {
   const [currentView, setCurrentView] = useState<'login' | 'apply' | 'availability'>('login');
-  const navigate = useNavigate();
   const location = useLocation();
   const mostrarVistas = import.meta.env.DEV && new URLSearchParams(location.search).get('vistas') === '1';
 
@@ -21,12 +21,7 @@ export default function PantallasEquipo() {
       </div>}
 
       {currentView === 'login' && (
-        <AuthLayout
-          activeTab="login"
-          onTabChange={(tab) => {
-            navigate(tab === 'register' ? '/registro' : '/login');
-          }}
-        >
+        <AuthLayout activeTab="login">
           <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
             <div style={styles.inputGroup}>
               <label htmlFor="login-correo" style={styles.label}>Correo institucional</label>
@@ -50,11 +45,11 @@ export default function PantallasEquipo() {
               />
             </div>
 
-            <div style={styles.rememberRow}>
-              <label style={{ fontSize: '12px', color: '#64748B' }}>
-                <input type="checkbox" style={{ marginRight: '6px' }} /> Recordarme
+            <div className="login-preferencias">
+              <label className="login-preferencias__recordar">
+                <input type="checkbox" /> Recordarme
               </label>
-              <a href="#forgot" style={{ fontSize: '12px', color: '#1D4ED8', textDecoration: 'none', fontWeight: '600' }}>
+              <a href="#forgot" className="login-preferencias__recuperar">
                 ¿Olvidaste tu contraseña?
               </a>
             </div>
@@ -107,17 +102,16 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   form: { display: 'flex', flexDirection: 'column', gap: '14px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  label: { fontSize: '12px', fontWeight: '600', color: '#334155' },
+  label: { fontSize: '13px', fontWeight: '600', color: '#334155' },
   input: {
     padding: '12px 14px',
     minHeight: '50px',
     borderRadius: '8px',
     border: '1px solid #E2E8F0',
-    fontSize: '13px',
+    fontSize: '16px',
     backgroundColor: '#FFFFFF',
     color: '#172a48',
   },
-  rememberRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   submitBtn: {
     backgroundColor: '#1467d5',
     color: '#FFFFFF',

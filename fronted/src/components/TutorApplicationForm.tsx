@@ -273,7 +273,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   form: { display: 'flex', flexDirection: 'column', gap: '16px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '13px', fontWeight: '600', color: '#334155' },
-  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' },
+  input: { padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '16px', outline: 'none' },
   fileInput: { padding: '8px', borderRadius: '8px', border: '1px dashed #CBD5E1', backgroundColor: '#F8FAFC', cursor: 'pointer' },
   submitBtn: { backgroundColor: '#2563EB', color: '#FFFFFF', padding: '12px', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '10px' },
   statusCardPending: { backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '12px', padding: '24px', textAlign: 'center' },
