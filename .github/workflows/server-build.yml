@@ -33,4 +33,4 @@ jobs:
         with:
           context: ./server
           push: true
-          tags: ghcr.io/${{ steps.owner.outputs.lc }}/MatiasV4squez/Integracion-IV-x-II
+          tags: ghcr.io/${{ steps.owner.outputs.lc }}/Integracion-IV-x-II
