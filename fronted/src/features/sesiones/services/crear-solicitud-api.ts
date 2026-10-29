@@ -1,13 +1,11 @@
 import type { SeleccionTutoria, SesionCreada } from '../models/solicitud-tutoria'
-
+import { prepararSolicitudTutoria } from '../utils/preparar-solicitud-tutoria'
 const urlApi = (
   import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api'
 ).replace(/\/$/, '')
 
-export async function crearSolicitudTutoria(
-  seleccion: SeleccionTutoria,
-  token: string,
-): Promise<SesionCreada> {
+export async function crearSolicitudTutoria(seleccion: SeleccionTutoria,token: string,): Promise<SesionCreada> {
+  const solicitud = prepararSolicitudTutoria(seleccion)
   const respuesta = await fetch(
     `${urlApi}/agendamiento-sesiones/sessions`,
     {
@@ -16,11 +14,7 @@ export async function crearSolicitudTutoria(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        id_tutor: seleccion.id_tutor,
-        id_materia: seleccion.id_materia,
-        id_bloque: seleccion.id_bloque,
-      }),
+      body: JSON.stringify(solicitud),
     },
   )
 
