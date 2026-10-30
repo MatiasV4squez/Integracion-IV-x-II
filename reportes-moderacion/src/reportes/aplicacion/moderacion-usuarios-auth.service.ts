@@ -5,9 +5,6 @@ import {
   type UsuariosAuthClient,
 } from '../dominio/ports/usuarios-auth-client.js';
 
-/**
- * Fachada de negocio que AgustÃ­n debe invocar al resolver una actuaciÃ³n.
- */
 @Injectable()
 export class ModeracionUsuariosAuthService {
   constructor(
