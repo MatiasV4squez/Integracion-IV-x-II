@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ReportesController } from './infraestructura/http/reportes.controller.js';
 import { ValidarSesionParaReporteGuard } from './infraestructura/http/guards/validar-sesion-para-reporte.guard.js';
 import { AdminJwtGuard } from './infraestructura/http/guards/admin-jwt.guard.js';
+import { UsuarioJwtGuard } from './infraestructura/http/guards/usuario-jwt.guard.js';
 import { PrismaService } from './infraestructura/persistencia/prisma.service.js';
 import { PrismaReporteRepository } from './infraestructura/persistencia/prisma-reporte.repository.js';
 import { PrismaReporteConsultaRepository } from './infraestructura/persistencia/prisma-reporte-consulta.repository.js';
@@ -47,6 +48,7 @@ import { ConsultarReportesAdminUseCase } from './aplicacion/consultar-reportes-a
     ReactivarSuspensionUseCase,
     ConsultarReportesAdminUseCase,
     ValidarSesionParaReporteGuard,
+    UsuarioJwtGuard,
     AdminJwtGuard,
   ],
 })

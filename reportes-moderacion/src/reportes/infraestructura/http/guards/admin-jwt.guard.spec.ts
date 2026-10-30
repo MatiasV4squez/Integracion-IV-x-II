@@ -6,7 +6,8 @@ import {
   UnauthorizedException,
   type ExecutionContext,
 } from '@nestjs/common';
-import { AdminJwtGuard, type RequestConUsuario } from './admin-jwt.guard.js';
+import { AdminJwtGuard } from './admin-jwt.guard.js';
+import type { RequestConUsuario } from './usuario-jwt.guard.js';
 
 const JWT_SECRET = 'secreto-de-prueba';
 

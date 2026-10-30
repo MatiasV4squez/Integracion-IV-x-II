@@ -6,15 +6,15 @@ import { ConsultarReportesAdminUseCase } from '../../aplicacion/consultar-report
 import { ResolverReporteUseCase } from '../../aplicacion/resolver-reporte.use-case.js';
 import { ReactivarSuspensionUseCase } from '../../aplicacion/reactivar-suspension.use-case.js';
 import { SESIONES_REPORTE_VALIDATOR } from '../../dominio/ports/sesiones-reporte-validator.js';
-import type { RequestConUsuario } from './guards/admin-jwt.guard.js';
+import type { RequestConUsuario } from './guards/usuario-jwt.guard.js';
 
-function requestAdmin(): RequestConUsuario {
+function requestUsuario(sub = '9', roles = ['ADMINISTRADOR']): RequestConUsuario {
   return {
     user: {
-      sub: '9',
+      sub,
       jti: 'jti-de-prueba',
       correo_institucional: 'admin@alu.uct.cl',
-      roles: ['ADMINISTRADOR'],
+      roles,
     },
   } as unknown as RequestConUsuario;
 }
@@ -50,18 +50,17 @@ describe('ReportesController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('delega la creación del reporte en el caso de uso', async () => {
+  it('delega la creación del reporte tomando el reportador del usuario autenticado', async () => {
     const dto = {
       titulo: 'Comportamiento inapropiado',
       descripcion: 'Detalle del reporte',
       id_sesion: '10',
-      id_usuario_reportador: '1',
       id_usuario_reportado: '2',
     };
 
-    await controller.create(dto);
+    await controller.create(dto, requestUsuario('1', ['ESTUDIANTE']));
 
-    expect(mockCrear).toHaveBeenCalledWith(dto);
+    expect(mockCrear).toHaveBeenCalledWith({ ...dto, id_usuario_reportador: '1' });
   });
 
   it('delega la consulta administrativa con los filtros recibidos', async () => {
@@ -75,13 +74,13 @@ describe('ReportesController', () => {
   it('resuelve el reporte usando el administrador autenticado', async () => {
     const dto = { estado: 'SUSPENDIDO' as const, motivo: 'Reincidencia' };
 
-    await controller.resolver('1', dto, requestAdmin());
+    await controller.resolver('1', dto, requestUsuario());
 
     expect(mockResolver).toHaveBeenCalledWith(1, dto, '9');
   });
 
   it('reactiva la suspensión usando el administrador autenticado', async () => {
-    await controller.reactivar('1', requestAdmin());
+    await controller.reactivar('1', requestUsuario());
 
     expect(mockReactivar).toHaveBeenCalledWith(1, '9');
   });

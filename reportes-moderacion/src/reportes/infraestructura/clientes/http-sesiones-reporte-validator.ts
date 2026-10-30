@@ -1,10 +1,16 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import type { SesionesReporteValidator } from '../../dominio/ports/sesiones-reporte-validator.js';
+import type {
+  ParticipacionSesion,
+  SesionesReporteValidator,
+} from '../../dominio/ports/sesiones-reporte-validator.js';
+import { idEntidadValido } from '../../dominio/identificadores.js';
 
 const TIMEOUT_MS = 5_000;
 
 interface ValidacionReporteResponse {
   alcanzo_estado_confirmada: boolean;
+  id_tutor: string;
+  id_tutee: string;
 }
 
 function servicioSesionesNoDisponible(): ServiceUnavailableException {
@@ -22,13 +28,21 @@ function isValidacionReporteResponse(
     typeof value === 'object' &&
     value !== null &&
     'alcanzo_estado_confirmada' in value &&
-    typeof value.alcanzo_estado_confirmada === 'boolean'
+    typeof value.alcanzo_estado_confirmada === 'boolean' &&
+    'id_tutor' in value &&
+    typeof value.id_tutor === 'string' &&
+    idEntidadValido(value.id_tutor) &&
+    'id_tutee' in value &&
+    typeof value.id_tutee === 'string' &&
+    idEntidadValido(value.id_tutee)
   );
 }
 
 @Injectable()
 export class HttpSesionesReporteValidator implements SesionesReporteValidator {
-  async alcanzoEstadoConfirmada(idSesion: string): Promise<boolean> {
+  async consultarParaReporte(
+    idSesion: string,
+  ): Promise<ParticipacionSesion | null> {
     const endpoint = this.endpoint(idSesion);
     let response: Response;
 
@@ -41,7 +55,7 @@ export class HttpSesionesReporteValidator implements SesionesReporteValidator {
       throw servicioSesionesNoDisponible();
     }
 
-    if (response.status === 404) return false;
+    if (response.status === 404) return null;
     if (!response.ok) throw servicioSesionesNoDisponible();
 
     let data: unknown;
@@ -55,7 +69,11 @@ export class HttpSesionesReporteValidator implements SesionesReporteValidator {
       throw servicioSesionesNoDisponible();
     }
 
-    return data.alcanzo_estado_confirmada;
+    return {
+      alcanzoEstadoConfirmada: data.alcanzo_estado_confirmada,
+      idTutor: data.id_tutor,
+      idTutee: data.id_tutee,
+    };
   }
 
   private endpoint(idSesion: string): URL {
@@ -63,7 +81,9 @@ export class HttpSesionesReporteValidator implements SesionesReporteValidator {
     if (!serviceUrl) throw servicioSesionesNoDisponible();
 
     try {
-      const baseUrl = new URL(serviceUrl.endsWith('/') ? serviceUrl : `${serviceUrl}/`);
+      const baseUrl = new URL(
+        serviceUrl.endsWith('/') ? serviceUrl : `${serviceUrl}/`,
+      );
       if (!['http:', 'https:'].includes(baseUrl.protocol)) {
         throw new Error('Invalid protocol');
       }
