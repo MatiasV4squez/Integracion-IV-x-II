@@ -22,3 +22,18 @@ model Reporte {
   reactivadoEn        DateTime?
   creadoEn            DateTime  @default(now())
 }
+
+model AvisoSesion {
+  id         Int      @id @default(autoincrement())
+  origen     String
+  version    Int
+  idAviso    String   @unique
+  fechaAviso DateTime
+  tipo       String
+  idSesion   BigInt
+  datos      Json
+  creadoEn   DateTime @default(now())
+
+  @@index([tipo, idSesion])
+  @@map("aviso_sesion")
+}

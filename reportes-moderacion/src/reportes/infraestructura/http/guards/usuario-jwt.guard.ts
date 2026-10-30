@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
-import { idEntidadValido } from '../../../dominio/identificadores.js';
+import { idEntidadValido } from '../../../../compartido/identificadores.js';
 
 const JWT_ISSUER = 'stp-usuarios-auth';
 const JWT_AUDIENCE = 'stp-clients';

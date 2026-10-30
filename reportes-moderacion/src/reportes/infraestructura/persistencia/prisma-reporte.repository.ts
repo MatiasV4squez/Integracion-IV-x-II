@@ -6,7 +6,7 @@ import type {
   DatosResolucionReporte,
   ReporteRepository,
 } from '../../dominio/ports/reporte.repository.js';
-import { PrismaService } from './prisma.service.js';
+import { PrismaService } from '../../../compartido/prisma.service.js';
 
 @Injectable()
 export class PrismaReporteRepository implements ReporteRepository {

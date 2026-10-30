@@ -1,4 +1,4 @@
-import { parsearIdEntidad } from '../dominio/identificadores.js';
+import { parsearIdEntidad } from '../../compartido/identificadores.js';
 import { payloadInvalido } from './errores.js';
 
 export function requerirIdEntidad(value: unknown, field: string): bigint {

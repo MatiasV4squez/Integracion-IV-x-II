@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaReporteConsultaRepository } from './prisma-reporte-consulta.repository.js';
-import type { PrismaService } from './prisma.service.js';
+import type { PrismaService } from '../../../compartido/prisma.service.js';
 
 function prismaSimulado() {
   const findMany = vi.fn();

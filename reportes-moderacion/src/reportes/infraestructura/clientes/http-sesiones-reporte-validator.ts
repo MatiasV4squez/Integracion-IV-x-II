@@ -3,7 +3,7 @@ import type {
   ParticipacionSesion,
   SesionesReporteValidator,
 } from '../../dominio/ports/sesiones-reporte-validator.js';
-import { idEntidadValido } from '../../dominio/identificadores.js';
+import { idEntidadValido } from '../../../compartido/identificadores.js';
 
 const TIMEOUT_MS = 5_000;
 

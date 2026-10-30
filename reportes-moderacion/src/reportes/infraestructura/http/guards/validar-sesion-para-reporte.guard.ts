@@ -10,7 +10,7 @@ import {
   SESIONES_REPORTE_VALIDATOR,
   type SesionesReporteValidator,
 } from '../../../dominio/ports/sesiones-reporte-validator.js';
-import { normalizarIdEntidad } from '../../../dominio/identificadores.js';
+import { normalizarIdEntidad } from '../../../../compartido/identificadores.js';
 import {
   usuarioActual,
   type RequestConUsuario,

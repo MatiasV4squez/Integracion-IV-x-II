@@ -5,6 +5,7 @@ import { CrearReporteUseCase } from '../../aplicacion/crear-reporte.use-case.js'
 import { ConsultarReportesAdminUseCase } from '../../aplicacion/consultar-reportes-admin.use-case.js';
 import { ResolverReporteUseCase } from '../../aplicacion/resolver-reporte.use-case.js';
 import { ReactivarSuspensionUseCase } from '../../aplicacion/reactivar-suspension.use-case.js';
+import { ConsultarConflictosSesionUseCase } from '../../../integraciones/aplicacion/consultar-conflictos-sesion.use-case.js';
 import { SESIONES_REPORTE_VALIDATOR } from '../../dominio/ports/sesiones-reporte-validator.js';
 import type { RequestConUsuario } from './guards/usuario-jwt.guard.js';
 
@@ -26,6 +27,7 @@ describe('ReportesController', () => {
   const mockConsultar = vi.fn();
   const mockResolver = vi.fn();
   const mockReactivar = vi.fn();
+  const mockConflictos = vi.fn();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,6 +37,7 @@ describe('ReportesController', () => {
         { provide: ConsultarReportesAdminUseCase, useValue: { ejecutar: mockConsultar } },
         { provide: ResolverReporteUseCase, useValue: { ejecutar: mockResolver } },
         { provide: ReactivarSuspensionUseCase, useValue: { ejecutar: mockReactivar } },
+        { provide: ConsultarConflictosSesionUseCase, useValue: { ejecutar: mockConflictos } },
         { provide: SESIONES_REPORTE_VALIDATOR, useValue: {} },
       ],
     }).compile();
@@ -63,12 +66,21 @@ describe('ReportesController', () => {
     expect(mockCrear).toHaveBeenCalledWith({ ...dto, id_usuario_reportador: '1' });
   });
 
-  it('delega la consulta administrativa con los filtros recibidos', async () => {
+  it('delega la consulta administrativa y compone los conflictos pendientes', async () => {
     const filtros = { estado: 'PENDIENTE', pagina: '2', limite: '10' };
+    const reportes = {
+      datos: [],
+      paginacion: { pagina: 2, limite: 10, total: 0, total_paginas: 0 },
+    };
+    const conflictos = [{ id_aviso: '31', id_sesion: 24n }];
+    mockConsultar.mockResolvedValue(reportes);
+    mockConflictos.mockResolvedValue(conflictos);
 
-    await controller.consultarParaAdmin(filtros);
+    const resultado = await controller.consultarParaAdmin(filtros);
 
     expect(mockConsultar).toHaveBeenCalledWith(filtros);
+    expect(mockConflictos).toHaveBeenCalledWith();
+    expect(resultado).toEqual({ ...reportes, conflictos_sesion: conflictos });
   });
 
   it('resuelve el reporte usando el administrador autenticado', async () => {

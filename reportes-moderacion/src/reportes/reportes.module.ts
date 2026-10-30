@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../compartido/prisma.module.js';
+import { IntegracionesModule } from '../integraciones/integraciones.module.js';
 import { ReportesController } from './infraestructura/http/reportes.controller.js';
 import { ValidarSesionParaReporteGuard } from './infraestructura/http/guards/validar-sesion-para-reporte.guard.js';
 import { AdminJwtGuard } from './infraestructura/http/guards/admin-jwt.guard.js';
 import { UsuarioJwtGuard } from './infraestructura/http/guards/usuario-jwt.guard.js';
-import { PrismaService } from './infraestructura/persistencia/prisma.service.js';
 import { PrismaReporteRepository } from './infraestructura/persistencia/prisma-reporte.repository.js';
 import { PrismaReporteConsultaRepository } from './infraestructura/persistencia/prisma-reporte-consulta.repository.js';
 import { HttpSesionesReporteValidator } from './infraestructura/clientes/http-sesiones-reporte-validator.js';
@@ -23,9 +24,9 @@ import { ReactivarSuspensionUseCase } from './aplicacion/reactivar-suspension.us
 import { ConsultarReportesAdminUseCase } from './aplicacion/consultar-reportes-admin.use-case.js';
 
 @Module({
+  imports: [PrismaModule, IntegracionesModule],
   controllers: [ReportesController],
   providers: [
-    PrismaService,
     {
       provide: REPORTE_REPOSITORY,
       useClass: PrismaReporteRepository,

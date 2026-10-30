@@ -23,6 +23,7 @@ import { CrearReporteUseCase } from '../../aplicacion/crear-reporte.use-case.js'
 import { ConsultarReportesAdminUseCase } from '../../aplicacion/consultar-reportes-admin.use-case.js';
 import { ResolverReporteUseCase } from '../../aplicacion/resolver-reporte.use-case.js';
 import { ReactivarSuspensionUseCase } from '../../aplicacion/reactivar-suspension.use-case.js';
+import { ConsultarConflictosSesionUseCase } from '../../../integraciones/aplicacion/consultar-conflictos-sesion.use-case.js';
 
 @Controller('reportes')
 export class ReportesController {
@@ -31,6 +32,7 @@ export class ReportesController {
     private readonly consultarReportesAdmin: ConsultarReportesAdminUseCase,
     private readonly resolverReporte: ResolverReporteUseCase,
     private readonly reactivarSuspension: ReactivarSuspensionUseCase,
+    private readonly consultarConflictosSesion: ConsultarConflictosSesionUseCase,
   ) {}
 
   @Post()
@@ -50,8 +52,12 @@ export class ReportesController {
 
   @Get('admin')
   @UseGuards(AdminJwtGuard)
-  consultarParaAdmin(@Query() filtros: ConsultaReportesAdminDto) {
-    return this.consultarReportesAdmin.ejecutar(filtros);
+  async consultarParaAdmin(@Query() filtros: ConsultaReportesAdminDto) {
+    const [reportes, conflictosSesion] = await Promise.all([
+      this.consultarReportesAdmin.ejecutar(filtros),
+      this.consultarConflictosSesion.ejecutar(),
+    ]);
+    return { ...reportes, conflictos_sesion: conflictosSesion };
   }
 
   @Patch(':id/resolucion')
