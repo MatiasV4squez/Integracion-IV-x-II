@@ -20,10 +20,14 @@ export class IntegracionesService {
       where: { idBloque, estadoBloque: anterior },
       data: { estadoBloque: estado },
     });
-    if (resultado.count !== 1)
+    if (resultado.count !== 1) {
+      const actual = await this.prisma.bloqueHorario.findUnique({ where: { idBloque } });
+      if (actual?.estadoBloque === estado)
+        return { idBloque: idBloque.toString(), estadoBloque: estado };
       throw new ConflictException(
         'El bloque cambió o no permite esta transición',
       );
+    }
     return { idBloque: idBloque.toString(), estadoBloque: estado };
   }
 

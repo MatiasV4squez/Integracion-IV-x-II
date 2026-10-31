@@ -101,7 +101,7 @@ La validación local del JWT no conoce revocaciones ni inactividad registradas p
 
 La respuesta es un arreglo de objetos con `idBloque`, `dia`, `horaInicio`, `horaFin` y `estadoBloque`; `idBloque` se representa como texto. Se ordena por día y hora de inicio. Los horarios ya iniciados se excluyen usando la zona `America/Santiago`, incluidos sus cambios estacionales. Esta ruta no modifica bloques ni incluye datos de postulaciones, materias o reputación, que corresponden a otras tareas.
 
-La consulta refleja los estados almacenados en `materias-tutores`. Para ocultar las solicitudes pendientes y sesiones confirmadas en la aplicación integrada, Agendamiento debe actualizar el estado de los bloques al reservarlos y liberarlos; esa integración sigue pendiente.
+La consulta refleja los estados almacenados en `materias-tutores`. La suite del flujo Tutor comprueba por HTTP real que Agendamiento reserva los bloques al crear solicitudes y los libera al rechazarlas, conservando la reserva al aceptar. La edición comprueba solapamientos y la infraestructura serializa las escrituras de horario del mismo tutor para impedir altas o ediciones simultáneas incompatibles.
 
 ## Búsqueda de tutores por materia
 
@@ -300,6 +300,8 @@ Este comando carga `TEST_DATABASE_URL` si está definida; de lo contrario, utili
 
 La suite de Materias utiliza `test_materias_<uuid>` y comprueba el catálogo HTTP con Prisma/PostgreSQL reales; elimina su esquema y compara el contenido de `public.materia`.
 
+`npm run test:flujo-tutor` ejecuta el recorrido integrado de disponibilidad, solicitudes y aceptación con Gateway, ambos micros y PostgreSQL reales. Requiere las copias compiladas de Sesiones y Gateway. Sus escenarios, límites de carga, resultados y preparación están en [Rendimiento e idempotencia del flujo Tutor](docs/rendimiento-idempotencia-tutor.md).
+
 Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tokens exclusivos de pruebas. Verifican el umbral, su igualdad exacta, duplicados, eventos contradictorios, rollback, entregas simultáneas, conservación de BIGINT y consultas sin notas. No necesitan iniciar Auth ni Agendamiento.
 
 ## Estructura y alcance
@@ -344,7 +346,7 @@ La revisión y corrección de las vulnerabilidades notificadas por `npm audit` q
 
 - **Búsqueda (RF09/CU07):** obtener el nombre mediante un contrato seguro de Auth y proteger la consulta con autenticación. Actualmente `GET /tutores` es pública y no incluye el nombre.
 - **Postulaciones:** acordar y comprobar el endpoint real de asignación de rol TUTOR. La llamada simulada en pruebas no confirma su compatibilidad con Auth.
-- **Disponibilidad:** comprobar la reserva y liberación desde Agendamiento. El PATCH actual solo cambia estados; no registra una operación propietaria ni verifica sesiones, habilitación por materia o solapamientos entre sesiones. El contrato nuevo de reservas se retiró y quedó para más adelante.
+- **Disponibilidad:** la reserva/liberación desde Agendamiento está comprobada por la suite del flujo Tutor en el alcance documentado. El PATCH actual solo cambia estados; no registra una operación propietaria ni verifica sesiones, habilitación por materia o solapamientos entre sesiones. El contrato nuevo de reservas se retiró y quedó para más adelante.
 - **Reputación:** verificar que Agendamiento envíe las calificaciones recibidas como tutor en sesiones completadas y que reintente los eventos conservando su identificador. El receptor está probado; el recorrido real entre micros sigue pendiente.
 - **Identidad:** integrar la consulta de revocaciones, suspensiones e inactividad de Auth. Verificar un JWT localmente no consulta esos estados.
 - **Arquitectura:** adaptar los módulos restantes cuando se aborde esa tarea. `EN_REVISION` no suspende la cuenta ni tiene una salida administrativa implementada en este micro.

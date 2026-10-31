@@ -35,7 +35,10 @@ const bloqueDisponible = {
 };
 
 const prismaMock = {
+  $transaction: vi.fn(),
+  $queryRaw: vi.fn(),
   bloqueHorario: {
+    findFirst: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
@@ -48,6 +51,9 @@ describe('DisponibilidadController (e2e)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    prismaMock.$transaction.mockImplementation((operacion: (tx: typeof prismaMock) => unknown) => operacion(prismaMock));
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    prismaMock.bloqueHorario.findFirst.mockResolvedValue(null);
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

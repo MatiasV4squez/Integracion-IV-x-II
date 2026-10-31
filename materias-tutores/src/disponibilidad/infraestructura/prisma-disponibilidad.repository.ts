@@ -38,7 +38,10 @@ export class PrismaDisponibilidadRepository implements DisponibilidadRepository 
   }
 
   async crear(idTutor: bigint, horario: HorarioBloque): Promise<BloqueHorario> {
-    return mapear(await this.prisma.bloqueHorario.create({ data: { idTutor, ...datosSql(horario) } }));
+    return this.conHorarioExclusivo(idTutor, async (tx) => {
+      await this.exigirHorarioLibre(tx, idTutor, horario);
+      return mapear(await tx.bloqueHorario.create({ data: { idTutor, ...datosSql(horario) } }));
+    });
   }
 
   async listarPropios(idTutor: bigint): Promise<BloqueHorario[]> {
@@ -60,16 +63,38 @@ export class PrismaDisponibilidadRepository implements DisponibilidadRepository 
   }
 
   async actualizarDisponible(idTutor: bigint, idBloque: bigint, horario: HorarioBloque): Promise<BloqueHorario> {
-    return this.escribirDisponible(idTutor, idBloque, datosSql(horario), 'actualizar');
+    return this.conHorarioExclusivo(idTutor, async (tx) => {
+      await this.exigirHorarioLibre(tx, idTutor, horario, idBloque);
+      return this.escribirDisponible(idTutor, idBloque, datosSql(horario), 'actualizar', tx);
+    });
   }
 
   async desactivarDisponible(idTutor: bigint, idBloque: bigint): Promise<BloqueHorario> {
     return this.escribirDisponible(idTutor, idBloque, { estadoBloque: 'INACTIVO' }, 'desactivar');
   }
 
-  private async escribirDisponible(idTutor: bigint, idBloque: bigint, data: Prisma.BloqueHorarioUpdateInput, operacion: 'actualizar' | 'desactivar'): Promise<BloqueHorario> {
+  private conHorarioExclusivo<T>(idTutor: bigint, operacion: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`disponibilidad:${idTutor}`}, 0))::text`;
+      return operacion(tx);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
+  }
+
+  private async exigirHorarioLibre(tx: Prisma.TransactionClient, idTutor: bigint, horario: HorarioBloque, idBloque?: bigint): Promise<void> {
+    const existente = await tx.bloqueHorario.findFirst({
+      where: {
+        idTutor, dia: fechaSql(horario.dia), estadoBloque: { not: 'INACTIVO' },
+        ...(idBloque === undefined ? {} : { idBloque: { not: idBloque } }),
+        horaInicio: { lt: horaSql(horario.horaFin) }, horaFin: { gt: horaSql(horario.horaInicio) },
+      },
+      select: { idBloque: true },
+    });
+    if (existente) throw new DisponibilidadError('CONFLICTO', 'El horario choca con un bloque de disponibilidad ya existente');
+  }
+
+  private async escribirDisponible(idTutor: bigint, idBloque: bigint, data: Prisma.BloqueHorarioUpdateInput, operacion: 'actualizar' | 'desactivar', cliente: Prisma.TransactionClient = this.prisma): Promise<BloqueHorario> {
     try {
-      return mapear(await this.prisma.bloqueHorario.update({ where: { idBloque, idTutor, estadoBloque: 'DISPONIBLE' }, data }));
+      return mapear(await cliente.bloqueHorario.update({ where: { idBloque, idTutor, estadoBloque: 'DISPONIBLE' }, data }));
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') throw new DisponibilidadError('CONFLICTO', `El bloque cambió y ya no se puede ${operacion}`);
       throw error;

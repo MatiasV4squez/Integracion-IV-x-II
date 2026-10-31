@@ -12,10 +12,15 @@ describe('PrismaDisponibilidadRepository', () => {
     estadoBloque: 'DISPONIBLE',
   };
   const horario = { dia: '2026-10-01', horaInicio: '09:00', horaFin: '10:00' };
-  const prisma = { bloqueHorario: { findMany: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() } };
+  const prisma = { $transaction: vi.fn(), $queryRaw: vi.fn(), bloqueHorario: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() } };
   const repo = new PrismaDisponibilidadRepository(prisma as unknown as PrismaService);
 
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    prisma.$transaction.mockImplementation((operacion: (tx: typeof prisma) => unknown) => operacion(prisma));
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.bloqueHorario.findFirst.mockResolvedValue(null);
+  });
 
   it('consulta solo los bloques no inactivos del mismo tutor y día', async () => {
     prisma.bloqueHorario.findMany.mockResolvedValue([bloque]);
