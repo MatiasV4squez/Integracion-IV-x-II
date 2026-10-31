@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
 import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
-let vite, validarCertificado, enviarPostulacionTutor, consultarMisPostulaciones, Page, AppRoutes, obtenerNavegacion
+let vite, validarCertificado, enviarPostulacionTutor, consultarMisPostulaciones, obtenerMiCertificado, Page, AppRoutes, obtenerNavegacion
 const fetchOriginal = globalThis.fetch
 const estudiante = { token: 'token-estudiante-prueba', idUsuario: '23', roles: ['ESTUDIANTE'], expiraEn: Date.now() + 3600000 }
 const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
@@ -35,7 +35,7 @@ const materias = [
 before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
   ;({ validarCertificado } = await vite.ssrLoadModule('/src/features/postulaciones/utils/validar-certificado.ts'))
-  ;({ enviarPostulacionTutor, consultarMisPostulaciones } = await vite.ssrLoadModule('/src/features/postulaciones/services/postulacion-tutor-api.ts'))
+  ;({ enviarPostulacionTutor, consultarMisPostulaciones, obtenerMiCertificado } = await vite.ssrLoadModule('/src/features/postulaciones/services/postulacion-tutor-api.ts'))
   ;({ default: Page } = await vite.ssrLoadModule('/src/features/postulaciones/pages/PostulacionTutorPage.tsx'))
   ;({ AppRoutes } = await vite.ssrLoadModule('/src/app/AppRoutes.tsx'))
   ;({ obtenerNavegacion } = await vite.ssrLoadModule('/src/shared/layout/configuracion-navegacion.ts'))
@@ -166,10 +166,10 @@ test('el formulario ofrece solo materias sin postulación activa y muestra el hi
 
 test('presenta carga, envío, éxito y errores sin perder la salida', () => {
   const enviando = pagina({ envio: { estado: 'enviando' } })
-  assert.match(enviando, /Enviando postulación…/)
+  assert.match(enviando, /Subiendo certificado…/)
   assert.match(enviando, /<select[^>]*disabled/)
   const exito = pagina({ envio: { estado: 'exitoso', postulacion: { ...pendiente, idMateria: '4' } } })
-  assert.match(exito, /Postulación enviada\..*Química general.*en revisión/)
+  assert.match(exito, /Postulación enviada\..*Química general[\s\S]*estado «En revisión»/)
   const error = pagina({ envio: { estado: 'error', mensaje: 'Ya tienes una postulación activa para esta materia.' } })
   assert.match(error, /role="alert"[^>]*>Ya tienes una postulación activa/)
   assert.match(error, /name="idMateria"/)
@@ -193,4 +193,54 @@ test('la ruta exige sesión y aparece en la navegación de estudiantes y tutores
   }
   assert.ok(!obtenerNavegacion([]).some((enlace) => enlace.destino === '/postulacion-tutor'))
   assert.ok(!obtenerNavegacion(['ADMIN']).some((enlace) => enlace.destino === '/postulacion-tutor'))
+})
+
+test('el postulante descarga solo su propio certificado, con el tipo declarado', async () => {
+  const llamadas = []
+  globalThis.fetch = async (destino, opciones) => {
+    llamadas.push({ destino, opciones })
+    return new Response(new Blob([PDF], { type: 'application/pdf' }), { status: 200 })
+  }
+  const archivo = await obtenerMiCertificado(estudiante, pendiente)
+  assert.equal(archivo.type, 'application/pdf')
+  assert.equal(String(llamadas[0].destino), url('postulaciones/41/certificado'))
+  assert.equal(llamadas[0].opciones.headers.Authorization, 'Bearer ' + estudiante.token)
+  assert.equal(llamadas[0].opciones.cache, 'no-store')
+
+  globalThis.fetch = () => { assert.fail('No debe pedir certificados ajenos') }
+  await assert.rejects(obtenerMiCertificado(estudiante, { ...pendiente, idUsuario: '99' }), /no son válidos/)
+  for (const [respuesta, mensaje] of [
+    [() => new Response(null, { status: 404 }), /ya no está disponible/],
+    [() => new Response(null, { status: 401 }), /sesión/],
+    [() => new Response(null, { status: 500 }), /No se pudo descargar/],
+    [() => new Response(new Blob([PNG], { type: 'image/png' })), /no es válido/],
+    [() => new Response(new Blob([], { type: 'application/pdf' })), /no es válido/],
+  ]) {
+    globalThis.fetch = async () => respuesta()
+    await assert.rejects(obtenerMiCertificado(estudiante, pendiente), mensaje)
+  }
+})
+
+test('el historial muestra la revisión y el certificado de cada postulación, y conserva el estado al actualizar', () => {
+  const html = pagina({ onVerCertificado: () => {} })
+  assert.match(html, /Revisada el/)
+  assert.equal((html.match(/Certificado: notas\.pdf/g) ?? []).length, 3)
+  assert.equal((html.match(/>Descargar</g) ?? []).length, 3)
+  assert.doesNotMatch(pagina(), />Descargar</, 'Sin acción del contenedor no ofrece descargar')
+
+  const descargando = pagina({ onVerCertificado: () => {}, descargando: '40' })
+  assert.match(descargando, /Descargando…/)
+  assert.equal((descargando.match(/disabled="" aria-label="Descargar certificado/g) ?? []).length, 3)
+
+  const errorDescarga = pagina({ onVerCertificado: () => {}, errorCertificado: { idPostulacion: '39', mensaje: 'El certificado ya no está disponible.' } })
+  assert.match(errorDescarga, /Motivo: Certificado ilegible[\s\S]*El certificado ya no está disponible\./)
+
+  const actualizando = pagina({ actualizandoHistorial: true })
+  assert.match(actualizando, /Actualizando…/)
+  assert.match(actualizando, /En revisión/)
+  assert.doesNotMatch(actualizando, /Cargando tus postulaciones/)
+
+  const fallo = pagina({ errorActualizacion: 'No pudimos conectar con el servidor. Inténtalo de nuevo.' })
+  assert.match(fallo, /role="alert"[^>]*>No pudimos conectar[^<]*Se muestra el último estado conocido/)
+  assert.match(fallo, /Nota acreditada: 6\.2/)
 })

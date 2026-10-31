@@ -80,6 +80,39 @@
   font-size: 12px;
 }
 
+.post-tutor__archivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.post-tutor__archivo span,
+.post-tutor__certificado span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.post-tutor__certificado {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.post-tutor__historial .post-tutor__error {
+  grid-column: 1 / -1;
+}
+
 .post-tutor__error {
   margin: 0;
   color: #b42318;

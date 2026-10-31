@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import type { Materia } from '../../materias/models/materia'
-import type { ConsultaPostulaciones } from '../models/postulacion'
+import type { ConsultaPostulaciones, Postulacion } from '../models/postulacion'
 import {
   DESCRIPCION_ESTADO_POSTULACION, ESTADOS_POSTULACION_ACTIVA, type EstadoEnvioPostulacion,
 } from '../models/postulacion-tutor'
@@ -20,10 +20,19 @@ interface Propiedades {
   onRecargarMaterias: () => void
   onRecargarHistorial: () => void
   onEnviar: (idMateria: string, certificado: File) => void
+  actualizandoHistorial?: boolean
+  errorActualizacion?: string | null
+  descargando?: string | null
+  errorCertificado?: { idPostulacion: string; mensaje: string } | null
+  onVerCertificado?: (postulacion: Postulacion) => void
 }
 
 function fechaLegible(fecha: string) {
   return new Date(fecha).toLocaleDateString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'medium' })
+}
+
+function tamanoLegible(bytes: number) {
+  return bytes < 1_000_000 ? Math.max(1, Math.round(bytes / 1000)) + ' KB' : (bytes / 1_000_000).toFixed(1).replace('.', ',') + ' MB'
 }
 
 function FormularioPostulacion({ materias, enviando, onEnviar }: {
@@ -35,12 +44,26 @@ function FormularioPostulacion({ materias, enviando, onEnviar }: {
   const [certificado, setCertificado] = useState<File | null>(null)
   const [errores, setErrores] = useState<{ materia?: string; certificado?: string }>({})
   const ultimoArchivo = useRef<File | null>(null)
+  const campoArchivo = useRef<HTMLInputElement>(null)
+
+  function quitarCertificado() {
+    ultimoArchivo.current = null
+    setCertificado(null)
+    setErrores((previos) => ({ ...previos, certificado: undefined }))
+    if (campoArchivo.current) {
+      campoArchivo.current.value = ''
+      campoArchivo.current.focus()
+    }
+  }
 
   async function cambiarCertificado(evento: ChangeEvent<HTMLInputElement>) {
     const archivo = evento.currentTarget.files?.[0] ?? null
     ultimoArchivo.current = archivo
     setCertificado(archivo)
-    if (!archivo) return
+    if (!archivo) {
+      setErrores((previos) => ({ ...previos, certificado: undefined }))
+      return
+    }
     const validacion = await validarCertificado(archivo)
     // Ignora resultados de un archivo que ya fue reemplazado.
     if (ultimoArchivo.current !== archivo) return
@@ -93,6 +116,7 @@ function FormularioPostulacion({ materias, enviando, onEnviar }: {
       <div className="post-tutor__campo">
         <label htmlFor="postulacion-certificado">Certificado de notas</label>
         <input
+          ref={campoArchivo}
           type="file"
           id="postulacion-certificado"
           name="certificado"
@@ -103,6 +127,18 @@ function FormularioPostulacion({ materias, enviando, onEnviar }: {
           aria-invalid={errores.certificado ? true : undefined}
           aria-describedby={'ayuda-postulacion-certificado' + (errores.certificado ? ' error-postulacion-certificado' : '')}
         />
+        {certificado && (
+          <div className="post-tutor__archivo">
+            <span>
+              <strong>{certificado.name}</strong>
+              {' · '}{tamanoLegible(certificado.size)}
+              {errores.certificado ? '' : ' · Listo para enviar'}
+            </span>
+            <button type="button" className="boton-global boton-global--secundario" disabled={enviando} onClick={quitarCertificado}>
+              Quitar archivo
+            </button>
+          </div>
+        )}
         <p id="ayuda-postulacion-certificado" className="post-tutor__ayuda">
           Adjunta el certificado donde se vea tu nota en la materia. Formato PDF o PNG, máximo 5 MB.
         </p>
@@ -112,7 +148,7 @@ function FormularioPostulacion({ materias, enviando, onEnviar }: {
       </div>
 
       <button type="submit" className="boton-global boton-global--primario" disabled={enviando}>
-        {enviando ? 'Enviando postulación…' : 'Enviar postulación'}
+        {enviando ? 'Subiendo certificado…' : 'Enviar postulación'}
       </button>
     </form>
   )
@@ -120,6 +156,8 @@ function FormularioPostulacion({ materias, enviando, onEnviar }: {
 
 export default function PostulacionTutorPage({
   materias, historial, envio, versionFormulario, onRecargarMaterias, onRecargarHistorial, onEnviar,
+  actualizandoHistorial = false, errorActualizacion = null, descargando = null, errorCertificado = null,
+  onVerCertificado,
 }: Propiedades) {
   const catalogo = materias.estado === 'listo' ? materias.materias : []
   const nombres = new Map(catalogo.map((materia) => [materia.idMateria, materia.nombre]))
@@ -142,7 +180,8 @@ export default function PostulacionTutorPage({
         <div role="status" aria-live="polite">
           {envio.estado === 'exitoso' && (
             <p className="post-tutor__aviso post-tutor__aviso--exito">
-              <strong>Postulación enviada.</strong> Tu postulación a {nombres.get(envio.postulacion.idMateria) ?? 'la materia'} quedó en revisión.
+              <strong>Postulación enviada.</strong> Tu postulación a {nombres.get(envio.postulacion.idMateria) ?? 'la materia'} quedó
+              registrada con el estado «{DESCRIPCION_ESTADO_POSTULACION[envio.postulacion.estado].etiqueta}».
             </p>
           )}
         </div>
@@ -171,14 +210,19 @@ export default function PostulacionTutorPage({
           <button
             type="button"
             className="boton-global boton-global--secundario"
-            disabled={historial.estado === 'cargando'}
+            disabled={historial.estado === 'cargando' || actualizandoHistorial}
             onClick={onRecargarHistorial}
           >
-            {historial.estado === 'error' ? 'Reintentar' : 'Actualizar'}
+            {actualizandoHistorial ? 'Actualizando…' : historial.estado === 'error' ? 'Reintentar' : 'Actualizar'}
           </button>
         </div>
         {historial.estado === 'cargando' && <p role="status">Cargando tus postulaciones…</p>}
         {historial.estado === 'error' && <p className="post-tutor__aviso post-tutor__aviso--error" role="alert">{historial.mensaje}</p>}
+        {errorActualizacion && (
+          <p className="post-tutor__aviso post-tutor__aviso--error" role="alert">
+            {errorActualizacion} Se muestra el último estado conocido.
+          </p>
+        )}
         {historial.estado === 'listo' && postulaciones.length === 0 && <p>Aún no has enviado postulaciones.</p>}
         {postulaciones.length > 0 && (
           <ul className="post-tutor__historial">
@@ -188,7 +232,10 @@ export default function PostulacionTutorPage({
                 <li key={postulacion.idPostulacion}>
                   <div>
                     <strong>{nombres.get(postulacion.idMateria) ?? 'Materia #' + postulacion.idMateria}</strong>
-                    <span>Enviada el {fechaLegible(postulacion.fechaPostulacion)} · {postulacion.certificadoNombre}</span>
+                    <span>
+                      Enviada el {fechaLegible(postulacion.fechaPostulacion)}
+                      {postulacion.fechaRevision && ` · Revisada el ${fechaLegible(postulacion.fechaRevision)}`}
+                    </span>
                   </div>
                   <span className={'post-tutor__estado post-tutor__estado--' + postulacion.estado.toLowerCase()}>
                     {descripcion.etiqueta}
@@ -198,6 +245,23 @@ export default function PostulacionTutorPage({
                     {postulacion.notaAcreditada !== null && ` Nota acreditada: ${postulacion.notaAcreditada.toFixed(1)}.`}
                     {postulacion.motivoRechazo && ` Motivo: ${postulacion.motivoRechazo}`}
                   </p>
+                  <div className="post-tutor__certificado">
+                    <span>Certificado: {postulacion.certificadoNombre}</span>
+                    {onVerCertificado && (
+                      <button
+                        type="button"
+                        className="boton-global boton-global--secundario"
+                        disabled={descargando !== null}
+                        aria-label={'Descargar certificado ' + postulacion.certificadoNombre}
+                        onClick={() => onVerCertificado(postulacion)}
+                      >
+                        {descargando === postulacion.idPostulacion ? 'Descargando…' : 'Descargar'}
+                      </button>
+                    )}
+                  </div>
+                  {errorCertificado?.idPostulacion === postulacion.idPostulacion && (
+                    <p className="post-tutor__error" role="alert">{errorCertificado.mensaje}</p>
+                  )}
                 </li>
               )
             })}

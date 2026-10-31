@@ -2,7 +2,7 @@ import { obtenerUrlApi } from '../../../config/api'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import type { Postulacion } from '../models/postulacion'
-import { validarCertificado } from '../utils/validar-certificado'
+import { TAMANO_MAXIMO_CERTIFICADO, validarCertificado } from '../utils/validar-certificado'
 import { esPostulacion } from '../utils/validar-postulacion'
 
 const SESION_INVALIDA = 'Tu sesión no es válida o ha vencido. Inicia sesión nuevamente.'
@@ -55,6 +55,34 @@ export async function consultarMisPostulaciones(sesion: SesionUsuario, externa?:
     return datos.map(copiarPostulacion)
   } catch (error) {
     controlarError(error, signal, externa, 'No se pudieron cargar tus postulaciones.')
+  }
+}
+
+// materias-tutores solo entrega el certificado a su dueño o a un administrador; aquí se evita pedir uno ajeno.
+export async function obtenerMiCertificado(
+  sesion: SesionUsuario, postulacion: Postulacion, externa?: AbortSignal,
+): Promise<Blob> {
+  externa?.throwIfAborted()
+  exigirSesion(sesion)
+  if (postulacion.idUsuario !== sesion.idUsuario || !esIdentificador(postulacion.idPostulacion)
+    || !['application/pdf', 'image/png'].includes(postulacion.certificadoTipo)) {
+    throw new Error('Los datos del certificado no son válidos.')
+  }
+  const signal = AbortSignal.any([AbortSignal.timeout(15000), ...(externa ? [externa] : [])])
+  try {
+    const respuesta = await fetch(obtenerUrlApi(`materias-tutores/postulaciones/${postulacion.idPostulacion}/certificado`), {
+      headers: { Authorization: 'Bearer ' + sesion.token }, cache: 'no-store', signal,
+    })
+    if (respuesta.status === 401) throw new Error(SESION_INVALIDA)
+    if (respuesta.status === 404) throw new Error('El certificado ya no está disponible.')
+    if (!respuesta.ok) throw new Error('No se pudo descargar el certificado. Inténtalo de nuevo.')
+    const archivo = await respuesta.blob()
+    if (archivo.type !== postulacion.certificadoTipo || archivo.size === 0 || archivo.size > TAMANO_MAXIMO_CERTIFICADO) {
+      throw new Error('El archivo del certificado no es válido.')
+    }
+    return archivo
+  } catch (error) {
+    controlarError(error, signal, externa, 'No se pudo descargar el certificado.')
   }
 }
 
