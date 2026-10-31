@@ -52,11 +52,16 @@ async function consultarSesiones(sesion: SesionUsuario, externa: AbortSignal | u
   }
 }
 
-export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
+// El historial incluye las sesiones como estudiante; aquí solo se conservan las dictadas como tutor.
+export async function consultarHistorialTutor(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
   externa?.throwIfAborted()
   exigirAcceso(sesion, 'TUTOR', 'Esta sección está disponible para tutores.')
   const historial = await consultarSesiones(sesion, externa, 'solicitudes', 'history')
-  return seleccionarSolicitudesRecibidas(historial, sesion.idUsuario)
+  return historial.filter((clase) => clase.id_tutor === sesion.idUsuario)
+}
+
+export async function consultarSolicitudesRecibidas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {
+  return seleccionarSolicitudesRecibidas(await consultarHistorialTutor(sesion, externa), sesion.idUsuario)
 }
 
 export async function consultarSesionesActivas(sesion: SesionUsuario, externa?: AbortSignal): Promise<Sesion[]> {

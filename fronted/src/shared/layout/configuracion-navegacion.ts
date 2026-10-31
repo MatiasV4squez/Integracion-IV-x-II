@@ -26,7 +26,7 @@ const ESTUDIANTE: readonly EnlaceNavegacion[] = [
 ]
 
 const TUTOR: readonly EnlaceNavegacion[] = [
-  PUBLICOS[0],
+  { etiqueta: 'Inicio', destino: '/tutor' },
   { etiqueta: 'Solicitudes', destino: '/solicitudes/recibidas' },
   { etiqueta: 'Disponibilidad', destino: '/disponibilidad' },
   { etiqueta: 'Postulaciones', destino: '/postulacion-tutor' },
@@ -48,7 +48,7 @@ export function obtenerNavegacion(roles: readonly string[] = []): readonly Enlac
 
 export function obtenerInicioPorRol(roles: readonly string[] = []): string {
   if (tieneRol(roles, 'ADMINISTRADOR')) return '/administracion/postulaciones'
-  if (tieneRol(roles, 'TUTOR')) return '/solicitudes/recibidas'
+  if (tieneRol(roles, 'TUTOR')) return '/tutor'
   return tieneRol(roles, 'ESTUDIANTE') ? '/inicio' : '/'
 }
 

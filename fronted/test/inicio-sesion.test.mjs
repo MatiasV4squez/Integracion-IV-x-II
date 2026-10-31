@@ -146,7 +146,7 @@ test('después del login solo redirige a rutas internas y usa el inicio de cada 
   }
   assert.equal(leerDestinoSolicitado({ desde: '/loginx' }), '/loginx')
   assert.equal(configuracion.obtenerInicioPorRol(['ADMIN']), '/administracion/postulaciones')
-  assert.equal(configuracion.obtenerInicioPorRol(['ESTUDIANTE', 'TUTOR']), '/solicitudes/recibidas')
+  assert.equal(configuracion.obtenerInicioPorRol(['ESTUDIANTE', 'TUTOR']), '/tutor')
   assert.equal(configuracion.obtenerInicioPorRol(['ESTUDIANTE']), '/inicio')
   assert.equal(configuracion.obtenerInicioPorRol([]), '/')
 })

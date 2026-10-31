@@ -6,6 +6,13 @@ export function seleccionarSolicitudesRecibidas(sesiones: Sesion[], idTutor: str
       || (BigInt(a.id_sesion) < BigInt(b.id_sesion) ? -1 : BigInt(a.id_sesion) > BigInt(b.id_sesion) ? 1 : 0))
 }
 
+// Incluye la sesión en curso: deja de ser próxima cuando termina, no cuando empieza.
+export function seleccionarProximasSesionesTutor(sesiones: Sesion[], idTutor: string, ahora: number): Sesion[] {
+  return sesiones.filter((sesion) => sesion.id_tutor === idTutor && sesion.estado_sesion === 'CONFIRMADA'
+    && Date.parse(sesion.fin) > ahora)
+    .sort((a, b) => Date.parse(a.inicio) - Date.parse(b.inicio))
+}
+
 export function obtenerPlazoSolicitud(fechaCreacion: string, ahora: number): string {
   const restante = Date.parse(fechaCreacion) + 24 * 60 * 60 * 1000 - ahora
   // La expiración efectiva la decide el microservicio en su siguiente ejecución programada.
