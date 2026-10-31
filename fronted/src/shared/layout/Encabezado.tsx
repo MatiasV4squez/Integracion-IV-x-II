@@ -5,9 +5,10 @@ import type { EnlaceNavegacion, UsuarioEncabezado } from './configuracion-navega
 interface Propiedades {
   enlaces: readonly EnlaceNavegacion[]
   usuario?: UsuarioEncabezado
+  alCerrarSesion?: () => void
 }
 
-export function Encabezado({ enlaces, usuario }: Propiedades) {
+export function Encabezado({ enlaces, usuario, alCerrarSesion }: Propiedades) {
   const [abierto, setAbierto] = useState(false)
   const cerrarMenu = () => setAbierto(false)
 
@@ -44,6 +45,15 @@ export function Encabezado({ enlaces, usuario }: Propiedades) {
             <div className="usuario-global" aria-label={'Sesión de ' + usuario.etiqueta}>
               <span className="usuario-global__avatar" aria-hidden="true">{usuario.rol.charAt(0)}</span>
               <div><strong>{usuario.etiqueta}</strong><span>{usuario.rol}</span></div>
+              {alCerrarSesion && (
+                <button
+                  type="button"
+                  className="usuario-global__salir"
+                  onClick={() => { cerrarMenu(); alCerrarSesion() }}
+                >
+                  Cerrar sesión
+                </button>
+              )}
             </div>
           ) : (
             <div className="encabezado-global__acceso">

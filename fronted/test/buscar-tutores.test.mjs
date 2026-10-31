@@ -209,7 +209,9 @@ test('conserva el acceso del equipo en la raíz y sus rutas generales al integra
       createElement(Route, { path: '/*', element: createElement('p', null, 'Acceso del equipo') }),
     )))
   assert.match(await renderRuta('/ruta-equipo'), /Pantalla del equipo/)
-  assert.match(await renderRuta('/login'), /Acceso del equipo/)
+  const login = await renderRuta('/login')
+  assert.match(login, /Bienvenido de vuelta/)
+  assert.doesNotMatch(login, /Acceso del equipo/)
   assert.match(await renderRuta('/'), /Acceso del equipo/)
   assert.doesNotMatch(await renderRuta('/solicitudes/recibidas'), /Acceso del equipo/)
 })

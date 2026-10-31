@@ -1,4 +1,6 @@
 import React from 'react';
+import { Navigate, useLocation } from 'react-router';
+import { useSesionUsuario } from '../shared/auth/useSesionUsuario';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -6,15 +8,14 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('userRole');
+  const sesion = useSesionUsuario();
+  const location = useLocation();
 
-  if (!token) {
-    window.location.href = '/login';
-    return null;
+  if (!sesion) {
+    return <Navigate to="/login" replace state={{ desde: location.pathname + location.search }} />;
   }
 
-  if (requiredRole && userRole !== requiredRole) {
+  if (requiredRole && !sesion.roles.includes(requiredRole.trim().toUpperCase())) {
     return (
       <div style={styles.unauthorizedContainer}>
         <h2>Acceso No Autorizado</h2>

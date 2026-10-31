@@ -1,6 +1,7 @@
 import { lazy, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import { TutoriasLayout } from './TutoriasLayout'
+import { inicioSesionHttp } from '../features/inicio-sesion/services/inicio-sesion-http'
 import { registroUsuarioHttp } from '../features/registro-usuario/services/registro-usuario-http'
 import { verificacionCuentaHttp } from '../features/verificacion-cuenta/services/verificacion-cuenta-http'
 
@@ -15,6 +16,8 @@ const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/contai
 const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
 const DisponibilidadContainer = lazy(() => import('../features/disponibilidad/containers/DisponibilidadContainer'))
 const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario/containers/RegistroUsuarioContainer'))
+const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
+
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
     <Routes>
@@ -31,6 +34,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
           element={<SolicitarTutoriaContainer idMateria="1" nombreMateria="Cálculo intermedio" />}
         />
         <Route path="/disponibilidad" element={<DisponibilidadContainer />} />
+        <Route path="/login" element={<InicioSesionContainer api={inicioSesionHttp} />} />
         <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
         {children}
         <Route path="/*" element={<PantallasEquipo />} />

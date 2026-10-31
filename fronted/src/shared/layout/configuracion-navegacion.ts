@@ -42,9 +42,15 @@ export function obtenerNavegacion(roles: readonly string[] = []): readonly Enlac
   return roles.length > 0 ? ESTUDIANTE : PUBLICOS
 }
 
-export function obtenerUsuarioEncabezado(sesion: { idUsuario: string; roles: string[] } | null): UsuarioEncabezado | undefined {
+export function obtenerInicioPorRol(roles: readonly string[] = []): string {
+  if (roles.some((rol) => rol === 'ADMIN' || rol === 'ADMINISTRADOR')) return '/administracion/postulaciones'
+  if (roles.includes('TUTOR')) return '/solicitudes/recibidas'
+  return roles.includes('ESTUDIANTE') ? '/inicio' : '/'
+}
+
+export function obtenerUsuarioEncabezado(sesion: { idUsuario: string; nombre?: string; roles: string[] } | null): UsuarioEncabezado | undefined {
   if (!sesion) return undefined
   const rol = sesion.roles.some((valor) => valor === 'ADMIN' || valor === 'ADMINISTRADOR')
     ? 'Administrador' : sesion.roles.includes('TUTOR') ? 'Tutor' : 'Estudiante'
-  return { etiqueta: 'Usuario ' + sesion.idUsuario, rol }
+  return { etiqueta: sesion.nombre ?? 'Usuario ' + sesion.idUsuario, rol }
 }
