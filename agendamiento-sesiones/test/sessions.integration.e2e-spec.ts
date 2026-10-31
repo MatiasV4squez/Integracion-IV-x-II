@@ -1194,7 +1194,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       }),
     );
     await act(session.id_sesion, 'accept').expect(409);
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy).toHaveBeenCalledTimes(6);
   });
   it('reintenta conflictos y confirma cuando desaparecen', async () => {
     const session = await fixture();
@@ -1961,7 +1961,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       .sort();
     await admin.query(`CREATE SCHEMA "${guarded}"`);
     try {
-      await admin.query(`SET search_path TO "${guarded}", public`);
+      await admin.query(`SET search_path TO "${guarded}", "${schema}", public`);
       const removalIndex = directories.findIndex((directory) =>
         directory.endsWith('_retirar_integracion_bloques'),
       );

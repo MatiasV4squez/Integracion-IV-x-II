@@ -31,7 +31,8 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
   async ejecutar<T>(
     operacion: (contexto: ContextoTransaccion) => Promise<T>,
   ): Promise<T> {
-    for (let intento = 1; intento <= 3; intento++) {
+    const maxIntentos = 6;
+    for (let intento = 1; intento <= maxIntentos; intento++) {
       try {
         return await this.prisma.$transaction(
           (transaccion) => operacion(crearRepositoriosPrisma(transaccion)),
@@ -41,9 +42,9 @@ export class UnidadDeTrabajoPrisma implements UnidadDeTrabajo {
         );
       } catch (error: unknown) {
         if (!isTransactionConflict(error)) throw error;
-        if (intento < 3)
+        if (intento < maxIntentos)
           await new Promise<void>((resolver) =>
-            setTimeout(resolver, 50 * intento),
+            setTimeout(resolver, Math.min(25 * 2 ** (intento - 1), 200) + Math.floor(Math.random() * 50)),
           );
       }
     }

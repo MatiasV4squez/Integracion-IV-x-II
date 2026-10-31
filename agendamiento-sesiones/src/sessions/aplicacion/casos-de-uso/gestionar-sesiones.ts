@@ -81,7 +81,9 @@ export class GestionarSesiones {
       });
     } catch (error: unknown) {
       try {
-        await this.disponibilidad.liberar(idBloque);
+        if (!(await this.sesiones.existeSesionActivaEnBloque(idBloque))) {
+          await this.disponibilidad.liberar(idBloque);
+        }
       } catch {
         this.registro.error(
           `No se pudo compensar la reserva del bloque ${idBloque} después de fallar la creación.`,

@@ -179,6 +179,22 @@ describe('Gestionar sesiones mediante puertos', () => {
     });
   });
 
+  it('no libera la reserva ganadora si otra solicitud concurrente ya quedó activa', async () => {
+    const fallo = new Error('Otra solicitud ganó la escritura');
+    jest.mocked(contexto.sesiones.crearPendiente).mockRejectedValue(fallo);
+    jest.mocked(lecturas.sesiones.existeSesionActivaEnBloque).mockResolvedValue(true);
+    await expect(aplicacion.crearSesion(entrada, '3')).rejects.toBe(fallo);
+    expect(lecturas.sesiones.existeSesionActivaEnBloque).toHaveBeenCalledWith(5n);
+    expect(disponibilidad.liberar).not.toHaveBeenCalled();
+  });
+
+  it('no libera a ciegas cuando falla la consulta necesaria para compensar', async () => {
+    jest.mocked(contexto.sesiones.crearPendiente).mockRejectedValue(new Error('Fallo al guardar'));
+    jest.mocked(lecturas.sesiones.existeSesionActivaEnBloque).mockRejectedValue(new Error('Sin conexión'));
+    await expect(aplicacion.crearSesion(entrada, '3')).rejects.toMatchObject({ motivo: 'DEPENDENCIA_NO_DISPONIBLE' });
+    expect(disponibilidad.liberar).not.toHaveBeenCalled();
+  });
+
   it('no libera un bloque si la reserva no fue confirmada', async () => {
     disponibilidad.reservar.mockRejectedValue(
       new Error('Fallo de comunicación'),

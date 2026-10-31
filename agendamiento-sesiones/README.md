@@ -118,6 +118,15 @@ que se elimina al terminar, y verifican el filtrado y orden con consultas reales
 
 ## Arquitectura hexagonal
 
+La creación compensa una reserva fallida solo después de comprobar que no haya
+otra sesión activa usando el bloque. La unidad de trabajo conserva aislamiento
+serializable, con hasta seis intentos para abortos reconocidos y esperas con
+variación; no reenvía HTTP ni reintenta errores de negocio o conexión. La prueba
+integrada de rendimiento e idempotencia está en la copia de `materias-tutores`,
+comando `npm run test:flujo-tutor`, y su guía en
+`docs/rendimiento-idempotencia-tutor.md`. Recorre el Gateway y ambos micros con
+PostgreSQL en esquemas de prueba; requiere compilar previamente Sesiones y Gateway.
+
 El dominio, los casos de uso y los adaptadores están organizados en
 `src/sessions`. Los controladores y DTO están en `src/sessions/infraestructura/http`;
 los casos de uso están en `src/sessions/aplicacion/casos-de-uso`.
