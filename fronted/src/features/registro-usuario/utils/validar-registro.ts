@@ -1,9 +1,11 @@
-import { validarCorreo, validarLongitudMaxima, validarObligatorio } from '../../../shared/utils/validaciones-formulario'
+import { normalizarCorreo, validarCorreo, validarLongitudMaxima, validarObligatorio } from '../../../shared/utils/validaciones-formulario'
 import type { FormularioRegistroUsuario } from '../models/datos-registro'
 
 export const LONGITUD_MAXIMA_NOMBRE = 120
 export const LONGITUD_MINIMA_CONTRASENA = 8
 export const LONGITUD_MAXIMA_CONTRASENA = 128
+// Auth solo registra cuentas de estudiantes con este dominio.
+export const DOMINIO_INSTITUCIONAL = '@alu.uct.cl'
 
 export type CampoRegistro = keyof FormularioRegistroUsuario
 export type ErroresRegistro = Partial<Record<CampoRegistro, string>>
@@ -29,6 +31,8 @@ export function validarConfirmacion(valor: string, contrasena: string): string |
 
 export function validarCorreoRegistro(valor: string): string | undefined {
   return validarCorreo(valor)
+    ?? (normalizarCorreo(valor).endsWith(DOMINIO_INSTITUCIONAL)
+      ? undefined : `Usa tu correo institucional ${DOMINIO_INSTITUCIONAL}.`)
 }
 
 export function validarRegistro(formulario: FormularioRegistroUsuario): ErroresRegistro {

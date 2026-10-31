@@ -4,6 +4,7 @@ import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import type { ConsultaPostulaciones, Postulacion } from '../models/postulacion'
 import PostulacionesAdminPage from '../pages/PostulacionesAdminPage'
 import { consultarPostulaciones, obtenerCertificadoPostulacion } from '../services/postulaciones-api'
+import { descargarArchivo } from '../../../shared/utils/descargar-archivo'
 
 function PostulacionesDelAdministrador({ sesion }: { sesion: SesionUsuario }) {
   const [consulta, establecerConsulta] = useState<ConsultaPostulaciones>({ estado: 'cargando' })
@@ -54,16 +55,7 @@ function PostulacionesDelAdministrador({ sesion }: { sesion: SesionUsuario }) {
     try {
       const archivo = await obtenerCertificadoPostulacion(sesion, postulacion, controlador.signal)
       if (controlador.signal.aborted || sesion.expiraEn <= Date.now()) return
-      const url = URL.createObjectURL(archivo)
-      const enlace = document.createElement('a')
-      enlace.href = url
-      enlace.download = `certificado-${postulacion.idPostulacion}.${archivo.type === 'application/pdf' ? 'pdf' : 'png'}`
-      document.body.appendChild(enlace)
-      try { enlace.click() }
-      finally {
-        enlace.remove()
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }
+      descargarArchivo(archivo, `certificado-${postulacion.idPostulacion}.${archivo.type === 'application/pdf' ? 'pdf' : 'png'}`)
     } catch (error) {
       if (!controlador.signal.aborted) establecerErrorCertificado(
         error instanceof Error ? error.message : 'No se pudo descargar el certificado.',

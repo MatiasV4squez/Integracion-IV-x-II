@@ -1,20 +1,22 @@
 import { obtenerUrlApi } from '../../../config/api'
-import { normalizarCorreo, validarCorreo } from '../../../shared/utils/validaciones-formulario'
+import { normalizarCorreo } from '../../../shared/utils/validaciones-formulario'
 import { ErrorRegistro, type RegistroUsuarioPuerto } from '../aplicacion/registro-usuario.puerto'
-import { validarContrasena, validarNombre } from '../utils/validar-registro'
+import { validarContrasena, validarCorreoRegistro, validarNombre } from '../utils/validar-registro'
 
 export const registroUsuarioHttp: RegistroUsuarioPuerto = {
   async registrar(datos, signal) {
     signal.throwIfAborted()
-    const error = validarNombre(datos.nombre) ?? validarCorreo(datos.correo) ?? validarContrasena(datos.contrasena)
+    const error = validarNombre(datos.nombre) ?? validarCorreoRegistro(datos.correo) ?? validarContrasena(datos.contrasena)
     if (error) throw new Error(error)
-    const respuesta = await fetch(obtenerUrlApi('usuarios-auth/auth/registro'), {
+    // Auth publica el registro en /usuarios/registro; /auth/registro no existe y responde 404.
+    const respuesta = await fetch(obtenerUrlApi('usuarios-auth/usuarios/registro'), {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: datos.nombre.trim(),
         correo_institucional: normalizarCorreo(datos.correo),
-        contrasena: datos.contrasena,
+        // Auth nombra password_hash al campo, pero recibe la contraseña en texto y la hashea con Argon2.
+        password_hash: datos.contrasena,
       }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
     })

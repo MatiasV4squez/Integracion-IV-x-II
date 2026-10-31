@@ -1,3 +1,5 @@
+import { tieneRol } from '../auth/acceso-rutas'
+
 export interface EnlaceNavegacion {
   etiqueta: string
   destino: string
@@ -20,12 +22,14 @@ const ESTUDIANTE: readonly EnlaceNavegacion[] = [
   { etiqueta: 'Mi panel', destino: '/panel' },
   { etiqueta: 'Solicitar tutoría', destino: '/solicitudes/nueva' },
   PUBLICOS[2],
+  { etiqueta: 'Ser tutor', destino: '/postulacion-tutor' },
 ]
 
 const TUTOR: readonly EnlaceNavegacion[] = [
-  PUBLICOS[0],
+  { etiqueta: 'Inicio', destino: '/tutor' },
   { etiqueta: 'Solicitudes', destino: '/solicitudes/recibidas' },
   { etiqueta: 'Disponibilidad', destino: '/disponibilidad' },
+  { etiqueta: 'Postulaciones', destino: '/postulacion-tutor' },
   PUBLICOS[2],
 ]
 
@@ -37,14 +41,20 @@ const ADMINISTRADOR: readonly EnlaceNavegacion[] = [
 
 // Solo configura la presentación; la API mantiene la autorización de cada operación.
 export function obtenerNavegacion(roles: readonly string[] = []): readonly EnlaceNavegacion[] {
-  if (roles.some((rol) => rol === 'ADMIN' || rol === 'ADMINISTRADOR')) return ADMINISTRADOR
-  if (roles.includes('TUTOR')) return TUTOR
+  if (tieneRol(roles, 'ADMINISTRADOR')) return ADMINISTRADOR
+  if (tieneRol(roles, 'TUTOR')) return TUTOR
   return roles.length > 0 ? ESTUDIANTE : PUBLICOS
 }
 
-export function obtenerUsuarioEncabezado(sesion: { idUsuario: string; roles: string[] } | null): UsuarioEncabezado | undefined {
+export function obtenerInicioPorRol(roles: readonly string[] = []): string {
+  if (tieneRol(roles, 'ADMINISTRADOR')) return '/administracion/postulaciones'
+  if (tieneRol(roles, 'TUTOR')) return '/tutor'
+  return tieneRol(roles, 'ESTUDIANTE') ? '/inicio' : '/'
+}
+
+export function obtenerUsuarioEncabezado(sesion: { idUsuario: string; nombre?: string; roles: string[] } | null): UsuarioEncabezado | undefined {
   if (!sesion) return undefined
-  const rol = sesion.roles.some((valor) => valor === 'ADMIN' || valor === 'ADMINISTRADOR')
-    ? 'Administrador' : sesion.roles.includes('TUTOR') ? 'Tutor' : 'Estudiante'
-  return { etiqueta: 'Usuario ' + sesion.idUsuario, rol }
+  const rol = tieneRol(sesion.roles, 'ADMINISTRADOR')
+    ? 'Administrador' : tieneRol(sesion.roles, 'TUTOR') ? 'Tutor' : 'Estudiante'
+  return { etiqueta: sesion.nombre ?? 'Usuario ' + sesion.idUsuario, rol }
 }

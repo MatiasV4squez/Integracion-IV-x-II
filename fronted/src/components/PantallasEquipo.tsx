@@ -1,77 +1,26 @@
 import React, { lazy, useState } from 'react';
 import { useLocation } from 'react-router';
-import AuthLayout from './AuthLayout';
-import ProtectedRoute from './ProtectedRoute';
-import './PantallasEquipo.css';
+import { RutaProtegida } from '../shared/auth/RutasAcceso';
 
-const TutorApplicationForm = lazy(() => import('./TutorApplicationForm'));
+const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'));
 const AvailabilityScreen = lazy(() => import('./AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })));
 
 export default function PantallasEquipo() {
-  const [currentView, setCurrentView] = useState<'login' | 'apply' | 'availability'>('login');
+  const [currentView, setCurrentView] = useState<'apply' | 'availability'>('apply');
   const location = useLocation();
   const mostrarVistas = import.meta.env.DEV && new URLSearchParams(location.search).get('vistas') === '1';
 
   return (
     <div className="app-container">
       {mostrarVistas && <div style={styles.devBar}>
-        <button onClick={() => setCurrentView('login')} style={styles.devBtn}>Vista Auth</button>
         <button onClick={() => setCurrentView('apply')} style={styles.devBtn}>Vista Postulación Tutor</button>
         <button onClick={() => setCurrentView('availability')} style={styles.devBtn}>Vista Disponibilidad (Compañero)</button>
       </div>}
 
-      {currentView === 'login' && (
-        <AuthLayout activeTab="login">
-          <form onSubmit={(e) => e.preventDefault()} style={styles.form}>
-            <div style={styles.inputGroup}>
-              <label htmlFor="login-correo" style={styles.label}>Correo institucional</label>
-              <input
-                type="email"
-                id="login-correo"
-                autoComplete="username"
-                placeholder="nombre@alu.uct.cl"
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label htmlFor="login-password" style={styles.label}>Contraseña</label>
-              <input
-                type="password"
-                id="login-password"
-                autoComplete="current-password"
-                placeholder="••••••••••••"
-                style={styles.input}
-              />
-            </div>
-
-            <div className="login-preferencias">
-              <label className="login-preferencias__recordar">
-                <input type="checkbox" /> Recordarme
-              </label>
-              <a href="#forgot" className="login-preferencias__recuperar">
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
-
-            <button
-              type="button"
-              style={styles.submitBtn}
-              onClick={() => {
-                localStorage.setItem('token', 'fake-jwt-token');
-                setCurrentView('apply');
-              }}
-            >
-              Iniciar sesión
-            </button>
-          </form>
-        </AuthLayout>
-      )}
-
       {currentView === 'apply' && (
-        <ProtectedRoute>
-          <TutorApplicationForm />
-        </ProtectedRoute>
+        <RutaProtegida>
+          <PostulacionTutorContainer />
+        </RutaProtegida>
       )}
 
       {currentView === 'availability' && <AvailabilityScreen />}
@@ -99,29 +48,5 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '4px',
     fontSize: '12px',
     cursor: 'pointer',
-  },
-  form: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  label: { fontSize: '13px', fontWeight: '600', color: '#334155' },
-  input: {
-    padding: '12px 14px',
-    minHeight: '50px',
-    borderRadius: '8px',
-    border: '1px solid #E2E8F0',
-    fontSize: '16px',
-    backgroundColor: '#FFFFFF',
-    color: '#172a48',
-  },
-  submitBtn: {
-    backgroundColor: '#1467d5',
-    color: '#FFFFFF',
-    padding: '12px',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginTop: '6px',
-    minHeight: '50px',
   },
 };

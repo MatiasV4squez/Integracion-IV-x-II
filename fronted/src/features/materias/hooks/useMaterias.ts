@@ -1,38 +1,52 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
+import { catalogoMaterias } from '../aplicacion/catalogo-materias'
 import type { Materia } from '../models/materia'
-import { ErrorConsultaMaterias, obtenerMaterias } from '../services/materias-api'
 
 type ConsultaMaterias =
   | { estado: 'cargando' }
   | { estado: 'listo'; materias: Materia[] }
   | { estado: 'error'; mensaje: string }
 
-export function useMaterias() {
-  const [consulta, setConsulta] = useState<ConsultaMaterias>({ estado: 'cargando' })
-  const [intento, setIntento] = useState(0)
-
-  useEffect(() => {
-    const controlador = new AbortController()
-
-    obtenerMaterias({ signal: controlador.signal, forzarRecarga: intento > 0 })
-      .then((materias) => {
-        if (!controlador.signal.aborted) setConsulta({ estado: 'listo', materias })
-      })
-      .catch((error: unknown) => {
-        if (controlador.signal.aborted) return
-        const mensaje = error instanceof ErrorConsultaMaterias
-          ? error.message
-          : 'No pudimos cargar las materias. Inténtalo de nuevo.'
-        setConsulta({ estado: 'error', mensaje })
-      })
-
-    return () => controlador.abort()
-  }, [intento])
-
-  function recargar() {
-    setConsulta({ estado: 'cargando' })
-    setIntento((actual) => actual + 1)
+function suscribir(notificar: () => void) {
+  const cancelar = catalogoMaterias.suscribir(notificar)
+  // Al volver a la pestaña solo se consulta si los datos vencieron.
+  const alVolver = () => {
+    if (document.visibilityState === 'visible') void catalogoMaterias.cargar()
   }
+  const alCambiarAlmacenamiento = (evento: StorageEvent) => {
+    if (evento.key === null || evento.key.startsWith('stp:catalogo-materias')) catalogoMaterias.sincronizarDesdeAlmacenamiento()
+  }
+  document.addEventListener('visibilitychange', alVolver)
+  window.addEventListener('storage', alCambiarAlmacenamiento)
+  return () => {
+    cancelar()
+    document.removeEventListener('visibilitychange', alVolver)
+    window.removeEventListener('storage', alCambiarAlmacenamiento)
+  }
+}
 
-  return { consulta, recargar }
+// Funciones estables: pueden usarse como dependencias de efectos sin repetirlos en cada render.
+const recargar = () => { void catalogoMaterias.cargar({ forzar: true }) }
+const revalidarSiFalta = (idMateria: string) => { void catalogoMaterias.revalidarSiFalta(idMateria) }
+
+export function useMaterias() {
+  const estado = useSyncExternalStore(suscribir, catalogoMaterias.obtenerEstado, catalogoMaterias.obtenerEstado)
+
+  useEffect(() => { void catalogoMaterias.cargar() }, [])
+
+  // Con datos previos se siguen mostrando mientras se actualizan o si la actualización falla.
+  const consulta: ConsultaMaterias = estado.materias !== null
+    ? { estado: 'listo', materias: estado.materias }
+    : estado.error !== null && !estado.actualizando
+      ? { estado: 'error', mensaje: estado.error }
+      : { estado: 'cargando' }
+
+  return {
+    consulta,
+    actualizando: estado.actualizando && estado.materias !== null,
+    errorActualizacion: estado.materias !== null ? estado.error : null,
+    obtenidoEn: estado.obtenidoEn,
+    recargar,
+    revalidarSiFalta,
+  }
 }

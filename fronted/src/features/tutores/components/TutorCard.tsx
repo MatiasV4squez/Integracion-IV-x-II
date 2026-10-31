@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { TutorBusqueda } from '../models/tutor-busqueda'
 import { formatearHorario } from '../utils/formatear-horario'
 import './TutorCard.css'
@@ -5,6 +6,7 @@ import './TutorCard.css'
 interface TutorCardProps {
   tutor: TutorBusqueda
   onVerPerfil?: (idTutor: string) => void
+  destinoSolicitud?: string
 }
 
 const formatoPromedio = new Intl.NumberFormat('es-CL', {
@@ -12,7 +14,7 @@ const formatoPromedio = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 1,
 })
 
-export function TutorCard({ tutor, onVerPerfil }: TutorCardProps) {
+export function TutorCard({ tutor, onVerPerfil, destinoSolicitud }: TutorCardProps) {
   const nombre = tutor.nombre?.trim() || 'Tutor'
   const proximoHorario = [...tutor.horariosDisponibles].sort((a, b) =>
     (a.dia + a.horaInicio).localeCompare(b.dia + b.horaInicio),
@@ -47,6 +49,12 @@ export function TutorCard({ tutor, onVerPerfil }: TutorCardProps) {
             : 'Sin horarios disponibles'}
         </p>
       </div>
+      <div className="tutor-card__acciones">
+      {destinoSolicitud && proximoHorario && (
+        <Link className="tutor-card__perfil tutor-card__solicitar" to={destinoSolicitud} aria-label={'Solicitar tutoría con ' + nombre}>
+          Solicitar tutoría
+        </Link>
+      )}
       <button
         className="tutor-card__perfil"
         type="button"
@@ -57,6 +65,7 @@ export function TutorCard({ tutor, onVerPerfil }: TutorCardProps) {
       >
         Ver perfil
       </button>
+      </div>
     </article>
   )
 }

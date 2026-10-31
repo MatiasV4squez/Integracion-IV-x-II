@@ -1,6 +1,6 @@
 import { interpretarSesion } from './sesion-usuario'
 
-interface ResultadoInicioSesion {
+export interface ResultadoInicioSesion {
   access_token: string
   usuario: {
     id_usuario: string
@@ -19,6 +19,16 @@ export function guardarSesionUsuario(resultado: ResultadoInicioSesion) {
   window.localStorage.setItem('usuario', JSON.stringify({ idUsuario: sesion.idUsuario, nombre }))
   window.localStorage.setItem('token', resultado.access_token)
   window.dispatchEvent(new Event('stp:sesion'))
+}
+
+// Retira la sesión local aunque la revocación en Auth no haya podido confirmarse.
+export function cerrarSesionUsuario() {
+  try {
+    window.localStorage.removeItem('token')
+    window.localStorage.removeItem('usuario')
+  } finally {
+    window.dispatchEvent(new Event('stp:sesion'))
+  }
 }
 
 export function obtenerNombreUsuario(idUsuario: string, usuarioGuardado: string | null): string | undefined {

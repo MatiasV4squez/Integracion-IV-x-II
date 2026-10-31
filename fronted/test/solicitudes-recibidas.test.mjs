@@ -169,5 +169,7 @@ test('limita a diez filas la página y registra la ruta privada de solicitudes r
   assert.match(html, /11 solicitudes por responder/)
   assert.match(html, /Página 1 de 2/)
   const ruta = (path) => renderizarRuta(createElement(MemoryRouter, { initialEntries: [path] }, createElement(AppRoutes)))
-  assert.match(await ruta('/solicitudes/recibidas'), /Inicia sesión para ver tus solicitudes/)
+  const privada = await ruta('/solicitudes/recibidas')
+  assert.match(privada, /Redirigiendo al inicio de sesión…/)
+  assert.doesNotMatch(privada, /Inicia sesión para ver tus solicitudes/)
 })

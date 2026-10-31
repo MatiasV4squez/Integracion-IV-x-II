@@ -106,6 +106,7 @@ export default function RegistroUsuarioPage({ envio, registrar }: {
         </form>
       )}
       {exitoso && <Link to="/login" className="boton-global boton-global--primario">Ir a iniciar sesión <span aria-hidden="true">→</span></Link>}
+      {exitoso && <Link to="/verificar-cuenta" className="boton-global boton-global--secundario">Solicitar enlace de verificación</Link>}
     </AccesoLayout>
   )
 }

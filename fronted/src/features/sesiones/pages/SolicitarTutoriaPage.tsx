@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { SelectorTutorBloque } from '../../tutores/components/SelectorTutorBloque'
 import type { TutorBusqueda } from '../../tutores/models/tutor-busqueda'
 import type { SeleccionTutoria, SesionCreada } from '../models/solicitud-tutoria'
@@ -7,6 +8,7 @@ interface Propiedades {
   idMateria: string
   nombreMateria: string
   tutores: TutorBusqueda[]
+  idTutorInicial?: string
   seleccion: SeleccionTutoria | null
   cargando: boolean
   errorCarga: string | null
@@ -18,7 +20,7 @@ interface Propiedades {
 }
 
 export default function SolicitarTutoriaPage({
-  idMateria, nombreMateria, tutores, seleccion, cargando, errorCarga,
+  idMateria, nombreMateria, tutores, idTutorInicial, seleccion, cargando, errorCarga,
   enviando, error, sesionCreada, alSeleccionar, alEnviar,
 }: Propiedades) {
   const seleccionVigente = seleccion?.id_materia === idMateria ? seleccion : null
@@ -62,6 +64,7 @@ export default function SolicitarTutoriaPage({
             <SelectorTutorBloque
               idMateria={idMateria}
               tutores={tutores}
+              idTutorInicial={idTutorInicial}
               alSeleccionar={alSeleccionar}
             />
           )}
@@ -102,9 +105,12 @@ export default function SolicitarTutoriaPage({
           {error && <p role="alert">{error}</p>}
 
           {sesionCreada && (
-            <p role="status">
-              Solicitud enviada. Pendiente de aceptación del tutor.
-            </p>
+            <>
+              <p role="status">
+                Solicitud enviada. Pendiente de aceptación del tutor.
+              </p>
+              <Link to="/panel">Ver mis sesiones en Mi panel</Link>
+            </>
           )}
         </section>
       </section>

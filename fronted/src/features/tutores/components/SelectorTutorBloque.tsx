@@ -5,6 +5,7 @@ import type { TutorBusqueda } from '../models/tutor-busqueda'
 interface Propiedades {
   idMateria: string
   tutores: TutorBusqueda[]
+  idTutorInicial?: string
   alSeleccionar: (seleccion: SeleccionTutoria | null) => void
 }
 
@@ -15,8 +16,14 @@ const formatoFecha = new Intl.DateTimeFormat('es-CL', {
   timeZone: 'UTC',
 })
 
-export function SelectorTutorBloque({ idMateria, tutores, alSeleccionar }: Propiedades) {
-  const [estado, establecerEstado] = useState({ idMateria, idTutor: '', dia: '', idBloque: '' })
+export function SelectorTutorBloque({ idMateria, tutores, idTutorInicial = '', alSeleccionar }: Propiedades) {
+  // Preselecciona el tutor elegido en la búsqueda solo si sigue disponible para la materia.
+  const [estado, establecerEstado] = useState(() => ({
+    idMateria,
+    idTutor: tutores.some((tutor) => tutor.idTutor === idTutorInicial) ? idTutorInicial : '',
+    dia: '',
+    idBloque: '',
+  }))
   const ultimaSeleccionNotificada = useRef('')
   const { idTutor, dia, idBloque } = estado
 

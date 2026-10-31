@@ -64,7 +64,13 @@ export default function BuscarTutoresPage({
                 <ul className="buscar-tutores__lista">
                   {resultado.items.map((tutor) => (
                     <li key={tutor.idTutor}>
-                      <TutorCard tutor={tutor} onVerPerfil={onVerPerfil} />
+                      <TutorCard
+                        tutor={tutor}
+                        onVerPerfil={onVerPerfil}
+                        destinoSolicitud={materia
+                          ? '/solicitudes/nueva?' + new URLSearchParams({ materiaId: materia.idMateria, tutorId: tutor.idTutor })
+                          : undefined}
+                      />
                     </li>
                   ))}
                 </ul>

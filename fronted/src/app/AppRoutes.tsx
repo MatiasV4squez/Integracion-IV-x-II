@@ -1,6 +1,8 @@
 import { lazy, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import { TutoriasLayout } from './TutoriasLayout'
+import { RutaInvitado, RutaProtegida } from '../shared/auth/RutasAcceso'
+import { inicioSesionHttp } from '../features/inicio-sesion/services/inicio-sesion-http'
 import { registroUsuarioHttp } from '../features/registro-usuario/services/registro-usuario-http'
 import { verificacionCuentaHttp } from '../features/verificacion-cuenta/services/verificacion-cuenta-http'
 
@@ -15,23 +17,37 @@ const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/contai
 const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
 const DisponibilidadContainer = lazy(() => import('../features/disponibilidad/containers/DisponibilidadContainer'))
 const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario/containers/RegistroUsuarioContainer'))
+const DashboardTutorContainer = lazy(() => import('../features/panel-tutor/containers/DashboardTutorContainer'))
+const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'))
+const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
+
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
     <Routes>
       <Route element={<TutoriasLayout />}>
-        <Route path="/administracion/postulaciones" element={<PostulacionesAdminContainer />} />
-        <Route path="/inicio" element={<DashboardEstudianteContainer />} />
         <Route path="/materias" element={<CatalogoMateriasContainer />} />
         <Route path="/tutores" element={<BuscarTutoresContainer />} />
-        <Route path="/solicitudes/recibidas" element={<SolicitudesRecibidasContainer />} />
-        <Route path="/panel" element={<PanelTuteeContainer />} />
         <Route path="/verificar-cuenta" element={<VerificacionCuentaContainer api={verificacionCuentaHttp} />} />
-        <Route
-          path="/solicitudes/nueva"
-          element={<SolicitarTutoriaContainer idMateria="1" nombreMateria="Cálculo intermedio" />}
-        />
-        <Route path="/disponibilidad" element={<DisponibilidadContainer />} />
-        <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
+        <Route element={<RutaInvitado />}>
+          <Route path="/login" element={<InicioSesionContainer api={inicioSesionHttp} />} />
+          <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
+        </Route>
+        <Route element={<RutaProtegida />}>
+          <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
+          <Route path="/inicio" element={<DashboardEstudianteContainer />} />
+          <Route path="/panel" element={<PanelTuteeContainer />} />
+          <Route path="/solicitudes/nueva" element={<SolicitarTutoriaContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['TUTOR']} />}>
+          <Route path="/tutor" element={<DashboardTutorContainer />} />
+          <Route path="/solicitudes/recibidas" element={<SolicitudesRecibidasContainer />} />
+          <Route path="/disponibilidad" element={<DisponibilidadContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
+          <Route path="/administracion/postulaciones" element={<PostulacionesAdminContainer />} />
+        </Route>
         {children}
         <Route path="/*" element={<PantallasEquipo />} />
       </Route>

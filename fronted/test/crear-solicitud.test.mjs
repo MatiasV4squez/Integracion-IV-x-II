@@ -50,9 +50,7 @@ test('envía los identificadores limpios y el JWT por el Gateway', async () => {
   assert.equal(llamadas.length, 1)
 
   const { url, opciones } = llamadas[0]
-  const base = (
-    vite.config.env.VITE_API_URL ?? 'http://localhost:8080/api'
-  ).replace(/\/$/, '')
+  const base = vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '')
 
   assert.equal(url, `${base}/agendamiento-sesiones/sessions`)
   assert.equal(opciones.method, 'POST')

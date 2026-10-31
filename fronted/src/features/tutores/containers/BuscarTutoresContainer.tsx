@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useBuscarTutores } from '../hooks/useBuscarTutores'
@@ -8,10 +9,12 @@ import { leerParametrosBusqueda } from '../utils/leer-parametros-busqueda'
 export default function BuscarTutoresContainer() {
   const [parametros, setParametros] = useSearchParams()
   const { materiaId, page, error: errorParametros } = leerParametrosBusqueda(parametros)
-  const { consulta: catalogo, recargar: recargarMaterias } = useMaterias()
+  const { consulta: catalogo, recargar: recargarMaterias, revalidarSiFalta, actualizando } = useMaterias()
   const materias = catalogo.estado === 'listo' ? catalogo.materias : []
   const materia = materias.find((item) => item.idMateria === materiaId)
-  const error = errorParametros ?? (catalogo.estado === 'listo' && materiaId && !materia
+  // Antes de declarar inexistente una materia, se confirma con datos recientes del catálogo.
+  useEffect(() => { if (materiaId) revalidarSiFalta(materiaId) }, [materiaId, revalidarSiFalta])
+  const error = errorParametros ?? (catalogo.estado === 'listo' && materiaId && !materia && !actualizando
     ? 'La materia seleccionada no está disponible. Elige otra materia.' : undefined)
   const { consulta, recargar } = useBuscarTutores(materia && !error ? materiaId : '', page)
 

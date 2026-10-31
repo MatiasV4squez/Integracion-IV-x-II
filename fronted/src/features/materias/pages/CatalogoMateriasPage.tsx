@@ -12,11 +12,15 @@ interface CatalogoMateriasPageProps {
   cargando?: boolean
   error?: string
   onReintentar?: () => void
+  actualizando?: boolean
+  errorActualizacion?: string | null
+  onActualizar?: () => void
   obtenerDestinoMateria?: (materia: Materia) => string
 }
 
 export default function CatalogoMateriasPage({
-  materias, cargando = false, error, onReintentar, obtenerDestinoMateria,
+  materias, cargando = false, error, onReintentar, actualizando = false, errorActualizacion = null, onActualizar,
+  obtenerDestinoMateria,
 }: CatalogoMateriasPageProps) {
   const [busqueda, setBusqueda] = useState('')
   const [consulta, setConsulta] = useState('')
@@ -33,6 +37,19 @@ export default function CatalogoMateriasPage({
       <p className="catalogo-materias__subtitulo">
         Explora las asignaturas disponibles para solicitar tutorías.
       </p>
+      {!cargando && !error && onActualizar && (
+        <div className="catalogo-materias__actualizacion">
+          <button type="button" className="catalogo-materias__actualizar" disabled={actualizando} onClick={onActualizar}>
+            {actualizando ? 'Actualizando…' : 'Actualizar catálogo'}
+          </button>
+          <span role="status">{actualizando ? 'Consultando las materias más recientes.' : ''}</span>
+        </div>
+      )}
+      {!cargando && !error && errorActualizacion && (
+        <p className="catalogo-materias__aviso" role="alert">
+          {errorActualizacion} Se muestran las materias consultadas anteriormente.
+        </p>
+      )}
 
       {cargando ? (
         <EstadoConsultaMaterias estado="cargando" />
