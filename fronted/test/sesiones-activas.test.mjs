@@ -145,8 +145,8 @@ test('muestra las sesiones activas con materia, tutor, horario y estado', () => 
 
 test('registra la ruta del panel del estudiante dentro del layout compartido', async () => {
   const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: ['/panel'] }, createElement(AppRoutes)))
-  assert.match(html, /Mi panel/)
-  assert.match(html, /Inicia sesión para ver tus sesiones/)
+  assert.match(html, /Redirigiendo al inicio de sesión…/)
+  assert.doesNotMatch(html, /Inicia sesión para ver tus sesiones/)
   assert.equal((html.match(/<header\b/g) ?? []).length, 1)
   assert.equal((html.match(/<main\b/g) ?? []).length, 1)
 })

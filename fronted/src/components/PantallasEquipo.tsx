@@ -1,6 +1,6 @@
 import React, { lazy, useState } from 'react';
 import { useLocation } from 'react-router';
-import ProtectedRoute from './ProtectedRoute';
+import { RutaProtegida } from '../shared/auth/RutasAcceso';
 
 const TutorApplicationForm = lazy(() => import('./TutorApplicationForm'));
 const AvailabilityScreen = lazy(() => import('./AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })));
@@ -18,9 +18,9 @@ export default function PantallasEquipo() {
       </div>}
 
       {currentView === 'apply' && (
-        <ProtectedRoute>
+        <RutaProtegida>
           <TutorApplicationForm />
-        </ProtectedRoute>
+        </RutaProtegida>
       )}
 
       {currentView === 'availability' && <AvailabilityScreen />}

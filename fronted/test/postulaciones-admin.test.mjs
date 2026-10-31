@@ -64,8 +64,8 @@ test('bloquea la descarga en curso y muestra su error sin inventar un detalle in
 
 test('integra la ruta administrativa con carga diferida, conservando un encabezado y un pie', async () => {
   const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: ['/administracion/postulaciones'] }, createElement(AppRoutes)))
-  assert.match(html, /Administrar postulaciones/)
-  assert.match(html, /Debes iniciar sesión/)
+  assert.match(html, /Redirigiendo al inicio de sesión…/)
+  assert.doesNotMatch(html, /Administrar postulaciones/)
   assert.equal((html.match(/<header\b/g) ?? []).length, 1)
   assert.equal((html.match(/<footer\b/g) ?? []).length, 1)
 })

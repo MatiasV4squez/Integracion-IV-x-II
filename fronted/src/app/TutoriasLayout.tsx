@@ -15,8 +15,9 @@ export function TutoriasLayout() {
   function cerrarSesion() {
     // La revocación es de mejor esfuerzo: la sesión local se retira aunque Auth no responda.
     if (sesion) inicioSesionHttp.cerrarSesion(sesion.token, new AbortController().signal).catch(() => {})
-    cerrarSesionUsuario()
+    // Navegar antes de retirar la sesión evita que la ruta protegida guarde su dirección como destino.
     navegar('/login', { replace: true })
+    cerrarSesionUsuario()
   }
 
   return (

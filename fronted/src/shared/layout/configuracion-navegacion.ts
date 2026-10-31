@@ -1,3 +1,5 @@
+import { tieneRol } from '../auth/acceso-rutas'
+
 export interface EnlaceNavegacion {
   etiqueta: string
   destino: string
@@ -37,20 +39,20 @@ const ADMINISTRADOR: readonly EnlaceNavegacion[] = [
 
 // Solo configura la presentación; la API mantiene la autorización de cada operación.
 export function obtenerNavegacion(roles: readonly string[] = []): readonly EnlaceNavegacion[] {
-  if (roles.some((rol) => rol === 'ADMIN' || rol === 'ADMINISTRADOR')) return ADMINISTRADOR
-  if (roles.includes('TUTOR')) return TUTOR
+  if (tieneRol(roles, 'ADMINISTRADOR')) return ADMINISTRADOR
+  if (tieneRol(roles, 'TUTOR')) return TUTOR
   return roles.length > 0 ? ESTUDIANTE : PUBLICOS
 }
 
 export function obtenerInicioPorRol(roles: readonly string[] = []): string {
-  if (roles.some((rol) => rol === 'ADMIN' || rol === 'ADMINISTRADOR')) return '/administracion/postulaciones'
-  if (roles.includes('TUTOR')) return '/solicitudes/recibidas'
-  return roles.includes('ESTUDIANTE') ? '/inicio' : '/'
+  if (tieneRol(roles, 'ADMINISTRADOR')) return '/administracion/postulaciones'
+  if (tieneRol(roles, 'TUTOR')) return '/solicitudes/recibidas'
+  return tieneRol(roles, 'ESTUDIANTE') ? '/inicio' : '/'
 }
 
 export function obtenerUsuarioEncabezado(sesion: { idUsuario: string; nombre?: string; roles: string[] } | null): UsuarioEncabezado | undefined {
   if (!sesion) return undefined
-  const rol = sesion.roles.some((valor) => valor === 'ADMIN' || valor === 'ADMINISTRADOR')
-    ? 'Administrador' : sesion.roles.includes('TUTOR') ? 'Tutor' : 'Estudiante'
+  const rol = tieneRol(sesion.roles, 'ADMINISTRADOR')
+    ? 'Administrador' : tieneRol(sesion.roles, 'TUTOR') ? 'Tutor' : 'Estudiante'
   return { etiqueta: sesion.nombre ?? 'Usuario ' + sesion.idUsuario, rol }
 }
