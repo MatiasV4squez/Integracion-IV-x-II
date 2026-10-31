@@ -18,6 +18,43 @@
   font-size: 15px;
 }
 
+.catalogo-materias__actualizacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.catalogo-materias__actualizar {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+  color: var(--color-primary-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.catalogo-materias__actualizar:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.catalogo-materias__aviso {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #b42318;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+}
+
 .catalogo-materias__resumen {
   display: flex;
   align-items: center;

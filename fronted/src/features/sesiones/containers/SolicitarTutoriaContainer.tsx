@@ -116,9 +116,11 @@ function SolicitudDeMateria({ sesion, idMateria, nombreMateria, idTutorInicial }
 export default function SolicitarTutoriaContainer() {
   const sesion = useSesionUsuario()
   const [parametros, establecerParametros] = useSearchParams()
-  const { consulta: catalogo, recargar } = useMaterias()
+  const { consulta: catalogo, recargar, revalidarSiFalta, actualizando } = useMaterias()
   const idMateria = parametros.get('materiaId') ?? ''
   const idTutor = parametros.get('tutorId') ?? ''
+  // Una materia creada después de la última consulta se busca antes de pedir elegir otra.
+  useEffect(() => { if (idMateria) revalidarSiFalta(idMateria) }, [idMateria, revalidarSiFalta])
 
   // RutaProtegida exige la sesión de estudiante; esto solo evita renderizar sin ella.
   if (!sesion) return null
@@ -145,7 +147,7 @@ export default function SolicitarTutoriaContainer() {
         <p>Elige la materia en la que necesitas apoyo para ver a sus tutores y horarios.</p>
         <SeleccionMateriaTutoria
           materias={catalogo.materias}
-          materiaInvalida={idMateria !== ''}
+          materiaInvalida={idMateria !== '' && !actualizando}
           onElegir={(elegida) => establecerParametros({ materiaId: elegida })}
         />
       </section>
