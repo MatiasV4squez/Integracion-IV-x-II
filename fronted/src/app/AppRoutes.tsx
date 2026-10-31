@@ -17,6 +17,7 @@ const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/contai
 const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
 const DisponibilidadContainer = lazy(() => import('../features/disponibilidad/containers/DisponibilidadContainer'))
 const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario/containers/RegistroUsuarioContainer'))
+const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'))
 const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
 
 export function AppRoutes({ children }: { children?: ReactNode }) {
@@ -29,6 +30,9 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
         <Route element={<RutaInvitado />}>
           <Route path="/login" element={<InicioSesionContainer api={inicioSesionHttp} />} />
           <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
+        </Route>
+        <Route element={<RutaProtegida />}>
+          <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
           <Route path="/inicio" element={<DashboardEstudianteContainer />} />

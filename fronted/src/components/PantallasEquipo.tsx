@@ -2,7 +2,7 @@ import React, { lazy, useState } from 'react';
 import { useLocation } from 'react-router';
 import { RutaProtegida } from '../shared/auth/RutasAcceso';
 
-const TutorApplicationForm = lazy(() => import('./TutorApplicationForm'));
+const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'));
 const AvailabilityScreen = lazy(() => import('./AvailabilityScreen').then(({ AvailabilityScreen }) => ({ default: AvailabilityScreen })));
 
 export default function PantallasEquipo() {
@@ -19,7 +19,7 @@ export default function PantallasEquipo() {
 
       {currentView === 'apply' && (
         <RutaProtegida>
-          <TutorApplicationForm />
+          <PostulacionTutorContainer />
         </RutaProtegida>
       )}
 
