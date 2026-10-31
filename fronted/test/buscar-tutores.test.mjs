@@ -148,11 +148,11 @@ test('lee enlaces compartidos y rechaza IDs, páginas o parámetros duplicados i
 })
 
 function renderPagina(consulta, adicionales = {}) {
-  return renderToStaticMarkup(createElement(BuscarTutoresPage, {
+  return renderToStaticMarkup(createElement(MemoryRouter, null, createElement(BuscarTutoresPage, {
     materias: [materia], materiaId: materia.idMateria, cargandoMaterias: false,
     onReintentarMaterias() {}, consulta, onBuscar() {}, onReintentar() {}, onCambiarPagina() {},
     ...adicionales,
-  }))
+  })))
 }
 
 test('muestra estados inicial, carga, error con reintento y búsqueda sin coincidencias', () => {
@@ -177,6 +177,9 @@ test('muestra resultados, calificaciones y paginación, y ofrece recuperar una p
   assert.match(html, /Página 1 de 3/)
   assert.match(html, /disabled="">Anterior/)
   assert.match(html, /disabled=""[^>]*>Ver perfil<\/button>/)
+  assert.match(html, /href="\/solicitudes\/nueva\?materiaId=9007199254740993&amp;tutorId=9007199254740995"[^>]*>\s*Solicitar tutoría/)
+  const sinHorarios = renderPagina({ estado: 'listo', resultado: { ...resultado, items: [{ ...tutor, horariosDisponibles: [] }] } })
+  assert.doesNotMatch(sinHorarios, /Solicitar tutoría/, 'No ofrece solicitar a un tutor sin bloques')
   assert.doesNotMatch(html, /<header|<footer/)
   const fueraDeRango = renderPagina({ estado: 'listo', resultado: { ...resultado, items: [], total: 21, page: 4, totalPages: 3 } })
   assert.match(fueraDeRango, /Volver a la primera página/)

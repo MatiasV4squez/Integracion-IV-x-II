@@ -51,6 +51,20 @@
   font-size: 13px;
 }
 
+.tutor-card__acciones {
+  display: grid;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.tutor-card__solicitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .tutor-card__perfil {
   flex-shrink: 0;
   min-width: 156px;
@@ -96,6 +110,12 @@
   .tutor-card__avatar {
     width: 48px;
     height: 48px;
+  }
+
+  .tutor-card__acciones {
+    grid-column: 2;
+    justify-self: end;
+    max-width: 100%;
   }
 
   .tutor-card__perfil {

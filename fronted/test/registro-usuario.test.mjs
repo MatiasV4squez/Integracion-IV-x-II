@@ -49,7 +49,7 @@ test('registra exclusivamente por el Gateway con el contrato público de Auth', 
   await api.registrar(datosValidos, signal())
   assert.equal(llamadas.length, 1)
   const { url, opciones } = llamadas[0]
-  assert.equal(url, vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/usuarios-auth/auth/registro')
+  assert.equal(url, vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/usuarios-auth/usuarios/registro')
   assert.equal(opciones.method, 'POST')
   assert.equal(opciones.headers['Content-Type'], 'application/json')
   assert.equal(opciones.headers.Authorization, undefined)
@@ -58,8 +58,18 @@ test('registra exclusivamente por el Gateway con el contrato público de Auth', 
   assert.deepEqual(JSON.parse(opciones.body), {
     nombre: 'Camila González',
     correo_institucional: 'camila@alu.uct.cl',
-    contrasena: 'clave-segura-1',
+    password_hash: 'clave-segura-1',
   })
+})
+
+test('solo admite el correo institucional que Auth acepta', async () => {
+  const completo = { nombre: 'Camila', correo: 'camila@alu.uct.cl', contrasena: 'clave-segura-1', confirmacion: 'clave-segura-1' }
+  assert.deepEqual(validarRegistro({ ...completo, correo: ' CAMILA@ALU.UCT.CL ' }), {})
+  for (const correo of ['camila@gmail.com', 'camila@uct.cl', 'camila@alu.uct.cl.com']) {
+    assert.match(validarRegistro({ ...completo, correo }).correo, /@alu\.uct\.cl/, correo)
+  }
+  globalThis.fetch = () => { assert.fail('No debe enviar un correo que Auth rechazará') }
+  await assert.rejects(api.registrar({ ...datosValidos, correo: 'camila@gmail.com' }, signal()), /institucional/)
 })
 
 test('diferencia datos rechazados, correo duplicado y fallos de comunicación', async () => {
@@ -117,8 +127,10 @@ test('muestra el resultado del registro y sus errores según el estado del enví
     createElement(Page, { envio, registrar: () => {} })))
   const exito = pagina('exitoso')
   assert.match(exito, /¡Cuenta creada!/)
-  assert.match(exito, /enlace de verificación/)
+  assert.match(exito, /Ya puedes iniciar sesión/)
+  assert.doesNotMatch(exito, /Revisa tu correo/, 'Auth no envía el enlace al registrar')
   assert.match(exito, /Ir a iniciar sesión/)
+  assert.match(exito, /href="\/verificar-cuenta"[^>]*>Solicitar enlace de verificación/)
   assert.doesNotMatch(exito, /name="contrasena"/)
   for (const [envio, esperado] of [['invalido', /No pudimos crear tu cuenta/], ['duplicado', /El correo institucional ya está registrado/], ['error', /No pudimos completar el registro/]]) {
     const html = pagina(envio)

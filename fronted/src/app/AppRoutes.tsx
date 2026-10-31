@@ -38,10 +38,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
           <Route path="/inicio" element={<DashboardEstudianteContainer />} />
           <Route path="/panel" element={<PanelTuteeContainer />} />
-          <Route
-            path="/solicitudes/nueva"
-            element={<SolicitarTutoriaContainer idMateria="1" nombreMateria="Cálculo intermedio" />}
-          />
+          <Route path="/solicitudes/nueva" element={<SolicitarTutoriaContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['TUTOR']} />}>
           <Route path="/tutor" element={<DashboardTutorContainer />} />
