@@ -27,7 +27,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "test:reputacion:postgres": "vitest run --config ./vitest.config.postgres.ts",
     "test:materias:postgres": "vitest run --config ./vitest.config.materias-postgres.ts",
-    "test:disponibilidad:postgres": "vitest run --config ./vitest.config.disponibilidad-postgres.ts"
+    "test:disponibilidad:postgres": "vitest run --config ./vitest.config.disponibilidad-postgres.ts",
+    "test:flujo-tutor": "npm run build && node --test test/flujo-tutor.integration.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -60,7 +61,6 @@
     "supertest": "^7.0.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.2",
-    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.2"
   },
   "allowScripts": {
