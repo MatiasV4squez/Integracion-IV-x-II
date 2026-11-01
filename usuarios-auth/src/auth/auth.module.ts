@@ -10,6 +10,8 @@ import {
   SESSION_REPOSITORY,
   MODERACION_CUENTAS_REPOSITORY,
   SESSION_IDLE_TIMEOUT_SECONDS,
+  ROLES_REPOSITORY,
+  type RolesRepository,
 } from './dominio/auth.ports';
 import { AuthService } from './aplicacion/auth.service';
 import { PasswordService } from './infraestructura/seguridad/password.service';
@@ -21,6 +23,10 @@ import { JwtAuthGuard } from './infraestructura/http/jwt-auth.guard';
 import { InternalServiceGuard } from './infraestructura/http/internal-service.guard';
 import { AuthController } from './infraestructura/http/auth.controller';
 import { InternalModeracionController } from './infraestructura/http/internal-moderacion.controller';
+import { AsignarTutorUseCase } from './aplicacion/asignar-tutor.use-case';
+import { PrismaRolesRepository } from './infraestructura/persistencia/prisma-roles.repository';
+import { IntegracionSecretGuard } from './infraestructura/http/integracion-secret.guard';
+import { InternalRolesController } from './infraestructura/http/internal-roles.controller';
 
 @Module({
   imports: [
@@ -41,7 +47,11 @@ import { InternalModeracionController } from './infraestructura/http/internal-mo
       }),
     }),
   ],
-  controllers: [AuthController, InternalModeracionController],
+  controllers: [
+    AuthController,
+    InternalModeracionController,
+    InternalRolesController,
+  ],
   providers: [
     {
       provide: SESSION_IDLE_TIMEOUT_SECONDS,
@@ -51,6 +61,12 @@ import { InternalModeracionController } from './infraestructura/http/internal-mo
     },
     { provide: PASSWORD_VERIFIER, useClass: PasswordService },
     { provide: TOKEN_PROVIDER, useClass: TokenService },
+    { provide: ROLES_REPOSITORY, useClass: PrismaRolesRepository },
+    {
+      provide: AsignarTutorUseCase,
+      inject: [ROLES_REPOSITORY],
+      useFactory: (roles: RolesRepository) => new AsignarTutorUseCase(roles),
+    },
     PrismaAuthRepository,
     { provide: SESSION_REPOSITORY, useExisting: PrismaAuthRepository },
     {
@@ -62,6 +78,7 @@ import { InternalModeracionController } from './infraestructura/http/internal-mo
     ModeracionCuentasService,
     JwtAuthGuard,
     InternalServiceGuard,
+    IntegracionSecretGuard,
   ],
   exports: [AuthService, JwtAuthGuard, TOKEN_PROVIDER, SessionService],
 })

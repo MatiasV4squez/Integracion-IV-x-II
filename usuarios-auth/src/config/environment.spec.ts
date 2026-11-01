@@ -37,6 +37,9 @@ describe('Configuración básica de autenticación', () => {
     { JWT_SECRET: 'secreto-corto' },
     { INTERNAL_SERVICE_API_KEY: undefined },
     { INTERNAL_SERVICE_API_KEY: 'clave-corta' },
+    { INTEGRACION_SECRET: '' },
+    { INTEGRACION_SECRET: 'clave-corta' },
+    { INTEGRACION_SECRET: 123 },
     { JWT_ACCESS_TTL_SECONDS: '59' },
     { JWT_ACCESS_TTL_SECONDS: '86401' },
     { JWT_ACCESS_TTL_SECONDS: 'media-hora' },
@@ -58,5 +61,14 @@ describe('Configuración básica de autenticación', () => {
     { EMAIL_VERIFICATION_TTL_MINUTES: '1441' },
   ])('rechaza una configuración inválida: %j', (override) => {
     expect(() => validateEnvironment({ ...base, ...override })).toThrow();
+  });
+
+  it('admite integración sin exigirla para arrancar los servicios existentes', () => {
+    expect(validateEnvironment(base).INTEGRACION_SECRET).toBeUndefined();
+    const secret = 'secreto-de-integracion-con-al-menos-32-bytes';
+    expect(
+      validateEnvironment({ ...base, INTEGRACION_SECRET: ` ${secret} ` })
+        .INTEGRACION_SECRET,
+    ).toBe(secret);
   });
 });

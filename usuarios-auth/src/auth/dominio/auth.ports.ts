@@ -1,6 +1,7 @@
 export const PASSWORD_VERIFIER = Symbol('PASSWORD_VERIFIER');
 export const TOKEN_PROVIDER = Symbol('TOKEN_PROVIDER');
 export const SESSION_REPOSITORY = Symbol('SESSION_REPOSITORY');
+export const ROLES_REPOSITORY = Symbol('ROLES_REPOSITORY');
 export const MODERACION_CUENTAS_REPOSITORY = Symbol(
   'MODERACION_CUENTAS_REPOSITORY',
 );
@@ -70,4 +71,13 @@ export interface ModeracionCuentasRepository {
     idUsuario: bigint,
     estado: EstadoCuentaModerable,
   ): Promise<ResultadoModeracion | null>;
+}
+
+export type ResultadoAsignarTutor =
+  | 'ASIGNADO'
+  | 'USUARIO_NO_ENCONTRADO'
+  | 'ROL_NO_CONFIGURADO';
+
+export interface RolesRepository {
+  asignarTutor(idUsuario: bigint): Promise<ResultadoAsignarTutor>;
 }

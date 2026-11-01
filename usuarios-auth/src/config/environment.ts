@@ -58,7 +58,19 @@ export function validateEnvironment(config: Record<string, unknown>) {
   }
   const internalServiceApiKey = required(config, 'INTERNAL_SERVICE_API_KEY');
   if (Buffer.byteLength(internalServiceApiKey, 'utf8') < 32) {
-    throw new Error('INTERNAL_SERVICE_API_KEY debe contener al menos 32 bytes.');
+    throw new Error(
+      'INTERNAL_SERVICE_API_KEY debe contener al menos 32 bytes.',
+    );
+  }
+  const integracionSecret =
+    config.INTEGRACION_SECRET === undefined
+      ? undefined
+      : required(config, 'INTEGRACION_SECRET');
+  if (
+    integracionSecret !== undefined &&
+    Buffer.byteLength(integracionSecret, 'utf8') < 32
+  ) {
+    throw new Error('INTEGRACION_SECRET debe contener al menos 32 bytes.');
   }
   const jwtAccessTtlSeconds = integerInRange(
     config.JWT_ACCESS_TTL_SECONDS,
@@ -100,6 +112,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     PORT: port,
     JWT_SECRET: jwtSecret,
     INTERNAL_SERVICE_API_KEY: internalServiceApiKey,
+    INTEGRACION_SECRET: integracionSecret,
     JWT_ACCESS_TTL_SECONDS: jwtAccessTtlSeconds,
     JWT_IDLE_TIMEOUT_SECONDS: jwtIdleTimeoutSeconds,
     SMTP_HOST: smtpHost,

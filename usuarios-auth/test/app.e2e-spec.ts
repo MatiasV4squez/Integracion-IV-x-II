@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { verify } from 'argon2';
 import request from 'supertest';
@@ -41,6 +42,8 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       updateMany: jest.fn(),
     },
     sesion: { create: jest.fn(), updateMany: jest.fn() },
+    rol: { findUnique: jest.fn() },
+    usuarioRol: { createMany: jest.fn() },
     verificacionCorreo: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -58,6 +61,8 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       PORT: '3000',
       JWT_SECRET: 'secreto-jwt-de-prueba-con-al-menos-32-bytes',
       INTERNAL_SERVICE_API_KEY: 'clave-interna-de-prueba-con-al-menos-32-bytes',
+      INTEGRACION_SECRET:
+        'secreto-de-integracion-de-prueba-con-al-menos-32-bytes',
       JWT_ACCESS_TTL_SECONDS: '1800',
       JWT_IDLE_TIMEOUT_SECONDS: '1800',
       SMTP_HOST: 'smtp.example.test',
@@ -150,6 +155,16 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       },
     );
     prisma.usuario.findUnique.mockImplementation(async () => cuentaActual);
+    prisma.rol.findUnique.mockResolvedValue({ id_rol: 7 });
+    prisma.usuarioRol.createMany.mockImplementation(async () => {
+      if (cuentaActual.roles.some(({ rol }) => rol.nombre === 'TUTOR'))
+        return { count: 0 };
+      cuentaActual.roles = [
+        ...cuentaActual.roles,
+        { rol: { nombre: 'TUTOR' } },
+      ];
+      return { count: 1 };
+    });
     prisma.usuario.updateMany.mockImplementation(
       async ({
         where,
@@ -188,6 +203,10 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
 
   afterAll(async () => {
     if (app) await app.close();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   function login(overrides: Record<string, unknown> = {}) {
@@ -582,6 +601,85 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       )
       .send({ estado });
   }
+
+  function asignarTutor(
+    body: Record<string, unknown> = { idUsuario: '1', rol: 'TUTOR' },
+    headers: Record<string, string> = {
+      'X-Integracion-Secret': process.env.INTEGRACION_SECRET as string,
+    },
+  ) {
+    return request(app.getHttpServer())
+      .post('/internal/usuarios/roles')
+      .set(headers)
+      .send(body);
+  }
+
+  it('asigna TUTOR sin duplicados, conserva BIGINT y lo incluye en el siguiente JWT', async () => {
+    cuentaActual.id_usuario = 9007199254740993n;
+    cuentaActual.roles = [{ rol: { nombre: 'ESTUDIANTE' } }];
+    const dto = { idUsuario: '9007199254740993', rol: 'TUTOR' };
+    const anterior = (await login().expect(200)).body.access_token as string;
+    await asignarTutor(dto).expect(200, dto);
+    await asignarTutor(dto).expect(200, dto);
+    expect(jwt.decode(anterior).roles).toEqual(['ESTUDIANTE']);
+    const nuevo = (await login().expect(200)).body.access_token as string;
+    expect(jwt.decode(nuevo).roles).toEqual(['ESTUDIANTE', 'TUTOR']);
+    expect(
+      prisma.usuarioRol.createMany.mock.calls[0][0].data[0].id_usuario,
+    ).toBe(9007199254740993n);
+  });
+
+  it.each([
+    {},
+    { idUsuario: '1' },
+    { idUsuario: 1, rol: 'TUTOR' },
+    { idUsuario: '0', rol: 'TUTOR' },
+    { idUsuario: '-1', rol: 'TUTOR' },
+    { idUsuario: 'abc', rol: 'TUTOR' },
+    { idUsuario: '9223372036854775808', rol: 'TUTOR' },
+    { idUsuario: '1', rol: 'ADMINISTRADOR' },
+  ])('rechaza una asignación inválida: %j', async (body) => {
+    await asignarTutor(body).expect(400);
+    expect(prisma.usuarioRol.createMany).not.toHaveBeenCalled();
+  });
+
+  it.each<Record<string, string>>([
+    {},
+    { 'X-Integracion-Secret': 'clave-incorrecta' },
+    {
+      'X-Internal-Service-Key': 'clave-interna-de-prueba-con-al-menos-32-bytes',
+    },
+  ])('rechaza credenciales de integración inválidas: %j', async (headers) => {
+    await asignarTutor(undefined, headers).expect(401);
+    expect(prisma.usuarioRol.createMany).not.toHaveBeenCalled();
+  });
+
+  it('mantiene separados los secretos de roles y moderación', async () => {
+    await request(app.getHttpServer())
+      .patch('/internal/usuarios/1/estado-cuenta')
+      .set('X-Integracion-Secret', process.env.INTEGRACION_SECRET as string)
+      .send({ estado: 'SUSPENDIDO' })
+      .expect(401);
+    expect(prisma.usuario.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rechaza la integración cuando INTEGRACION_SECRET no está configurado', async () => {
+    jest.spyOn(app.get(ConfigService), 'get').mockReturnValueOnce(undefined);
+    await asignarTutor().expect(401);
+    expect(prisma.usuarioRol.createMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { consulta: prisma.usuario.findUnique, status: 404 },
+    { consulta: prisma.rol.findUnique, status: 503 },
+  ])(
+    'responde $status cuando faltan datos de la asignación',
+    async ({ consulta, status }) => {
+      consulta.mockResolvedValueOnce(null);
+      await asignarTutor().expect(status);
+      expect(prisma.usuarioRol.createMany).not.toHaveBeenCalled();
+    },
+  );
 
   it('suspende todas las sesiones y la reactivación requiere un login nuevo', async () => {
     const primera = (await login().expect(200)).body.access_token as string;
