@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { UsuariosPersistenceModule } from '../usuarios/infraestructura/usuarios-persistence.module';
+import { UsuariosPersistenceModule } from '../usuarios/infraestructura/persistencia/usuarios-persistence.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
 import {
@@ -59,7 +59,8 @@ import { InternalRolesController } from './infraestructura/http/internal-roles.c
       useFactory: (config: ConfigService) =>
         config.getOrThrow<number>('JWT_IDLE_TIMEOUT_SECONDS'),
     },
-    { provide: PASSWORD_VERIFIER, useClass: PasswordService },
+    PasswordService,
+    { provide: PASSWORD_VERIFIER, useExisting: PasswordService },
     { provide: TOKEN_PROVIDER, useClass: TokenService },
     { provide: ROLES_REPOSITORY, useClass: PrismaRolesRepository },
     {
@@ -80,6 +81,12 @@ import { InternalRolesController } from './infraestructura/http/internal-roles.c
     InternalServiceGuard,
     IntegracionSecretGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, TOKEN_PROVIDER, SessionService],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    TOKEN_PROVIDER,
+    SessionService,
+    PasswordService,
+  ],
 })
 export class AuthModule {}

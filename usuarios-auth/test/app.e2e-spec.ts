@@ -5,10 +5,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { verify } from 'argon2';
+import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { serializeBigInt } from '../src/config/json-serialization';
-import { EMAIL_VERIFICATION_SENDER } from '../src/verificacion-correo/ports/email-verification.sender';
+import { EMAIL_VERIFICATION_SENDER } from '../src/verificacion-correo/dominio/ports/email-verification.sender';
 import { loginFixture } from './fixtures/login.fixture';
 
 interface SesionSimulada {
@@ -312,12 +313,16 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     expect(prisma.usuario.findUnique).not.toHaveBeenCalled();
   });
 
-  it.each(['/auth/registro'])(
+  it.each(['/auth/registro', '/verificacion-correo'])(
     'no expone la ruta fuera de alcance %s',
     async (path) => {
       await request(app.getHttpServer()).post(path).send({}).expect(404);
     },
   );
+
+  it('no publica el listado antiguo de verificaciones', async () => {
+    await request(app.getHttpServer()).get('/verificacion-correo').expect(404);
+  });
 
   it('reenvía un enlace sin exponer ni almacenar el token original', async () => {
     prisma.usuario.findUnique.mockResolvedValueOnce({
@@ -564,6 +569,33 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     ).toBe(true);
     expect(respuesta.body).not.toHaveProperty('password_hash');
   });
+
+  it.each(['existente', 'concurrente'])(
+    'devuelve 409 para un correo duplicado %s',
+    async (modo) => {
+      prisma.usuario.findUnique.mockResolvedValueOnce(
+        modo === 'existente' ? usuarioExistente : null,
+      );
+      prisma.usuario.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Correo duplicado', {
+          code: 'P2002',
+          clientVersion: '5.22.0',
+          meta: { target: ['correo_institucional'] },
+        }),
+      );
+      const respuesta = await request(app.getHttpServer())
+        .post('/usuarios/registro')
+        .send({
+          nombre: 'Duplicado',
+          correo_institucional: email,
+          password_hash: loginFixture.password,
+        })
+        .expect(409);
+      expect(respuesta.body.message).toBe(
+        'El correo institucional ya está registrado.',
+      );
+    },
+  );
 
   it('comparte el flujo JWT con el login de usuarios', async () => {
     const { body } = await request(app.getHttpServer())

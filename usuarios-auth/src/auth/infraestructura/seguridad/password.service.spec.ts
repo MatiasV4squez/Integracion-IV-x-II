@@ -1,8 +1,17 @@
 import { PasswordService } from './password.service';
 import { loginFixture } from '../../../../test/fixtures/login.fixture';
 
-describe('Comprobación de contraseña para login', () => {
+describe('Hash y comprobación de contraseñas', () => {
   const service = new PasswordService();
+
+  it('genera un hash compatible con el login y conserva los espacios', async () => {
+    const hash = await service.generarHash(loginFixture.password);
+    expect(hash).not.toBe(loginFixture.password);
+    expect(await service.verificar(hash, loginFixture.password)).toBe(true);
+    expect(await service.verificar(hash, loginFixture.password.trim())).toBe(
+      false,
+    );
+  });
 
   it('acepta la contraseña correspondiente al hash existente', async () => {
     expect(

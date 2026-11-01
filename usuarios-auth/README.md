@@ -59,6 +59,13 @@ El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" 
 - El lote exige `ids` con entre 1 y 100 IDs positivos dentro del rango BIGINT, separados por comas. Conserva el orden solicitado, ignora duplicados y omite usuarios inexistentes; si ninguno existe, responde `200 []`. Datos inválidos: 400; JWT o sesión inválidos: 401; usuario individual inexistente: 404.
 - `UsuariosController` → `ConsultarDatosPublicosUseCase` → puerto `DatosPublicosRepository` → adaptador `PrismaUsuarioRepository` existente. El caso de uso no depende de NestJS ni Prisma; la consulta selecciona solo los campos públicos y no carga correo, hash ni relaciones privadas. El mismo caso de uso sirve para consultas individuales y por lote.
 
+## Organización de usuarios
+
+- `aplicacion` contiene registro y consulta pública sin NestJS, Prisma ni Argon2. HTTP y DTO están en `infraestructura/http`; Prisma y su módulo están en `infraestructura/persistencia`.
+- El registro usa un puerto de hash implementado por el mismo adaptador de contraseñas que Auth. Se conserva el módulo de persistencia separado para compartirlo con login sin crear dependencias circulares.
+- El contrato de registro conserva `password_hash` como campo de entrada; HTTP lo transforma a los datos del caso de uso y nunca devuelve el hash. Un correo repetido responde 409, también ante registros concurrentes.
+- Se retiraron `UsuariosService`, su prueba de plantilla, los DTO de actualización y la entidad vacía sin consumidores. El puerto de usuarios conserva únicamente las operaciones de registro y búsqueda por correo; el puerto de datos públicos mantiene la consulta por lote.
+
 ## Verificación de correo (U4)
 
 - Local sin SMTP: `SMTP_DISABLED=true` registra el enlace en el log del servidor y permite iniciar sin variables SMTP.
@@ -66,6 +73,7 @@ El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" 
 - `EMAIL_VERIFICATION_URL=http://localhost:5173/verificar-cuenta` para la web local; configurar la URL pública del frontend en producción.
 - Producción: `SMTP_DISABLED=false` y datos del SMTP institucional (host, puerto, seguridad, remitente y credenciales según corresponda). Se rechaza el modo de logs en producción.
 - Se reutilizan el puerto de envío y el servicio de verificación existentes; el módulo selecciona el adaptador SMTP o el de logs.
+- Organización: `aplicacion` coordina solicitar y confirmar mediante puertos de `dominio`; `infraestructura` contiene HTTP/DTO, Prisma, SMTP/logs y criptografía. La aplicación recibe configuración simple y no importa NestJS ni Prisma. El controlador traduce los errores a los mismos códigos HTTP y la confirmación conserva su transacción.
 
 ## Swagger (U5)
 
@@ -77,9 +85,9 @@ Swagger se publica en `/api` solo cuando `NODE_ENV` es distinto de `production`.
 
 ## Alcance
 
-En `roles`, `usuario-rol` y `verificacion-correo` solo se actualizaron los imports del guard en sus pruebas y del DTO compartido de correo. Sus rutas CRUD y su autorización quedan pendientes de la decisión del equipo sobre esos módulos. Se mantiene el flujo de verificación existente bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
+Las rutas CRUD y la autorización de `roles` y `usuario-rol` siguen pendientes de la decisión del equipo. Se retiró el CRUD antiguo `GET/POST /verificacion-correo`, sin consumidores encontrados en el proyecto; ambas rutas responden 404. La verificación se mantiene bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
 
-El registro conserva su implementación y la validación global existente. No envía automáticamente el enlace de verificación. `GET /usuarios` consulta únicamente los IDs solicitados; no expone un listado general. La antigua ruta raíz `POST /usuarios` no forma parte del controlador actual.
+El registro conserva su contrato y la validación global existente. No envía automáticamente el enlace de verificación. `GET /usuarios` consulta únicamente los IDs solicitados; no expone un listado general. La antigua ruta raíz `POST /usuarios` no forma parte del controlador actual.
 
 ## Configuración y comprobación
 
@@ -111,10 +119,10 @@ npm run db:migrate
 
 La inserción es idempotente por nombre: conserva los roles existentes, sus IDs y las relaciones con usuarios. Los IDs son generados por PostgreSQL; el registro conecta `ESTUDIANTE` por nombre, sin asumir un ID fijo.
 
-La creación de roles es responsabilidad de las migraciones de persistencia. Se retiró el inicializador de `UsuariosService`; el arranque de la aplicación no crea roles. `prisma/seed.ts` queda como utilidad manual opcional y no es necesario para completar U3.
+La creación de roles es responsabilidad de las migraciones de persistencia. El arranque de la aplicación no crea roles y el servicio antiguo `UsuariosService` fue retirado. `prisma/seed.ts` queda como utilidad manual opcional y no es necesario para completar U3.
 
 Para comprobar esta migración en una base de prueba: aplicarla con la tabla de roles vacía y con roles y asignaciones existentes; repetir su SQL y verificar que no aparezcan duplicados ni cambien los IDs o las asignaciones existentes.
 
 Las pruebas HTTP usan validación global, controladores, adaptadores y guards reales con Prisma y SMTP simulados. Cubren login, sesiones, logout, inactividad, suspensión/reactivación, asignación idempotente de TUTOR y separación de credenciales internas. Las pruebas de AuthService permiten sustituir adaptadores y comprueban que no se entregue un token si falla la creación de su sesión. Las de AsignarTutorUseCase comprueban IDs BIGINT y errores mediante un puerto sustituido.
 
-Quedan pendientes las pruebas de los flujos de login, sesiones y verificación contra PostgreSQL y SMTP reales y la integración completa con Reportes.
+También se realizaron comprobaciones locales con PostgreSQL, Mailpit y el SMTP configurado, separadas de las suites automatizadas anteriores: registro/login, asignación de TUTOR desde Materias/Tutores y confirmación de correo con concurrencia y rollback. La integración completa con Reportes sigue pendiente.
