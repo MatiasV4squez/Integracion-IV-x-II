@@ -19,12 +19,42 @@ describe('Configuración básica de autenticación', () => {
       JWT_SECRET: base.JWT_SECRET,
       JWT_ACCESS_TTL_SECONDS: 1800,
       JWT_IDLE_TIMEOUT_SECONDS: 1800,
+      SMTP_DISABLED: false,
       SMTP_HOST: base.SMTP_HOST,
       SMTP_PORT: 587,
       SMTP_SECURE: false,
       EMAIL_VERIFICATION_URL: base.EMAIL_VERIFICATION_URL,
       EMAIL_VERIFICATION_SECRET: base.EMAIL_VERIFICATION_SECRET,
       EMAIL_VERIFICATION_TTL_MINUTES: 30,
+    });
+  });
+
+  it('admite logs sin configurar SMTP', () => {
+    expect(
+      validateEnvironment({
+        ...base,
+        SMTP_DISABLED: 'true',
+        SMTP_HOST: undefined,
+        SMTP_USER: undefined,
+        SMTP_PASSWORD: undefined,
+        SMTP_FROM: undefined,
+      }).SMTP_DISABLED,
+    ).toBe(true);
+  });
+
+  it('admite Mailpit sin credenciales SMTP', () => {
+    expect(
+      validateEnvironment({
+        ...base,
+        SMTP_HOST: 'mailpit',
+        SMTP_PORT: '1025',
+        SMTP_USER: '',
+        SMTP_PASSWORD: '',
+      }),
+    ).toMatchObject({
+      SMTP_PORT: 1025,
+      SMTP_USER: undefined,
+      SMTP_PASSWORD: undefined,
     });
   });
 
@@ -46,6 +76,8 @@ describe('Configuración básica de autenticación', () => {
     { JWT_IDLE_TIMEOUT_SECONDS: '59' },
     { JWT_IDLE_TIMEOUT_SECONDS: '86401' },
     { JWT_IDLE_TIMEOUT_SECONDS: 'media-hora' },
+    { SMTP_DISABLED: 'quizas' },
+    { NODE_ENV: 'production', SMTP_DISABLED: 'true' },
     { SMTP_HOST: undefined },
     { SMTP_PORT: '0' },
     { SMTP_PORT: 'no-es-puerto' },

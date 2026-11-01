@@ -11,14 +11,13 @@ export class SmtpEmailVerificationSender implements EmailVerificationSender {
 
   constructor(config: ConfigService) {
     this.remitente = config.getOrThrow<string>('SMTP_FROM');
+    const user = config.get<string>('SMTP_USER');
+    const pass = config.get<string>('SMTP_PASSWORD');
     this.transporter = nodemailer.createTransport({
       host: config.getOrThrow<string>('SMTP_HOST'),
       port: config.getOrThrow<number>('SMTP_PORT'),
       secure: config.getOrThrow<boolean>('SMTP_SECURE'),
-      auth: {
-        user: config.getOrThrow<string>('SMTP_USER'),
-        pass: config.getOrThrow<string>('SMTP_PASSWORD'),
-      },
+      auth: user && pass ? { user, pass } : undefined,
       connectionTimeout: 5_000,
       greetingTimeout: 5_000,
       socketTimeout: 10_000,

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { LogEmailVerificationSender } from './log-email-verification.sender';
 import { VerificacionCorreoService } from './verificacion-correo.service';
 import { VerificacionCorreoController } from './verificacion-correo.controller';
 import { EmailVerificationController } from './email-verification.controller';
@@ -11,10 +13,13 @@ import { SmtpEmailVerificationSender } from './smtp-email-verification.sender';
   providers: [
     VerificacionCorreoService,
     EmailVerificationService,
-    SmtpEmailVerificationSender,
     {
       provide: EMAIL_VERIFICATION_SENDER,
-      useExisting: SmtpEmailVerificationSender,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        config.getOrThrow<boolean>('SMTP_DISABLED')
+          ? new LogEmailVerificationSender()
+          : new SmtpEmailVerificationSender(config),
     },
   ],
   exports: [EmailVerificationService],

@@ -6,6 +6,15 @@ function required(config: Record<string, unknown>, key: string): string {
   return value.trim();
 }
 
+function optional(
+  config: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  return config[key] === undefined || config[key] === ''
+    ? undefined
+    : required(config, key);
+}
+
 function integerInRange(
   value: unknown,
   key: string,
@@ -86,12 +95,29 @@ export function validateEnvironment(config: Record<string, unknown>) {
     60,
     86400,
   );
-  const smtpHost = required(config, 'SMTP_HOST');
-  const smtpPort = integerInRange(config.SMTP_PORT, 'SMTP_PORT', 587, 1, 65535);
-  const smtpSecure = booleanValue(config.SMTP_SECURE, 'SMTP_SECURE', false);
-  const smtpUser = required(config, 'SMTP_USER');
-  const smtpPassword = required(config, 'SMTP_PASSWORD');
-  const smtpFrom = required(config, 'SMTP_FROM');
+  const smtpDisabled = booleanValue(
+    config.SMTP_DISABLED,
+    'SMTP_DISABLED',
+    false,
+  );
+  if (config.NODE_ENV === 'production' && smtpDisabled) {
+    throw new Error('SMTP_DISABLED debe ser false en producción.');
+  }
+  const smtpHost = smtpDisabled ? undefined : required(config, 'SMTP_HOST');
+  const smtpPort = smtpDisabled
+    ? undefined
+    : integerInRange(config.SMTP_PORT, 'SMTP_PORT', 587, 1, 65535);
+  const smtpSecure = smtpDisabled
+    ? undefined
+    : booleanValue(config.SMTP_SECURE, 'SMTP_SECURE', false);
+  const smtpUser = smtpDisabled ? undefined : optional(config, 'SMTP_USER');
+  const smtpPassword = smtpDisabled
+    ? undefined
+    : optional(config, 'SMTP_PASSWORD');
+  const smtpFrom = smtpDisabled ? undefined : required(config, 'SMTP_FROM');
+  if (Boolean(smtpUser) !== Boolean(smtpPassword)) {
+    throw new Error('SMTP_USER y SMTP_PASSWORD deben configurarse juntos.');
+  }
   const emailVerificationUrl = httpUrl(config, 'EMAIL_VERIFICATION_URL');
   const emailVerificationSecret = required(config, 'EMAIL_VERIFICATION_SECRET');
   if (Buffer.byteLength(emailVerificationSecret, 'utf8') < 32) {
@@ -115,6 +141,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
     INTEGRACION_SECRET: integracionSecret,
     JWT_ACCESS_TTL_SECONDS: jwtAccessTtlSeconds,
     JWT_IDLE_TIMEOUT_SECONDS: jwtIdleTimeoutSeconds,
+    SMTP_DISABLED: smtpDisabled,
     SMTP_HOST: smtpHost,
     SMTP_PORT: smtpPort,
     SMTP_SECURE: smtpSecure,

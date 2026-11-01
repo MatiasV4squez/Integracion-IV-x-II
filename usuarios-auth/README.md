@@ -59,6 +59,14 @@ El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" 
 - El lote exige `ids` con entre 1 y 100 IDs positivos dentro del rango BIGINT, separados por comas. Conserva el orden solicitado, ignora duplicados y omite usuarios inexistentes; si ninguno existe, responde `200 []`. Datos inválidos: 400; JWT o sesión inválidos: 401; usuario individual inexistente: 404.
 - `UsuariosController` → `ConsultarDatosPublicosUseCase` → puerto `DatosPublicosRepository` → adaptador `PrismaUsuarioRepository` existente. El caso de uso no depende de NestJS ni Prisma; la consulta selecciona solo los campos públicos y no carga correo, hash ni relaciones privadas. El mismo caso de uso sirve para consultas individuales y por lote.
 
+## Verificación de correo (U4)
+
+- Local sin SMTP: `SMTP_DISABLED=true` registra el enlace en el log del servidor y permite iniciar sin variables SMTP.
+- Con Mailpit: ejecutar `docker compose up -d mailpit` y usar `SMTP_DISABLED=false`, `SMTP_HOST=localhost`, puerto `1025`, `SMTP_SECURE=false` y credenciales vacías. Si Auth corre en la misma red Compose, usar `SMTP_HOST=mailpit`. Bandeja: http://localhost:8025.
+- `EMAIL_VERIFICATION_URL=http://localhost:5173/verificar-cuenta` para la web local; configurar la URL pública del frontend en producción.
+- Producción: `SMTP_DISABLED=false` y datos del SMTP institucional (host, puerto, seguridad, remitente y credenciales según corresponda). Se rechaza el modo de logs en producción.
+- Se reutilizan el puerto de envío y el servicio de verificación existentes; el módulo selecciona el adaptador SMTP o el de logs.
+
 ## Alcance
 
 En `roles`, `usuario-rol` y `verificacion-correo` solo se actualizaron los imports del guard en sus pruebas y del DTO compartido de correo. Sus rutas CRUD y su autorización quedan pendientes de la decisión del equipo sobre esos módulos. Se mantiene el flujo de verificación existente bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
