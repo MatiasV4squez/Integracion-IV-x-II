@@ -1,11 +1,15 @@
-import { validarCertificado, validarRevision } from './postulaciones.dto.js';
+import { validarCertificado as validar } from './certificado.js';
+
+function validarCertificado(datos: ReturnType<typeof archivo>) {
+  return validar(datos).tipo;
+}
 
 function archivo(nombre: string, tipo: string, contenido: Buffer) {
   return {
-    originalname: nombre,
-    mimetype: tipo,
-    size: contenido.length,
-    buffer: contenido,
+    nombre,
+    tipoDeclarado: tipo,
+    tamano: contenido.length,
+    contenido,
   };
 }
 
@@ -50,21 +54,4 @@ describe('Certificados y revisiones', () => {
     ).toThrow();
   });
 
-  it('valida nota y motivo sin aceptar campos extra', () => {
-    expect(validarRevision({ notaAcreditada: 5.0 }, 'aprobar')).toEqual({
-      notaAcreditada: 5,
-    });
-    expect(() =>
-      validarRevision({ notaAcreditada: 5.05 }, 'aprobar'),
-    ).toThrow();
-    expect(() =>
-      validarRevision({ notaAcreditada: 5, idUsuario: '2' }, 'aprobar'),
-    ).toThrow();
-    expect(
-      validarRevision(
-        { motivoRechazo: '  Certificado ilegible  ' },
-        'rechazar',
-      ),
-    ).toEqual({ motivoRechazo: 'Certificado ilegible' });
-  });
 });

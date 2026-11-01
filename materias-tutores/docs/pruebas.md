@@ -59,13 +59,23 @@ Archivos:
 
 ### Postulaciones (RF06/RF07)
 
-Validación de certificados/revisión, mínimo académico, rechazo, transición a rol pendiente, habilitación tras confirmar la llamada simulada y permisos/entrada HTTP. La suite HTTP sustituye `PostulacionesService`.
+Validación de certificados/revisión, mínimo académico, rechazo, transición a rol pendiente, habilitación tras confirmar la llamada simulada y permisos/entrada HTTP. La suite HTTP sustituye los casos de uso para comprobar el adaptador de entrada; la suite de integración siguiente ejecuta los casos de uso y adaptadores reales.
 
 Archivos:
 
-- `src/postulaciones/postulaciones.dto.spec.ts`
-- `src/postulaciones/postulaciones.service.spec.ts`
+- `src/postulaciones/dominio/certificado.spec.ts`
+- `src/postulaciones/aplicacion/postulaciones.use-cases.spec.ts`
 - `test/postulaciones.e2e-spec.ts`
+
+### Postulaciones con PostgreSQL, archivos y Gateway
+
+`npm run test:postulaciones:integracion` compila y ejecuta `test/postulaciones.integration.mjs`. Requiere PostgreSQL local (`TEST_DATABASE_URL` o `DATABASE_URL` de `.env`) y el gateway compilado; `GATEWAY_PROJECT_DIR` permite indicar su carpeta si no está en la ruta habitual.
+
+La suite levanta el módulo real y el gateway en puertos temporales, aplica las migraciones existentes en un esquema aislado y guarda certificados en un directorio temporal. Comprueba multipart, respuestas/errores, BIGINT, permisos, descargas PDF/PNG, duplicados concurrentes, revisión exclusiva, aprobación, rechazo y reintentos. Un receptor HTTP controlado verifica el contrato saliente de asignación de rol y simula éxito o indisponibilidad; no sustituye la verificación pendiente contra el endpoint real de Auth. También confirma que el tutor solo aparece habilitado en búsqueda después de la confirmación remota.
+
+Al terminar elimina el esquema y los archivos temporales y verifica que los datos de `public` no cambiaron. La prueba no modifica cuentas reales ni requiere que los servidores de desarrollo estén iniciados.
+
+Los límites de dependencias se comprueban en `test/arquitectura-hexagonal.spec.ts`; la petición saliente a Auth se cubre también en `src/postulaciones/infraestructura/http-asignar-rol-tutor.adapter.spec.ts`.
 
 ### Búsqueda (parte de RF09)
 
@@ -104,7 +114,7 @@ Escritura condicional de estado y protección por secreto interno. No prueba la 
 
 Archivos:
 
-- `src/integraciones/integraciones.service.spec.ts`
+- `src/integraciones/aplicacion/cambiar-estado-bloque.use-case.spec.ts`
 - caso de bloques en `test/reputacion.e2e-spec.ts`
 
 ### Configuración y conexión

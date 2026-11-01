@@ -272,7 +272,7 @@ La respuesta `201` y la consulta `GET /tutores/10/reputacion` utilizan la misma 
 
 La consulta requiere un JWT válido. Un tutor habilitado sin perfil de calificaciones devuelve `200` con cantidad `0`, promedio `null` y estado `ACTIVO`; un tutor desconocido devuelve `404`. Entradas inválidas devuelven `400`, una clave interna o JWT inválido `401`, y una nota bajo otro rol, un tutor no habilitado o un evento contradictorio `409`.
 
-El dominio contiene el cálculo y las reglas sin importar Nest ni Prisma. Los casos de uso coordinan el registro y la consulta mediante el puerto `ReputacionRepository`, que expone una transacción con operaciones del negocio. El adaptador Prisma implementa ese contrato y los reintentos. Los controllers validan HTTP, aplican los guards y traducen los errores del dominio a respuestas HTTP. `IntegracionesService` conserva el contrato existente de reserva y liberación de bloques; el cálculo de reputación se gestiona en `src/reputacion/`.
+El dominio contiene el cálculo y las reglas sin importar Nest ni Prisma. Los casos de uso coordinan el registro y la consulta mediante el puerto `ReputacionRepository`, que expone una transacción con operaciones del negocio. El adaptador Prisma implementa ese contrato y los reintentos. Los controllers validan HTTP, aplican los guards y traducen los errores del dominio a respuestas HTTP. `CambiarEstadoBloqueUseCase` y su adaptador Prisma conservan el contrato existente de reserva y liberación de bloques; el cálculo de reputación se gestiona en `src/reputacion/`.
 
 Agendamiento conserva la responsabilidad de comprobar que la sesión esté Completada, que el evaluador sea un participante y que exista una sola calificación por participante. Debe enviar únicamente calificaciones recibidas por el tutor y reutilizar el mismo identificador al reintentar una entrega. No se accede a su base de datos ni se modifica su código. El receptor se probó con eventos de prueba; queda verificar el envío desde el microservicio real. Auth y Moderación no son dependencias del cálculo; la consulta mantiene la comprobación local de JWT existente, con las limitaciones de revocación ya documentadas.
 
@@ -318,6 +318,8 @@ Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tok
 - `src/tutores/aplicacion/`: caso de uso, modelos y puertos de búsqueda sin dependencias de HTTP ni Prisma.
 - `src/tutores/infraestructura/`: adaptadores de Prisma y disponibilidad; `http/` contiene el controller y los DTO y validadores de consulta.
 - `src/reputacion/`: dominio, casos de uso, puerto de repositorio y adaptadores HTTP/Prisma para el cálculo de reputación.
+- `src/postulaciones/`: reglas de certificados/nota, siete casos de uso y puertos de repositorio, certificados y rol; adaptadores Prisma, disco y HTTP.
+- `src/integraciones/`: caso de uso de cambio de estado, puerto de bloques, escritura condicional Prisma y adaptador HTTP interno.
 - `prisma/schema.prisma`: modelos de materia, bloque, postulación, habilitación y reputación.
 - `prisma/migrations/`: historial versionado de cambios de esquema.
 - `prisma/seed.ts`: datos iniciales idempotentes del catálogo.
@@ -326,13 +328,13 @@ Las pruebas reales recorren HTTP, guards, casos de uso y Prisma con claves y tok
 
 El proyecto tiene sus propias dependencias y compilación. Según el SRS, se integra mediante HTTP/REST con otros servicios y gestiona su propio esquema o base de datos PostgreSQL, sin acceso directo a las bases ajenas.
 
-Materias, Disponibilidad, Tutores y Reputación separan casos de uso, puertos y adaptadores. Postulaciones conserva la estructura de módulo, controller y service de NestJS, con acceso directo a Prisma desde el service; su adaptación a arquitectura hexagonal sigue pendiente. La organización del proyecto completo todavía no es hexagonal.
+Materias, Disponibilidad, Tutores, Reputación, Postulaciones e Integraciones separan casos de uso, puertos y adaptadores. Sus módulos de Nest componen las dependencias; los núcleos de aplicación y dominio no importan Nest ni Prisma. Los controllers y filtros de infraestructura mantienen las rutas, los DTO y los errores HTTP existentes.
 
-La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los módulos que necesiten consultar datos importan `DatabaseModule` e inyectan `PrismaService`. Están implementados el catálogo, la gestión de bloques, las postulaciones, la revisión y los contratos internos; falta conectarlos y probarlos contra los otros microservicios reales.
+La infraestructura de conexión usa Prisma y el adaptador PostgreSQL. Los adaptadores de persistencia reciben `PrismaService` desde `DatabaseModule`; los casos de uso reciben sus puertos. La suite del flujo Tutor comprueba la reserva/liberación con Agendamiento y Gateway reales. La asignación de rol de Postulaciones conserva el contrato HTTP acordado, pero todavía requiere un endpoint receptor real en Auth.
 
 No se crean tablas al arrancar. Las migraciones crean y aplican los cambios de esquema en desarrollo. `npm run prisma:deploy` aplica migraciones existentes en el entorno de despliegue.
 
-`npm ci` genera automáticamente el cliente Prisma; tras modificar el esquema, ejecuta `npm run prisma:generate`. Las pruebas unitarias y `test:e2e` usan sustitutos de la conexión y no requieren PostgreSQL; no demuestran que las credenciales locales sean válidas. `test:reputacion:postgres`, `test:materias:postgres` y `test:disponibilidad:postgres` son verificaciones separadas con la base real.
+`npm ci` genera automáticamente el cliente Prisma; tras modificar el esquema, ejecuta `npm run prisma:generate`. Las pruebas unitarias y `test:e2e` usan sustitutos de la conexión y no requieren PostgreSQL; no demuestran que las credenciales locales sean válidas. `test:reputacion:postgres`, `test:materias:postgres`, `test:disponibilidad:postgres` y `test:postulaciones:integracion` son verificaciones separadas con la base real. Esta última comprueba además archivos, Gateway y el contrato saliente de Auth mediante un receptor HTTP controlado; usa únicamente esquemas y archivos temporales. Sus requisitos están en [la guía de pruebas](docs/pruebas.md).
 
 ## Archivos locales
 
@@ -349,6 +351,6 @@ La revisión y corrección de las vulnerabilidades notificadas por `npm audit` q
 - **Disponibilidad:** la reserva/liberación desde Agendamiento está comprobada por la suite del flujo Tutor en el alcance documentado. El PATCH actual solo cambia estados; no registra una operación propietaria ni verifica sesiones, habilitación por materia o solapamientos entre sesiones. El contrato nuevo de reservas se retiró y quedó para más adelante.
 - **Reputación:** verificar que Agendamiento envíe las calificaciones recibidas como tutor en sesiones completadas y que reintente los eventos conservando su identificador. El receptor está probado; el recorrido real entre micros sigue pendiente.
 - **Identidad:** integrar la consulta de revocaciones, suspensiones e inactividad de Auth. Verificar un JWT localmente no consulta esos estados.
-- **Arquitectura:** adaptar los módulos restantes cuando se aborde esa tarea. `EN_REVISION` no suspende la cuenta ni tiene una salida administrativa implementada en este micro.
+- **Revisión de tutores:** `EN_REVISION` no suspende la cuenta ni tiene una salida administrativa implementada en este micro.
 
 Estos pendientes deben acompañar la entrega: las pruebas locales no demuestran que la aplicación integrada cumpla todos los requisitos del SRS.

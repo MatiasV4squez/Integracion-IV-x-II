@@ -28,7 +28,8 @@
     "test:reputacion:postgres": "vitest run --config ./vitest.config.postgres.ts",
     "test:materias:postgres": "vitest run --config ./vitest.config.materias-postgres.ts",
     "test:disponibilidad:postgres": "vitest run --config ./vitest.config.disponibilidad-postgres.ts",
-    "test:flujo-tutor": "npm run build && node --test test/flujo-tutor.integration.mjs"
+    "test:flujo-tutor": "npm run build && node --test test/flujo-tutor.integration.mjs",
+    "test:postulaciones:integracion": "npm run build && node --test test/postulaciones.integration.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

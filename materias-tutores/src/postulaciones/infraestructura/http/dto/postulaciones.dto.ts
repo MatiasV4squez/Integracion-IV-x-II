@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { parsePositiveId } from '../auth/parse-positive-id.js';
+import { parsePositiveId } from '../../../../auth/parse-positive-id.js';
 
 export interface ArchivoCertificado {
   originalname: string;
@@ -60,37 +60,4 @@ export function validarRevision(
     );
   }
   return { motivoRechazo: motivo.trim() };
-}
-
-export function validarCertificado(
-  archivo: ArchivoCertificado | undefined,
-): 'application/pdf' | 'image/png' {
-  if (
-    !archivo ||
-    !Buffer.isBuffer(archivo.buffer) ||
-    archivo.size < 1 ||
-    archivo.size > 5_000_000
-  ) {
-    throw new BadRequestException('Adjunta un certificado de hasta 5 MB');
-  }
-  const nombre = archivo.originalname.toLowerCase();
-  const pdf =
-    nombre.endsWith('.pdf') &&
-    archivo.mimetype === 'application/pdf' &&
-    archivo.buffer.subarray(0, 5).toString('ascii') === '%PDF-';
-  const png =
-    nombre.endsWith('.png') &&
-    archivo.mimetype === 'image/png' &&
-    archivo.buffer
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-  if (!pdf && !png) {
-    throw new BadRequestException('El certificado debe ser PDF o PNG válido');
-  }
-  if (archivo.originalname.length > 255) {
-    throw new BadRequestException(
-      'El nombre del certificado es demasiado largo',
-    );
-  }
-  return pdf ? 'application/pdf' : 'image/png';
 }

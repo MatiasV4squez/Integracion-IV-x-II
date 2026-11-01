@@ -1,11 +1,19 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, Req, Res, UploadedFile, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { AuthenticatedJwtGuard, type AuthenticatedRequest } from '../auth/authenticated-jwt.guard.js';
-import { type ArchivoCertificado, leerIdPositivo, validarRevision } from './postulaciones.dto.js';
-import { PostulacionesService } from './postulaciones.service.js';
-import { PostulacionRespuestaDto } from './postulacion-respuesta.dto.js';
+import { AuthenticatedJwtGuard, type AuthenticatedRequest } from '../../../auth/authenticated-jwt.guard.js';
+import { type ArchivoCertificado, leerIdPositivo, validarRevision } from './dto/postulaciones.dto.js';
+import { PostularTutorUseCase } from '../../aplicacion/postular-tutor.use-case.js';
+import { ConsultarPostulacionesPropiasUseCase } from '../../aplicacion/consultar-postulaciones-propias.use-case.js';
+import { ListarPostulacionesPendientesUseCase } from '../../aplicacion/listar-postulaciones-pendientes.use-case.js';
+import { ObtenerCertificadoUseCase } from '../../aplicacion/obtener-certificado.use-case.js';
+import { AprobarPostulacionUseCase } from '../../aplicacion/aprobar-postulacion.use-case.js';
+import { RechazarPostulacionUseCase } from '../../aplicacion/rechazar-postulacion.use-case.js';
+import { ReintentarAsignacionRolUseCase } from '../../aplicacion/reintentar-asignacion-rol.use-case.js';
+import { presentarPostulacion } from './presentar-postulacion.js';
+import { PostulacionesErrorFilter } from './postulaciones-error.filter.js';
+import { PostulacionRespuestaDto } from './dto/postulacion-respuesta.dto.js';
 
 function esAdministrador(peticion: AuthenticatedRequest): boolean {
   return peticion.roles.some((rol) =>
@@ -22,9 +30,18 @@ function exigirAdministrador(peticion: AuthenticatedRequest): void {
 @ApiTags('Postulaciones')
 @ApiBearerAuth()
 @UseGuards(AuthenticatedJwtGuard)
+@UseFilters(PostulacionesErrorFilter)
 @Controller('postulaciones')
 export class PostulacionesController {
-  constructor(private readonly postulaciones: PostulacionesService) {}
+  constructor(
+    private readonly crear: PostularTutorUseCase,
+    private readonly propias: ConsultarPostulacionesPropiasUseCase,
+    private readonly pendientes: ListarPostulacionesPendientesUseCase,
+    private readonly certificado: ObtenerCertificadoUseCase,
+    private readonly aprobarPostulacion: AprobarPostulacionUseCase,
+    private readonly rechazarPostulacion: RechazarPostulacionUseCase,
+    private readonly reintentar: ReintentarAsignacionRolUseCase,
+  ) {}
 
   @Post()
   @UseInterceptors(
@@ -45,25 +62,25 @@ export class PostulacionesController {
   })
   @ApiOperation({ summary: 'Postular a una materia con certificado PDF o PNG' })
   @ApiCreatedResponse({ type: PostulacionRespuestaDto })
-  postular(
+  async postular(
     @Req() peticion: AuthenticatedRequest,
     @Body('idMateria') idMateria: string,
-    @UploadedFile() certificado: ArchivoCertificado,
+    @UploadedFile() certificado: ArchivoCertificado | undefined,
   ) {
     if (typeof idMateria !== 'string')
       throw new BadRequestException('idMateria es obligatorio');
-    return this.postulaciones.postular(
+    return presentarPostulacion(await this.crear.ejecutar(
       peticion.idUsuario,
       leerIdPositivo(idMateria, 'idMateria'),
-      certificado,
-    );
+      certificado ? { nombre: certificado.originalname, tipoDeclarado: certificado.mimetype, tamano: certificado.size, contenido: certificado.buffer } : undefined,
+    ));
   }
 
   @Get('mias')
   @ApiOperation({ summary: 'Consultar las postulaciones propias' })
   @ApiOkResponse({ type: PostulacionRespuestaDto, isArray: true })
-  consultarPropias(@Req() peticion: AuthenticatedRequest) {
-    return this.postulaciones.consultarPropias(peticion.idUsuario);
+  async consultarPropias(@Req() peticion: AuthenticatedRequest) {
+    return (await this.propias.ejecutar(peticion.idUsuario)).map(presentarPostulacion);
   }
 
   @Get('pendientes')
@@ -71,9 +88,9 @@ export class PostulacionesController {
     summary: 'Listar postulaciones pendientes para administración',
   })
   @ApiOkResponse({ type: PostulacionRespuestaDto, isArray: true })
-  listarPendientes(@Req() peticion: AuthenticatedRequest) {
+  async listarPendientes(@Req() peticion: AuthenticatedRequest) {
     exigirAdministrador(peticion);
-    return this.postulaciones.listarPendientes();
+    return (await this.pendientes.ejecutar()).map(presentarPostulacion);
   }
 
   @Get(':idPostulacion/certificado')
@@ -84,7 +101,7 @@ export class PostulacionesController {
     @Res() respuesta: Response,
   ) {
     const idPostulacion = leerIdPositivo(idTexto, 'idPostulacion');
-    const archivo = await this.postulaciones.obtenerCertificado(
+    const archivo = await this.certificado.ejecutar(
       idPostulacion,
       esAdministrador(peticion) ? null : peticion.idUsuario,
     );
@@ -93,7 +110,7 @@ export class PostulacionesController {
       `attachment; filename="certificado.${archivo.tipo === 'application/pdf' ? 'pdf' : 'png'}"`,
     );
     respuesta.setHeader('X-Content-Type-Options', 'nosniff');
-    respuesta.type(archivo.tipo).send(archivo.contenido);
+    respuesta.type(archivo.tipo).send(Buffer.from(archivo.contenido));
   }
 
   @Patch(':idPostulacion/aprobar')
@@ -117,18 +134,18 @@ export class PostulacionesController {
       },
     },
   })
-  aprobar(
+  async aprobar(
     @Req() peticion: AuthenticatedRequest,
     @Param('idPostulacion') idTexto: string,
     @Body() cuerpo: unknown,
   ) {
     exigirAdministrador(peticion);
     const revision = validarRevision(cuerpo, 'aprobar');
-    return this.postulaciones.aprobar(
+    return presentarPostulacion(await this.aprobarPostulacion.ejecutar(
       leerIdPositivo(idTexto, 'idPostulacion'),
       peticion.idUsuario,
       revision.notaAcreditada!,
-    );
+    ));
   }
 
   @Patch(':idPostulacion/rechazar')
@@ -149,31 +166,31 @@ export class PostulacionesController {
       },
     },
   })
-  rechazar(
+  async rechazar(
     @Req() peticion: AuthenticatedRequest,
     @Param('idPostulacion') idTexto: string,
     @Body() cuerpo: unknown,
   ) {
     exigirAdministrador(peticion);
     const revision = validarRevision(cuerpo, 'rechazar');
-    return this.postulaciones.rechazar(
+    return presentarPostulacion(await this.rechazarPostulacion.ejecutar(
       leerIdPositivo(idTexto, 'idPostulacion'),
       peticion.idUsuario,
       revision.motivoRechazo!,
-    );
+    ));
   }
 
   @Post(':idPostulacion/reintentar-rol')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reintentar una asignación de rol TUTOR pendiente' })
   @ApiOkResponse({ type: PostulacionRespuestaDto })
-  reintentarRol(
+  async reintentarRol(
     @Req() peticion: AuthenticatedRequest,
     @Param('idPostulacion') idTexto: string,
   ) {
     exigirAdministrador(peticion);
-    return this.postulaciones.reintentarAsignacion(
+    return presentarPostulacion(await this.reintentar.ejecutar(
       leerIdPositivo(idTexto, 'idPostulacion'),
-    );
+    ));
   }
 }
