@@ -67,6 +67,14 @@ El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" 
 - Producción: `SMTP_DISABLED=false` y datos del SMTP institucional (host, puerto, seguridad, remitente y credenciales según corresponda). Se rechaza el modo de logs en producción.
 - Se reutilizan el puerto de envío y el servicio de verificación existentes; el módulo selecciona el adaptador SMTP o el de logs.
 
+## Swagger (U5)
+
+Swagger se publica en `/api` solo cuando `NODE_ENV` es distinto de `production`. En producción no se registran la interfaz ni las rutas de documentación JSON/YAML.
+
+- Local: configurar `NODE_ENV=development` en el `.env` de `usuarios-auth`; `.env.example` sirve como plantilla.
+- Despliegue: definir explícitamente `NODE_ENV=production` en las variables del servidor o su `.env` y configurar el SMTP de producción descrito en U4.
+- `npm run start:prod` no establece `NODE_ENV`. Si se omite o tiene otro valor, Swagger permanece habilitado. Reiniciar Auth después de cambiar las variables.
+
 ## Alcance
 
 En `roles`, `usuario-rol` y `verificacion-correo` solo se actualizaron los imports del guard en sus pruebas y del DTO compartido de correo. Sus rutas CRUD y su autorización quedan pendientes de la decisión del equipo sobre esos módulos. Se mantiene el flujo de verificación existente bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
