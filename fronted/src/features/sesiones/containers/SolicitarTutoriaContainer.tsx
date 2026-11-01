@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Navigate, useSearchParams } from 'react-router'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import type { TutorBusqueda } from '../../tutores/models/tutor-busqueda'
 import { obtenerTutores } from '../../tutores/services/disponibilidad-tutores-api'
-import { SeleccionMateriaTutoria } from '../components/SeleccionMateriaTutoria'
+import { completarNombresTutores } from '../../tutores/services/nombres-tutores-api'
 import type { SeleccionTutoria, SesionCreada } from '../models/solicitud-tutoria'
 import SolicitarTutoriaPage from '../pages/SolicitarTutoriaPage'
 import { crearSolicitudTutoria, ErrorCrearSolicitud } from '../services/crear-solicitud-api'
@@ -35,7 +35,9 @@ function SolicitudDeMateria({ sesion, idMateria, nombreMateria, idTutorInicial }
       try {
         const datos = await obtenerTutores(idMateria, controlador.signal)
         // Agendamiento rechaza que el estudiante se solicite tutoría a sí mismo.
-        if (!controlador.signal.aborted) establecerTutores(datos.filter((tutor) => tutor.idTutor !== sesion.idUsuario))
+        const disponibles = await completarNombresTutores(
+          datos.filter((tutor) => tutor.idTutor !== sesion.idUsuario), sesion.token, controlador.signal)
+        if (!controlador.signal.aborted) establecerTutores(disponibles)
       } catch (fallo) {
         if (!controlador.signal.aborted) {
           establecerErrorCarga(fallo instanceof Error ? fallo.message : 'No se pudieron cargar los tutores.')
@@ -47,7 +49,7 @@ function SolicitudDeMateria({ sesion, idMateria, nombreMateria, idTutorInicial }
 
     void cargarTutores()
     return () => controlador.abort()
-  }, [idMateria, sesion.idUsuario, intentoCarga])
+  }, [idMateria, sesion.idUsuario, sesion.token, intentoCarga])
 
   const seleccionVigente = seleccion?.id_materia === idMateria ? seleccion : null
   const tutorSeleccionado = tutores.find((tutor) => tutor.idTutor === seleccionVigente?.id_tutor)
@@ -115,41 +117,29 @@ function SolicitudDeMateria({ sesion, idMateria, nombreMateria, idTutorInicial }
 
 export default function SolicitarTutoriaContainer() {
   const sesion = useSesionUsuario()
-  const [parametros, establecerParametros] = useSearchParams()
+  const [parametros] = useSearchParams()
   const { consulta: catalogo, recargar, revalidarSiFalta, actualizando } = useMaterias()
   const idMateria = parametros.get('materiaId') ?? ''
   const idTutor = parametros.get('tutorId') ?? ''
-  // Una materia creada después de la última consulta se busca antes de pedir elegir otra.
   useEffect(() => { if (idMateria) revalidarSiFalta(idMateria) }, [idMateria, revalidarSiFalta])
 
   // RutaProtegida exige la sesión de estudiante; esto solo evita renderizar sin ella.
   if (!sesion) return null
 
-  if (catalogo.estado !== 'listo') return (
+  const materia = catalogo.estado === 'listo'
+    ? catalogo.materias.find((item) => item.idMateria === idMateria) : undefined
+  if (!idMateria || (catalogo.estado === 'listo' && !materia && !actualizando)) return <Navigate to="/tutores" replace />
+
+  if (!materia) return (
     <main className="seleccion-tutoria">
       <section className="seleccion-tutoria__tarjeta">
         <h1>Agenda una tutoría</h1>
-        {catalogo.estado === 'cargando' ? <p role="status">Cargando materias…</p> : (
+        {catalogo.estado !== 'error' ? <p role="status">Cargando materias…</p> : (
           <>
             <p role="alert">{catalogo.mensaje}</p>
             <button type="button" onClick={recargar}>Reintentar</button>
           </>
         )}
-      </section>
-    </main>
-  )
-
-  const materia = catalogo.materias.find((item) => item.idMateria === idMateria)
-  if (!materia) return (
-    <main className="seleccion-tutoria">
-      <section className="seleccion-tutoria__tarjeta">
-        <h1>Agenda una tutoría</h1>
-        <p>Elige la materia en la que necesitas apoyo para ver a sus tutores y horarios.</p>
-        <SeleccionMateriaTutoria
-          materias={catalogo.materias}
-          materiaInvalida={idMateria !== '' && !actualizando}
-          onElegir={(elegida) => establecerParametros({ materiaId: elegida })}
-        />
       </section>
     </main>
   )

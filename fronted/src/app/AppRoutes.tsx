@@ -8,6 +8,7 @@ import { verificacionCuentaHttp } from '../features/verificacion-cuenta/services
 
 const CatalogoMateriasContainer = lazy(() => import('../features/materias/containers/CatalogoMateriasContainer'))
 const BuscarTutoresContainer = lazy(() => import('../features/tutores/containers/BuscarTutoresContainer'))
+const PerfilTutorContainer = lazy(() => import('../features/tutores/containers/PerfilTutorContainer'))
 const SolicitudesRecibidasContainer = lazy(() => import('../features/sesiones/containers/SolicitudesRecibidasContainer'))
 const VerificacionCuentaContainer = lazy(() => import('../features/verificacion-cuenta/containers/VerificacionCuentaContainer'))
 const PanelTuteeContainer = lazy(() => import('../features/panel-tutee/containers/PanelTuteeContainer'))
@@ -35,6 +36,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
         <Route element={<RutaProtegida />}>
           <Route path="/materias" element={<CatalogoMateriasContainer />} />
           <Route path="/tutores" element={<BuscarTutoresContainer />} />
+          <Route path="/tutores/:idTutor" element={<PerfilTutorContainer />} />
           <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>

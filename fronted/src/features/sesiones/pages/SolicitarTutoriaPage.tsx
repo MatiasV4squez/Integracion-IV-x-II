@@ -36,7 +36,7 @@ export default function SolicitarTutoriaPage({
 
         {tutorSeleccionado ? (
           <>
-            <h3>Tutor {tutorSeleccionado.idTutor}</h3>
+            <h3>{tutorSeleccionado.nombre?.trim() || 'Tutor ' + tutorSeleccionado.idTutor}</h3>
 
             <p>
               {tutorSeleccionado.promedioCalificaciones === null
@@ -76,7 +76,7 @@ export default function SolicitarTutoriaPage({
           {seleccionVigente && bloqueSeleccionado ? (
             <>
               <p>{nombreMateria}</p>
-              <p>Con el tutor {seleccionVigente.id_tutor}</p>
+              <p>Con el tutor {tutorSeleccionado?.nombre?.trim() || seleccionVigente.id_tutor}</p>
               <p>
                 {bloqueSeleccionado.dia} ·{' '}
                 {bloqueSeleccionado.horaInicio}–

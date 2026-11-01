@@ -72,7 +72,7 @@ test('configura menús por rol sin inventar identidad ni alterar los permisos de
   assert.match(html, /href="\/solicitudes\/recibidas"/)
   assert.match(html, /href="\/disponibilidad"/)
   assert.doesNotMatch(html, /Registrarse|Martina|Diego/)
-  assert.ok(configuracion.obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/solicitudes/nueva'))
+  assert.ok(!configuracion.obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/solicitudes/nueva'))
 })
 
 test('una URL de demostración no puede presentar éxito en producción', () => {

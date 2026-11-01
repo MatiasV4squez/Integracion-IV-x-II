@@ -85,7 +85,7 @@ export function SelectorTutorBloque({ idMateria, tutores, idTutorInicial = '', a
         <option value="">Selecciona un tutor</option>
         {tutores.map((tutor) => (
           <option key={tutor.idTutor} value={tutor.idTutor}>
-            Tutor {tutor.idTutor}
+            {tutor.nombre?.trim() || 'Tutor ' + tutor.idTutor}
           </option>
         ))}
       </select>

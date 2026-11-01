@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ConsultaTutores } from '../models/consulta-tutores'
+import { completarNombresTutores } from '../services/nombres-tutores-api'
 import { buscarTutores, ErrorConsultaTutores } from '../services/tutores-api'
 
-export function useBuscarTutores(materiaId: string, page: number) {
+export function useBuscarTutores(materiaId: string, page: number, token?: string) {
   const [intento, setIntento] = useState(0)
   const clave = JSON.stringify([materiaId, page, intento])
   const [respuesta, setRespuesta] = useState<{ clave: string; consulta: ConsultaTutores }>({
@@ -19,6 +20,9 @@ export function useBuscarTutores(materiaId: string, page: number) {
     const controlador = new AbortController()
 
     buscarTutores({ materiaId, page, signal: controlador.signal })
+      .then(async (resultado) => ({
+        ...resultado, items: await completarNombresTutores(resultado.items, token, controlador.signal),
+      }))
       .then((resultado) => {
         if (!controlador.signal.aborted) setRespuesta({ clave, consulta: { estado: 'listo', resultado } })
       })
@@ -30,7 +34,7 @@ export function useBuscarTutores(materiaId: string, page: number) {
       })
 
     return () => controlador.abort()
-  }, [materiaId, page, clave])
+  }, [materiaId, page, clave, token])
 
   const consulta: ConsultaTutores = !materiaId ? { estado: 'inicial' }
     : respuesta.clave === clave ? respuesta.consulta : { estado: 'cargando' }

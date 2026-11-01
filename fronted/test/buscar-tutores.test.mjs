@@ -178,6 +178,7 @@ test('muestra resultados, calificaciones y paginación, y ofrece recuperar una p
   assert.match(html, /disabled="">Anterior/)
   assert.match(html, /disabled=""[^>]*>Ver perfil<\/button>/)
   assert.match(html, /href="\/solicitudes\/nueva\?materiaId=9007199254740993&amp;tutorId=9007199254740995"[^>]*>\s*Solicitar tutoría/)
+  assert.match(html, /Ver perfil<\/button>\s*<a[^>]*>\s*Solicitar tutoría/, 'Solicitar tutoría aparece debajo de Ver perfil')
   const sinHorarios = renderPagina({ estado: 'listo', resultado: { ...resultado, items: [{ ...tutor, horariosDisponibles: [] }] } })
   assert.doesNotMatch(sinHorarios, /Solicitar tutoría/, 'No ofrece solicitar a un tutor sin bloques')
   assert.doesNotMatch(html, /<header|<footer/)

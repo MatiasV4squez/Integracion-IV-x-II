@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useBuscarTutores } from '../hooks/useBuscarTutores'
 import type { CriteriosBusquedaTutores } from '../models/criterios-busqueda-tutores'
@@ -8,6 +9,8 @@ import { leerParametrosBusqueda } from '../utils/leer-parametros-busqueda'
 
 export default function BuscarTutoresContainer() {
   const [parametros, setParametros] = useSearchParams()
+  const navegar = useNavigate()
+  const sesion = useSesionUsuario()
   const { materiaId, page, error: errorParametros } = leerParametrosBusqueda(parametros)
   const { consulta: catalogo, recargar: recargarMaterias, revalidarSiFalta, actualizando } = useMaterias()
   const materias = catalogo.estado === 'listo' ? catalogo.materias : []
@@ -16,7 +19,7 @@ export default function BuscarTutoresContainer() {
   useEffect(() => { if (materiaId) revalidarSiFalta(materiaId) }, [materiaId, revalidarSiFalta])
   const error = errorParametros ?? (catalogo.estado === 'listo' && materiaId && !materia && !actualizando
     ? 'La materia seleccionada no está disponible. Elige otra materia.' : undefined)
-  const { consulta, recargar } = useBuscarTutores(materia && !error ? materiaId : '', page)
+  const { consulta, recargar } = useBuscarTutores(materia && !error ? materiaId : '', page, sesion?.token)
 
   function buscar(criterios: CriteriosBusquedaTutores) {
     if (criterios.materiaId === materiaId && page === 1 && !error) recargar()
@@ -34,6 +37,9 @@ export default function BuscarTutoresContainer() {
       onBuscar={buscar}
       onReintentar={error ? undefined : recargar}
       onCambiarPagina={(pagina) => setParametros({ materiaId, page: String(pagina) })}
+      onVerPerfil={materia
+        ? (idTutor) => navegar('/tutores/' + idTutor + '?' + new URLSearchParams({ materiaId: materia.idMateria }))
+        : undefined}
     />
   )
 }

@@ -75,7 +75,7 @@ export default function DashboardEstudiantePage({
         <div className="dashboard-estudiante__interior">
           <div className="dashboard-estudiante__titulo-agenda">
             <h2 id="dashboard-clases-agendadas">Tus clases agendadas</h2>
-            <Link to="/solicitudes/nueva">Solicitar tutoría <span aria-hidden="true">→</span></Link>
+            <Link to="/tutores">Solicitar tutoría <span aria-hidden="true">→</span></Link>
           </div>
           <div className="dashboard-estudiante__clases">
             {clasesAgendadas ?? (

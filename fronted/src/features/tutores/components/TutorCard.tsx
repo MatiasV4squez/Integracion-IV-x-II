@@ -50,21 +50,21 @@ export function TutorCard({ tutor, onVerPerfil, destinoSolicitud }: TutorCardPro
         </p>
       </div>
       <div className="tutor-card__acciones">
-      {destinoSolicitud && proximoHorario && (
-        <Link className="tutor-card__perfil tutor-card__solicitar" to={destinoSolicitud} aria-label={'Solicitar tutoría con ' + nombre}>
-          Solicitar tutoría
-        </Link>
-      )}
-      <button
-        className="tutor-card__perfil"
-        type="button"
-        disabled={!onVerPerfil}
-        onClick={() => onVerPerfil?.(tutor.idTutor)}
-        title={!onVerPerfil ? 'El perfil aún no está disponible.' : undefined}
-        aria-label={'Ver perfil de ' + nombre}
-      >
-        Ver perfil
-      </button>
+        <button
+          className="tutor-card__perfil"
+          type="button"
+          disabled={!onVerPerfil}
+          onClick={() => onVerPerfil?.(tutor.idTutor)}
+          title={!onVerPerfil ? 'El perfil aún no está disponible.' : undefined}
+          aria-label={'Ver perfil de ' + nombre}
+        >
+          Ver perfil
+        </button>
+        {destinoSolicitud && proximoHorario && (
+          <Link className="tutor-card__perfil tutor-card__solicitar" to={destinoSolicitud} aria-label={'Solicitar tutoría con ' + nombre}>
+            Solicitar tutoría
+          </Link>
+        )}
       </div>
     </article>
   )
