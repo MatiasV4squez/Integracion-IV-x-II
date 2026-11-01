@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsuariosController } from './usuarios.controller';
 import { RegistrarUsuarioUseCase } from './aplicacion/registrar-user.use-case';
 import { AuthService } from '../auth/aplicacion/auth.service';
+import { ConsultarDatosPublicosUseCase } from './aplicacion/consultar-datos-publicos.use-case';
+import { JwtAuthGuard } from '../auth/infraestructura/http/jwt-auth.guard';
 
 describe('UsuariosController', () => {
   let controller: UsuariosController;
@@ -14,8 +16,15 @@ describe('UsuariosController', () => {
       providers: [
         { provide: RegistrarUsuarioUseCase, useValue: registrarUsuario },
         { provide: AuthService, useValue: auth },
+        {
+          provide: ConsultarDatosPublicosUseCase,
+          useValue: { ejecutar: jest.fn() },
+        },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<UsuariosController>(UsuariosController);
   });

@@ -37,6 +37,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
   const prisma = {
     usuario: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -155,6 +156,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       },
     );
     prisma.usuario.findUnique.mockImplementation(async () => cuentaActual);
+    prisma.usuario.findMany.mockResolvedValue([]);
     prisma.rol.findUnique.mockResolvedValue({ id_rol: 7 });
     prisma.usuarioRol.createMany.mockImplementation(async () => {
       if (cuentaActual.roles.some(({ rol }) => rol.nombre === 'TUTOR'))
@@ -591,6 +593,88 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     expect(body).not.toHaveProperty('access_token');
     expect(prisma.sesion.create).not.toHaveBeenCalled();
   });
+
+  const usuarioConsultado = {
+    ...usuarioExistente,
+    id_usuario: 9007199254740993n,
+    carrera: null,
+    semestre_actual: null,
+    biografia: null,
+  };
+  const datosPublicos = {
+    id: '9007199254740993',
+    nombre: 'Estudiante',
+    carrera: null,
+    semestre_actual: null,
+    biografia: null,
+  };
+
+  function consultar(ruta: string, token?: string) {
+    const peticion = request(app.getHttpServer()).get(ruta);
+    return token ? peticion.auth(token, { type: 'bearer' }) : peticion;
+  }
+
+  it.each([
+    {
+      ruta: '/usuarios/' + datosPublicos.id,
+      ids: [9007199254740993n],
+      esperado: datosPublicos,
+    },
+    {
+      ruta: `/usuarios?ids=${datosPublicos.id},2,999,2`,
+      ids: [9007199254740993n, 2n, 999n],
+      esperado: [datosPublicos, { ...datosPublicos, id: '2' }],
+    },
+  ])(
+    'devuelve solo datos públicos en una consulta y respeta los IDs: $ruta',
+    async ({ ruta, ids, esperado }) => {
+      cuentaActual.roles = [{ rol: { nombre: 'ESTUDIANTE' } }];
+      const token = (await login().expect(200)).body.access_token as string;
+      prisma.usuario.findMany.mockResolvedValue([
+        { ...usuarioConsultado, id_usuario: 2n },
+        usuarioConsultado,
+      ]);
+      await consultar(ruta, token).expect(200, esperado);
+      expect(prisma.usuario.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.usuario.findMany).toHaveBeenCalledWith({
+        where: { id_usuario: { in: ids } },
+        select: {
+          id_usuario: true,
+          nombre: true,
+          carrera: true,
+          semestre_actual: true,
+          biografia: true,
+        },
+      });
+    },
+  );
+
+  it.each(['/usuarios/12', '/usuarios?ids=2,3'])(
+    'exige JWT para consultar datos públicos: %s',
+    async (ruta) => {
+      await consultar(ruta).expect(401);
+      expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['/usuarios', 400],
+    ['/usuarios?ids=2,,3', 400],
+    ['/usuarios?ids=2&ids=3', 400],
+    ['/usuarios/9223372036854775808', 400],
+    ['/usuarios?ids=' + Array<string>(101).fill('1').join(','), 400],
+    ['/usuarios/999', 404],
+    ['/usuarios?ids=999', 200],
+  ] as const)(
+    'responde correctamente a la consulta %s: %i',
+    async (ruta, status) => {
+      const token = (await login().expect(200)).body.access_token as string;
+      const respuesta = await consultar(ruta, token).expect(status);
+      if (status === 200) expect(respuesta.body).toEqual([]);
+      if (status === 400)
+        expect(prisma.usuario.findMany).not.toHaveBeenCalled();
+    },
+  );
 
   function moderar(id: string, estado: string) {
     return request(app.getHttpServer())

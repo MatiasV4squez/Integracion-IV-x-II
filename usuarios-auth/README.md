@@ -28,6 +28,8 @@ Los consumidores importan el guard y el DTO de correo directamente desde `infrae
 | -------------------------------------------- | ------------------------ | ----------------------------------------------- |
 | `POST /auth/login`                           | Público                  | JWT y datos públicos del usuario.               |
 | `POST /usuarios/login`                       | Público                  | Mismo flujo y respuesta que Auth.               |
+| `GET /usuarios/:id` | JWT y sesión vigentes | Datos públicos de un usuario; 404 si no existe. |
+| `GET /usuarios?ids=2,3,7` | JWT y sesión vigentes | Datos públicos por lote en una sola consulta. |
 | `GET /auth/sesion`                           | JWT y sesión vigentes    | Identidad y registro de actividad.              |
 | `POST /auth/logout`                          | JWT y sesión vigentes    | Revoca la sesión actual; responde 204.          |
 | `PATCH /internal/usuarios/:id/estado-cuenta` | `x-internal-service-key` | Cambia el estado y devuelve sesiones revocadas. |
@@ -50,11 +52,18 @@ El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" 
 - **Arquitectura:** controlador → `AsignarTutorUseCase` → `RolesRepository` → `PrismaRolesRepository`. El caso de uso no depende de NestJS ni Prisma. La inserción transaccional con `skipDuplicates` tolera reintentos y concurrencia sin quitar roles anteriores.
 - **JWT y reintentos:** volver a iniciar sesión para obtener TUTOR en el JWT. Las postulaciones `PENDIENTE_ROL` se recuperan con `POST /postulaciones/:id/reintentar-rol` en Materias/Tutores.
 
+## Datos públicos de usuarios (U2)
+
+- Ambos GET requieren `Authorization: Bearer <JWT>` y una sesión vigente. Cualquier usuario autenticado puede consultar a otros usuarios.
+- Respuesta individual: `{ "id": "12", "nombre": "Ana", "carrera": null, "semestre_actual": null, "biografia": null }`. Solo se devuelven esos cinco campos; el ID viaja como texto y los datos opcionales ausentes como `null`.
+- El lote exige `ids` con entre 1 y 100 IDs positivos dentro del rango BIGINT, separados por comas. Conserva el orden solicitado, ignora duplicados y omite usuarios inexistentes; si ninguno existe, responde `200 []`. Datos inválidos: 400; JWT o sesión inválidos: 401; usuario individual inexistente: 404.
+- `UsuariosController` → `ConsultarDatosPublicosUseCase` → puerto `DatosPublicosRepository` → adaptador `PrismaUsuarioRepository` existente. El caso de uso no depende de NestJS ni Prisma; la consulta selecciona solo los campos públicos y no carga correo, hash ni relaciones privadas. El mismo caso de uso sirve para consultas individuales y por lote.
+
 ## Alcance
 
 En `roles`, `usuario-rol` y `verificacion-correo` solo se actualizaron los imports del guard en sus pruebas y del DTO compartido de correo. Sus rutas CRUD y su autorización quedan pendientes de la decisión del equipo sobre esos módulos. Se mantiene el flujo de verificación existente bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
 
-El registro conserva su implementación y la validación global existente. No envía automáticamente el enlace de verificación. Las antiguas rutas raíz GET/POST /usuarios no forman parte del controlador actual.
+El registro conserva su implementación y la validación global existente. No envía automáticamente el enlace de verificación. `GET /usuarios` consulta únicamente los IDs solicitados; no expone un listado general. La antigua ruta raíz `POST /usuarios` no forma parte del controlador actual.
 
 ## Configuración y comprobación
 

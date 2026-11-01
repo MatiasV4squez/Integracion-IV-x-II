@@ -1,11 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Usuario } from '../dominio/usuario';
-import { UsuarioRepository } from '../dominio/ports/usuario.repository';
+import type {
+  DatosPublicosRepository,
+  DatosPublicosUsuario,
+  UsuarioRepository,
+} from '../dominio/ports/usuario.repository';
 
 @Injectable()
-export class PrismaUsuarioRepository implements UsuarioRepository {
+export class PrismaUsuarioRepository
+  implements UsuarioRepository, DatosPublicosRepository
+{
   constructor(private readonly prisma: PrismaService) {}
+
+  async buscarPorIds(ids: bigint[]): Promise<DatosPublicosUsuario[]> {
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { id_usuario: { in: ids } },
+      select: {
+        id_usuario: true,
+        nombre: true,
+        carrera: true,
+        semestre_actual: true,
+        biografia: true,
+      },
+    });
+    return usuarios.map(usuario => ({
+      id: usuario.id_usuario.toString(),
+      nombre: usuario.nombre,
+      carrera: usuario.carrera,
+      semestre_actual: usuario.semestre_actual,
+      biografia: usuario.biografia,
+    }));
+  }
 
   // Mapeador: Traduce lo que devuelve Prisma a nuestra Entidad Pura de Dominio
   private toDomain(prismaUser: any): Usuario {
