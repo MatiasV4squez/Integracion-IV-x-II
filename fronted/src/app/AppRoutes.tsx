@@ -20,19 +20,21 @@ const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario
 const DashboardTutorContainer = lazy(() => import('../features/panel-tutor/containers/DashboardTutorContainer'))
 const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'))
 const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
+const InicioPublicoPage = lazy(() => import('../features/inicio-publico/pages/InicioPublicoPage'))
 
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
     <Routes>
       <Route element={<TutoriasLayout />}>
-        <Route path="/materias" element={<CatalogoMateriasContainer />} />
-        <Route path="/tutores" element={<BuscarTutoresContainer />} />
         <Route path="/verificar-cuenta" element={<VerificacionCuentaContainer api={verificacionCuentaHttp} />} />
         <Route element={<RutaInvitado />}>
+          <Route path="/" element={<InicioPublicoPage />} />
           <Route path="/login" element={<InicioSesionContainer api={inicioSesionHttp} />} />
           <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
         </Route>
         <Route element={<RutaProtegida />}>
+          <Route path="/materias" element={<CatalogoMateriasContainer />} />
+          <Route path="/tutores" element={<BuscarTutoresContainer />} />
           <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>

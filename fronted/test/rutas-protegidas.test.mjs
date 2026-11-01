@@ -34,6 +34,8 @@ test('exige sesión y el rol que corresponde a cada sección', () => {
 
 test('sin sesión las rutas privadas redirigen al login sin mostrar su contenido', async () => {
   const privadas = [
+    ['/materias', /Explora las asignaturas/],
+    ['/tutores?materiaId=3&page=1', /Resultados de búsqueda/],
     ['/inicio', /Panel del estudiante|Próxima/],
     ['/panel', /Mi panel/],
     ['/solicitudes/nueva', /Cálculo intermedio/],
@@ -51,11 +53,22 @@ test('sin sesión las rutas privadas redirigen al login sin mostrar su contenido
 
 test('las rutas públicas y de acceso siguen disponibles sin sesión', async () => {
   for (const [ruta, contenido] of [
-    ['/materias', /Materias/], ['/tutores', /tutores/i], ['/verificar-cuenta', /Verifica/],
+    ['/', /Encuentra al tutor perfecto para ti/], ['/verificar-cuenta', /Verifica/],
     ['/login', /Bienvenido de vuelta/], ['/registro', /Crea tu cuenta/],
   ]) {
     const html = await renderRuta(ruta)
     assert.doesNotMatch(html, /Redirigiendo al inicio de sesión/, ruta)
     assert.match(html, contenido, ruta)
   }
+})
+
+test('el inicio público reutiliza el layout y ofrece acceso y registro sin consultas privadas', async () => {
+  const html = await renderRuta('/')
+  assert.equal((html.match(/<main\b/g) ?? []).length, 1)
+  assert.equal((html.match(/<header\b/g) ?? []).length, 1)
+  assert.equal((html.match(/<footer\b/g) ?? []).length, 1)
+  assert.match(html, /Cómo funciona/)
+  assert.match(html, /href="\/login"[^>]*>Iniciar sesión<\/a>/)
+  assert.match(html, /href="\/registro"[^>]*>Crear cuenta<\/a>/)
+  assert.doesNotMatch(html, /<form\b|<input\b/)
 })

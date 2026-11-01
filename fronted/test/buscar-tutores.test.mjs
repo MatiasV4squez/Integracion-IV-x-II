@@ -205,7 +205,7 @@ test('las tarjetas pueden enlazar a una búsqueda por ID', () => {
   assert.match(html, /href="\/tutores\?materiaId=9007199254740993&amp;page=1"/)
 })
 
-test('conserva el acceso del equipo en la raíz y sus rutas generales al integrar las nuevas pantallas', async () => {
+test('muestra el inicio público en la raíz y conserva las rutas adicionales del equipo', async () => {
   const renderRuta = (ruta) => renderizarRuta(createElement(MemoryRouter, { initialEntries: [ruta] },
     createElement(AppRoutes, null,
       createElement(Route, { path: '/ruta-equipo', element: createElement('p', null, 'Pantalla del equipo') }),
@@ -215,6 +215,7 @@ test('conserva el acceso del equipo en la raíz y sus rutas generales al integra
   const login = await renderRuta('/login')
   assert.match(login, /Bienvenido de vuelta/)
   assert.doesNotMatch(login, /Acceso del equipo/)
-  assert.match(await renderRuta('/'), /Acceso del equipo/)
+  assert.match(await renderRuta('/'), /Encuentra al tutor perfecto para ti/)
+  assert.doesNotMatch(await renderRuta('/'), /Acceso del equipo/)
   assert.doesNotMatch(await renderRuta('/solicitudes/recibidas'), /Acceso del equipo/)
 })

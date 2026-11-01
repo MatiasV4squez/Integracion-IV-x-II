@@ -7,11 +7,6 @@
 
 .solicitudes-recibidas h1 { margin: 0 0 24px; font-size: 30px; line-height: 1.5; letter-spacing: -0.7px; }
 .solicitudes-recibidas__subtitulo { margin: 0 0 32px; color: var(--color-text-muted); font-size: 14px; }
-.solicitudes-recibidas__contexto { width: fit-content; max-width: 100%; margin: 0 0 24px; padding: 12px 24px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-primary-text); font-size: 14px; font-weight: 600; }
-.solicitudes-recibidas__pestanas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 24px; }
-.solicitudes-recibidas__pestanas span, .solicitudes-recibidas__pestanas button { display: grid; place-items: center; min-height: 48px; padding: 12px 24px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); font: inherit; font-size: 14px; }
-.solicitudes-recibidas__pestanas span { background: var(--color-primary); border-color: var(--color-primary); color: white; font-weight: 600; }
-.solicitudes-recibidas__pestanas button:disabled { color: var(--color-text-muted); cursor: not-allowed; }
 .solicitudes-recibidas__resumen { margin-bottom: 24px; padding: 16px 20px; border-radius: 12px; background: var(--color-primary-soft); font-size: 14px; }
 .solicitudes-recibidas__resumen strong { color: var(--color-primary-text); }
 .solicitudes-recibidas__resumen p { margin: 12px 0 0; color: var(--color-text-muted); font-size: 13px; }
@@ -40,7 +35,6 @@
 
 @media (max-width: 600px) {
   .solicitudes-recibidas { padding-inline: 16px; }
-  .solicitudes-recibidas__pestanas { flex-direction: column; align-items: flex-start; }
   .solicitudes-recibidas__resumen { padding-inline: 16px; }
   .solicitudes-recibidas__panel { padding: 24px 16px; }
   .listado-solicitudes, .listado-solicitudes tbody, .listado-solicitudes tr, .listado-solicitudes td { display: block; width: 100%; }

@@ -1,0 +1,43 @@
+.inicio-publico { background: var(--color-surface); }
+.inicio-publico__interior { width: min(100%, 1296px); margin-inline: auto; padding-inline: 24px; }
+.inicio-publico__presentacion, .inicio-publico__funcionamiento { background: var(--color-primary-soft); }
+.inicio-publico__portada { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: center; gap: 64px; padding-block: 44px; }
+.inicio-publico__mensaje { min-width: 0; }
+.inicio-publico__etiqueta { margin: 0 0 12px; color: var(--color-primary-text); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+.inicio-publico h1 { max-width: 700px; margin: 0 0 16px; font-size: clamp(32px, 3.2vw, 44px); line-height: 1.25; letter-spacing: -1px; }
+.inicio-publico__descripcion { max-width: 650px; margin: 0 0 20px; color: var(--color-text-muted); font-size: 16px; }
+.inicio-publico__ilustracion { display: block; width: 100%; height: auto; }
+.inicio-publico__acciones { display: flex; flex-wrap: wrap; gap: 12px; }
+.inicio-publico__acciones a { min-height: 48px; padding-inline: 24px; }
+.inicio-publico__ventajas { padding-block: 32px 48px; }
+.inicio-publico h2 { margin: 0 0 32px; font-size: 24px; line-height: 1.3; letter-spacing: -.4px; }
+.inicio-publico h3 { margin: 0 0 4px; font-size: 16px; line-height: 1.4; }
+.inicio-publico__beneficios, .inicio-publico__pasos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; margin: 0; padding: 0; list-style: none; }
+.inicio-publico__beneficios li { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.inicio-publico__beneficios p, .inicio-publico__pasos p { margin: 0; color: var(--color-text-muted); font-size: 14px; }
+.inicio-publico__icono { display: grid; flex-shrink: 0; place-items: center; width: 52px; height: 52px; border-radius: 14px; color: #a85b00; background: var(--color-primary-soft); }
+.inicio-publico__funcionamiento { padding-block: 32px 40px; }
+.inicio-publico__pasos { gap: 0; background: var(--color-surface); }
+.inicio-publico__pasos li { padding: 12px 24px 24px; text-align: center; }
+.inicio-publico__numero { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 20px; font-weight: 700; }
+.inicio-publico__pasos h3 { margin-bottom: 8px; }
+
+@media (max-width: 1000px) {
+  .inicio-publico__portada { gap: 32px; }
+  .inicio-publico__beneficios { gap: 24px; }
+  .inicio-publico__beneficios li { align-items: flex-start; }
+}
+
+@media (max-width: 760px) {
+  .inicio-publico__portada { grid-template-columns: 1fr; padding-block: 32px; }
+  .inicio-publico__ilustracion { width: min(100%, 430px); margin-inline: auto; }
+  .inicio-publico__beneficios, .inicio-publico__pasos { grid-template-columns: 1fr; gap: 24px; }
+  .inicio-publico__pasos li { padding: 16px 24px; }
+  .inicio-publico__ventajas, .inicio-publico__funcionamiento { padding-block: 32px; }
+}
+
+@media (max-width: 400px) {
+  .inicio-publico__interior { padding-inline: 16px; }
+  .inicio-publico__acciones { flex-direction: column; }
+  .inicio-publico__acciones a { width: 100%; }
+}

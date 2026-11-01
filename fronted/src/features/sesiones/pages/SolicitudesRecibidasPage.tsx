@@ -36,14 +36,8 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
 
   return (
     <main className="solicitudes-recibidas" aria-labelledby="solicitudes-titulo">
-      <h1 id="solicitudes-titulo">Mis tutorías</h1>
+      <h1 id="solicitudes-titulo">Solicitudes recibidas</h1>
       <p className="solicitudes-recibidas__subtitulo">Revisa las solicitudes antes de que expire su plazo de respuesta.</p>
-      {!acceso && <p className="solicitudes-recibidas__contexto">Actuando como Tutor</p>}
-      <nav className="solicitudes-recibidas__pestanas" aria-label="Secciones de mis tutorías">
-        <span aria-current="page">Solicitudes recibidas{listo ? ' (' + solicitudes.length + ')' : ''}</span>
-        <button type="button" disabled title="Esta sección estará disponible próximamente.">Próximas</button>
-        <button type="button" disabled title="Esta sección estará disponible próximamente.">Historial</button>
-      </nav>
 
       {listo && (
         <div className="solicitudes-recibidas__resumen" role="status">

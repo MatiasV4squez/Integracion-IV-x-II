@@ -59,7 +59,7 @@ test('la ruta de solicitud ya no hardcodea materia y exige una sesión real ante
   for (const path of ['/solicitudes/nueva', '/solicitudes/nueva?materiaId=1', '/solicitudes/nueva?materiaId=abc']) {
     const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: [path] }, createElement(AppRoutes)))
     assert.doesNotMatch(html, /Cálculo intermedio/)
-    assert.match(html, /Inicia sesión para solicitar una tutoría/)
+    assert.match(html, /Redirigiendo al inicio de sesión/)
     assert.match(html, /href="\/login"/)
   }
 })
