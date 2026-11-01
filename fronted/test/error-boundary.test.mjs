@@ -47,3 +47,17 @@ test('getDerivedStateFromError registra el fallo y el estado inicial no lo prese
   assert.deepEqual(ErrorBoundary.getDerivedStateFromError(fallo), { error: fallo })
   assert.deepEqual(new ErrorBoundary({ children: null }).state, { error: null })
 })
+
+test('con un fallo registrado muestra la alternativa y reintentar limpia el error', () => {
+  const limite = new ErrorBoundary({ children: createElement('p', null, 'Contenido visible') })
+  limite.state = { error: new Error('boom') }
+
+  const html = renderToStaticMarkup(limite.render())
+  assert.match(html, /Algo falló en esta página/)
+  assert.doesNotMatch(html, /Contenido visible|boom/)
+
+  let nuevoEstado
+  limite.setState = (estado) => { nuevoEstado = estado }
+  limite.render().props.onReintentar()
+  assert.deepEqual(nuevoEstado, { error: null })
+})
