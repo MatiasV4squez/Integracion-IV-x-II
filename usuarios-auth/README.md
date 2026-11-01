@@ -48,7 +48,7 @@ El registro conserva su implementación y la validación global existente. No en
 
 ## Configuración y comprobación
 
-Se conservan las variables de `.env.example`: PostgreSQL, secretos JWT e interno, tiempos de sesión y configuración de correo. El modelo Sesion corresponde a la migración existente `20260927000100_sesiones_jwt`. No se agregó una migración ni se aplicaron cambios a la base de datos.
+Se conservan las variables de `.env.example`: PostgreSQL, secretos JWT e interno, tiempos de sesión y configuración de correo. El modelo Sesion corresponde a la migración existente `20260927000100_sesiones_jwt`. La migración `20261031000000_roles_base` agrega los roles base.
 
 Desde `usuarios-auth`:
 
@@ -60,8 +60,26 @@ npm test -- --runInBand
 npm run test:e2e -- --runInBand
 ```
 
-Si la base todavía no tiene la tabla de sesiones, aplicar las migraciones pendientes mediante `npm run db:migrate`. El rol ESTUDIANTE debe existir para registrar usuarios; su inicialización está en `prisma/seed.ts`.
+Antes de iniciar la aplicación o registrar usuarios, aplicar las migraciones pendientes mediante `npm run db:migrate`.
+
+### Roles base (U3)
+
+La migración `20261031000000_roles_base` garantiza estos roles:
+
+- `ESTUDIANTE`
+- `TUTOR`
+- `ADMINISTRADOR`
+
+```powershell
+npm run db:migrate
+```
+
+La inserción es idempotente por nombre: conserva los roles existentes, sus IDs y las relaciones con usuarios. Los IDs son generados por PostgreSQL; el registro conecta `ESTUDIANTE` por nombre, sin asumir un ID fijo.
+
+La creación de roles es responsabilidad de las migraciones de persistencia. Se retiró el inicializador de `UsuariosService`; el arranque de la aplicación no crea roles. `prisma/seed.ts` queda como utilidad manual opcional y no es necesario para completar U3.
+
+Para comprobar esta migración en una base de prueba: aplicarla con la tabla de roles vacía y con roles y asignaciones existentes; repetir su SQL y verificar que no aparezcan duplicados ni cambien los IDs o las asignaciones existentes.
 
 Las pruebas HTTP usan validación global, controladores, adaptadores y guards reales con Prisma y SMTP simulados. Cubren login, sesiones, logout, inactividad, suspensión/reactivación y credenciales internas. Las pruebas de AuthService permiten sustituir adaptadores y comprueban que no se entregue un token si falla la creación de su sesión.
 
-Quedan pendientes las pruebas contra PostgreSQL y SMTP reales y la integración completa con Reportes.
+Quedan pendientes las pruebas de los flujos de login, sesiones y verificación contra PostgreSQL y SMTP reales y la integración completa con Reportes.

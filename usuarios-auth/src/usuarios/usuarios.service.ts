@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
@@ -22,17 +22,8 @@ type UsuarioPublico = Prisma.UsuarioGetPayload<{
 }>;
 
 @Injectable()
-export class UsuariosService implements OnModuleInit {
+export class UsuariosService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.prisma.rol.upsert({
-      where: { id_rol: 1 },
-      update: {},
-      create: { id_rol: 1, nombre: 'ESTUDIANTE' },
-    });
-    console.log('Rol ESTUDIANTE verificado/creado en la base de datos');
-  }
   
   async create(createUsuarioDto: CreateUsuarioDto) {
     const hashedPassword = await hash(createUsuarioDto.password_hash);
@@ -47,7 +38,7 @@ export class UsuariosService implements OnModuleInit {
         roles: {
           create:{
             rol: {
-              connect: {id_rol: 1},
+              connect: {nombre: 'ESTUDIANTE'},
             }
           }
         }
