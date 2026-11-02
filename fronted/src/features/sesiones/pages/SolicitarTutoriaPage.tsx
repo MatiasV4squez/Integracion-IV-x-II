@@ -89,6 +89,7 @@ export default function SolicitarTutoriaPage({
 
           <button
             type="button"
+            className="seleccion-tutoria__enviar"
             onClick={alEnviar}
             disabled={
               cargando ||

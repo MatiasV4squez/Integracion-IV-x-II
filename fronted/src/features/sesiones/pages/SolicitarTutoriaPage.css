@@ -96,6 +96,31 @@
   margin-bottom: 0;
 }
 
+.seleccion-tutoria .seleccion-tutoria__enviar {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 24px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #0961d2;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.seleccion-tutoria .seleccion-tutoria__enviar:hover:not(:disabled) {
+  background: #074ea8;
+}
+
+.seleccion-tutoria .seleccion-tutoria__enviar:focus-visible {
+  outline: 2px solid #0961d2;
+  outline-offset: 3px;
+}
+
+.seleccion-tutoria .seleccion-tutoria__enviar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 760px) {
   .seleccion-tutoria {
     grid-template-columns: minmax(0, 1fr);

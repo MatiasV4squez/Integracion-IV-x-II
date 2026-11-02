@@ -13,6 +13,12 @@
 .listado-sesiones-activas td { padding: 16px; border: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
 .listado-sesiones-activas td p { margin: 4px 0 0; color: var(--color-text-muted); }
 .listado-sesiones-activas__etiqueta { color: var(--color-primary-text); font-weight: 600; }
+.listado-sesiones-activas__etiqueta--cancelada { color: #b42318; }
+.listado-sesiones-activas__estado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.listado-sesiones-activas__cancelar { flex-shrink: 0; min-height: 36px; padding: 6px 14px; border: 1px solid #b42318; border-radius: 10px; background: #b42318; color: white; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.listado-sesiones-activas__cancelar:hover:not(:disabled) { background: #912018; }
+.listado-sesiones-activas__cancelar:disabled { opacity: .6; cursor: not-allowed; }
+.sesiones-activas__error { margin: 0 0 16px; padding: 12px 16px; border-left: 4px solid #b42318; border-radius: 8px; background: var(--color-surface); color: #b42318; font-size: 14px; }
 
 @media (max-width: 600px) {
   .sesiones-activas { padding: 24px 16px; }

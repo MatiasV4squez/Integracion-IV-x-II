@@ -3,10 +3,17 @@ import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { SesionesActivas } from '../components/SesionesActivas'
+import { useCancelarSesion } from '../hooks/useCancelarSesion'
+import { useNombresTutores } from '../hooks/useNombreTutores'
 import { useSesionesActivas } from '../hooks/useSesionesActivas'
 
 function SesionesActivasDelEstudiante({ sesion }: { sesion: SesionUsuario }) {
   const { consulta, recargar } = useSesionesActivas(sesion)
+  const cancelacion = useCancelarSesion(sesion)
+  const nombresTutores = useNombresTutores(
+    consulta.estado === 'listo' ? consulta.sesiones.map((clase) => clase.id_tutor) : [],
+    sesion.token,
+  )
   const { consulta: catalogo } = useMaterias()
   const puedeActualizar = consulta.estado !== 'error' || consulta.tipo === 'consulta'
 
@@ -20,7 +27,7 @@ function SesionesActivasDelEstudiante({ sesion }: { sesion: SesionUsuario }) {
     return () => { window.clearInterval(temporizador); window.removeEventListener('focus', alVolver) }
   }, [recargar, puedeActualizar])
 
-  return <SesionesActivas consulta={consulta} materias={catalogo.estado === 'listo' ? catalogo.materias : []} onRecargar={recargar} />
+  return <SesionesActivas consulta={consulta} materias={catalogo.estado === 'listo' ? catalogo.materias : []} onRecargar={recargar} cancelacion={cancelacion} nombresTutores={nombresTutores} />
 }
 
 export default function SesionesActivasContainer() {

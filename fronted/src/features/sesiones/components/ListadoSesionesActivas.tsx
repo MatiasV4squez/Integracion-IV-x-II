@@ -1,14 +1,17 @@
 import type { Materia } from '../../materias/models/materia'
+import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import type { Sesion } from '../models/sesion'
-import { etiquetarEstadoActivo } from '../utils/sesiones-activas'
+import { etiquetarEstadoActivo, puedeCancelar } from '../utils/sesiones-activas'
 import { formatearHorarioSesion } from '../utils/solicitudes-recibidas'
 
 interface ListadoSesionesActivasProps {
   sesiones: Sesion[]
   materias: Materia[]
+  cancelacion?: CancelacionSesiones
+  nombresTutores?: Map<string, string>
 }
 
-export function ListadoSesionesActivas({ sesiones, materias }: ListadoSesionesActivasProps) {
+export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombresTutores }: ListadoSesionesActivasProps) {
   const porId = new Map(materias.map((materia) => [materia.idMateria, materia]))
   return (
     <table className="listado-sesiones-activas">
@@ -25,13 +28,26 @@ export function ListadoSesionesActivas({ sesiones, materias }: ListadoSesionesAc
             <tr key={sesion.id_sesion}>
               <td data-etiqueta="Materia / Tutor">
                 <strong>{materia ? materia.nombre + ' · ' + materia.codigo : 'Materia #' + sesion.id_materia}</strong>
-                <p>Tutor #{sesion.id_tutor}</p>
+                <p>{nombresTutores?.get(sesion.id_tutor) ?? 'Tutor #' + sesion.id_tutor}</p>
               </td>
               <td data-etiqueta="Fecha y horario">
                 <time dateTime={sesion.inicio}>{formatearHorarioSesion(sesion.inicio, sesion.fin)}</time>
               </td>
               <td data-etiqueta="Estado">
-                <span className="listado-sesiones-activas__etiqueta">{etiquetarEstadoActivo(sesion.estado_sesion)}</span>
+                {cancelacion?.canceladas.includes(sesion.id_sesion) ? (
+                  <span className="listado-sesiones-activas__etiqueta listado-sesiones-activas__etiqueta--cancelada">Cancelada</span>
+                ) : (
+                  <div className="listado-sesiones-activas__estado">
+                    <span className="listado-sesiones-activas__etiqueta">{etiquetarEstadoActivo(sesion.estado_sesion)}</span>
+                    {cancelacion && puedeCancelar(sesion) && (
+                      <button type="button" className="listado-sesiones-activas__cancelar"
+                        disabled={cancelacion.cancelando !== null} aria-busy={cancelacion.cancelando === sesion.id_sesion}
+                        onClick={() => cancelacion.cancelar(sesion.id_sesion)}>
+                        {cancelacion.cancelando === sesion.id_sesion ? 'Cancelando…' : 'Cancelar'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </td>
             </tr>
           )

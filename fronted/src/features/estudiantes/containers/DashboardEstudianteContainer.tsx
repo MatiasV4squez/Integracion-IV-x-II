@@ -4,6 +4,8 @@ import DashboardEstudiantePage from '../pages/DashboardEstudiantePage'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useSesionesActivas } from '../../sesiones/hooks/useSesionesActivas'
+import { useCancelarSesion } from '../../sesiones/hooks/useCancelarSesion'
+import { useNombresTutores } from '../../sesiones/hooks/useNombreTutores'
 import { useConsultaSesiones } from '../../sesiones/hooks/useConsultaSesiones'
 import { consultarHistorialEstudiante } from '../../sesiones/services/sesiones-api'
 import { SesionesActivas } from '../../sesiones/components/SesionesActivas'
@@ -12,6 +14,11 @@ import { useState } from 'react'
 
 function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
   const { consulta, recargar } = useSesionesActivas(sesion)
+  const cancelacion = useCancelarSesion(sesion)
+  const nombresTutores = useNombresTutores(
+    consulta.estado === 'listo' ? consulta.sesiones.map((clase) => clase.id_tutor) : [],
+    sesion.token,
+  )
   const { consulta: consultaHistorial, recargar: recargarHistorial } = useConsultaSesiones(sesion, consultarHistorialEstudiante)
   const historial = consultaHistorial.estado === 'listo' ? consultaHistorial.sesiones : []
   const { consulta: catalogo } = useMaterias()
@@ -22,7 +29,8 @@ function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
 
   const proximaClase = consulta.estado === 'listo'
     ? consulta.sesiones.find(
-      (clase) => clase.estado_sesion === 'CONFIRMADA' && Date.parse(clase.inicio) > ahora,)
+      (clase) => clase.estado_sesion === 'CONFIRMADA' && Date.parse(clase.inicio) > ahora
+        && !cancelacion.canceladas.includes(clase.id_sesion),)
     : undefined
 
   const materia = materias.find(
@@ -126,6 +134,8 @@ function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
           consulta={consulta}
           materias={materias}
           onRecargar={actualizarSesiones}
+          cancelacion={cancelacion}
+          nombresTutores={nombresTutores}
         />
       }
     />
