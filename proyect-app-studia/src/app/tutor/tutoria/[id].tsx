@@ -3,9 +3,9 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Radius, Spacing, type ThemeColors } from '@/constants/theme';
-import { findTutoria, initials, statusBadge, statusLabel, type TutoriaStatus } from '@/constants/tutorias';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius, Spacing, type ThemeColors } from '@/presentation/constants/theme';
+import { findTutoria, initials, statusBadge, statusLabel, type TutoriaStatus } from '@/presentation/constants/tutorias';
+import { useTheme } from '@/presentation/hooks/use-theme';
 
 export default function TutoriaDetailScreen() {
   const colors = useTheme();
@@ -111,7 +111,8 @@ function createStyles(colors: ThemeColors) {
       borderRadius: Radius.lg,
       padding: Spacing.lg,
       gap: Spacing.md,
-      boxShadow: '0 2px 8px rgba(15, 27, 45, 0.08)',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     sectionTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
     row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },

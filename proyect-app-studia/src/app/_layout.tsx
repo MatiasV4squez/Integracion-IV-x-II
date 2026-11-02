@@ -3,12 +3,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
-import { useAuth } from '@/hooks/use-auth';
-import { usePreferences } from '@/hooks/use-preferences';
-import { useUI } from '@/hooks/use-ui';
-import { canAccess } from '@/navigation/access';
-import { SessionsProvider } from '@/state/sessions-context';
-import { authStore, preferencesStore } from '@/store';
+import { useAuth } from '@/presentation/hooks/use-auth';
+import { usePreferences } from '@/presentation/hooks/use-preferences';
+import { useUI } from '@/presentation/hooks/use-ui';
+import { canAccess } from '@/presentation/navigation/access';
+import { SessionsProvider } from '@/presentation/state/sessions-context';
+import { authStore, preferencesStore } from '@/di/container';
 
 // La pantalla de carga se mantiene hasta recuperar la sesión y las preferencias guardadas.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -55,6 +55,14 @@ function RootNavigator() {
   const { isAuthenticated, roles } = useAuth();
   const ui = useUI();
   const session = { isAuthenticated, roles };
+  // Encabezado como el de la web: blanco, título oscuro y acciones en azul.
+  const headerOptions = {
+    headerShown: true,
+    headerStyle: { backgroundColor: ui.surface },
+    headerTintColor: ui.primaryText,
+    headerTitleStyle: { color: ui.text, fontWeight: '700' as const },
+    headerShadowVisible: true,
+  };
   useSessionActivity();
 
   return (
@@ -63,21 +71,18 @@ function RootNavigator() {
       <Stack.Protected guard={canAccess('authenticated', session)}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="detalle-sesion" options={{ headerShown: false }} />
+        <Stack.Screen name="postulacion-tutor" options={{ ...headerOptions, title: 'Ser tutor' }} />
+      </Stack.Protected>
+
+      {/* Solo administradores */}
+      <Stack.Protected guard={canAccess('admin', session)}>
+        <Stack.Screen name="admin/postulaciones" options={{ ...headerOptions, title: 'Administración' }} />
       </Stack.Protected>
 
       {/* Solo cuentas con rol Tutor */}
       <Stack.Protected guard={canAccess('tutor', session)}>
         <Stack.Screen name="tutor" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="publicar-disponibilidad"
-          options={{
-            headerShown: true,
-            title: 'Publicar disponibilidad',
-            headerStyle: { backgroundColor: ui.navy },
-            headerTintColor: '#FFFFFF',
-            headerShadowVisible: false,
-          }}
-        />
+        <Stack.Screen name="publicar-disponibilidad" options={{ ...headerOptions, title: 'Publicar disponibilidad' }} />
       </Stack.Protected>
 
       {/* Solo sin sesión */}
@@ -85,6 +90,9 @@ function RootNavigator() {
         <Stack.Screen name="login" />
         <Stack.Screen name="registro" />
       </Stack.Protected>
+
+      {/* Con o sin sesión: se abre desde el enlace del correo */}
+      <Stack.Screen name="verificar-cuenta" />
     </Stack>
   );
 }

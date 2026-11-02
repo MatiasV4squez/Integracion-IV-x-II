@@ -1,4 +1,4 @@
-import PublicarDisponibilidadScreen from '@/screens/publicar-disponibilidad-screen';
+import PublicarDisponibilidadScreen from '@/presentation/screens/publicar-disponibilidad-screen';
 
 export default function PublicarDisponibilidadRoute() {
   return <PublicarDisponibilidadScreen />;

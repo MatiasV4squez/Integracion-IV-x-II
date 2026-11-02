@@ -4,10 +4,10 @@ import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Radius } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useTutorMode } from '@/hooks/use-tutor-mode';
-import { getVisibleTabs, type TabName } from '@/navigation/access';
+import { Radius } from '@/presentation/constants/theme';
+import { useTheme } from '@/presentation/hooks/use-theme';
+import { useTutorMode } from '@/presentation/hooks/use-tutor-mode';
+import { getVisibleTabs, type TabName } from '@/presentation/navigation/access';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 

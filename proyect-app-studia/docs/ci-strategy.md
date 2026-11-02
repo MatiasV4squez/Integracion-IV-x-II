@@ -16,6 +16,6 @@ En un solo job (`ubuntu-latest`), con `working-directory: proyect-app-studia`:
 3. `npm ci` — instala dependencias exactas del lockfile.
 4. `npm run lint` — `expo lint`.
 5. `npx tsc --noEmit` — type-check sin emitir archivos.
-6. `npm test` — pruebas de reglas de negocio en `src/utils/*.test.mjs`.
+6. `npm test` — pruebas de dominio, casos de uso, adaptadores y estado en `src/**/*.test.mjs`.
 
 Cualquier paso que falle corta el workflow (rojo en el PR).

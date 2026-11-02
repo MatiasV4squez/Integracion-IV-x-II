@@ -1,4 +1,4 @@
-import RegistroScreen from '@/screens/registro-screen';
+import RegistroScreen from '@/presentation/screens/registro-screen';
 
 export default function RegistroRoute() {
   return <RegistroScreen />;

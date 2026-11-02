@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/presentation/hooks/use-theme';
 
 export default function TutorStackLayout() {
   const colors = useTheme();
@@ -9,8 +9,9 @@ export default function TutorStackLayout() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
-        headerShadowVisible: false,
+        headerTintColor: colors.primaryDark,
+        headerTitleStyle: { color: colors.text, fontWeight: '700' },
+        headerShadowVisible: true,
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="mis-tutorias" options={{ title: 'Mis tutorías' }} />
