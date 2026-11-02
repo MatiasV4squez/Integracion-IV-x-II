@@ -38,6 +38,9 @@ describe('Contrato HTTP de disponibilidad de materias-tutores', () => {
     expect(consulta.mock.calls[0][1]?.signal).toBe(
       consulta.mock.calls[1][1]?.signal,
     );
+    for (const [, opciones] of consulta.mock.calls) {
+      expect(opciones?.headers).toEqual({ 'X-Integracion-Secret': 's'.repeat(32) });
+    }
   });
 
   it('mantiene compatibilidad con el listado anterior sin paginación', async () => {

@@ -29,6 +29,7 @@ export class DisponibilidadTutoresHttp implements DisponibilidadTutores {
         url.searchParams.set('limit', '100');
         const respuesta = await this.solicitar(url, {
           method: 'GET',
+          headers: { 'X-Integracion-Secret': destino.secreto },
           signal: limiteEspera,
         });
         const datos: unknown = await respuesta.json();
