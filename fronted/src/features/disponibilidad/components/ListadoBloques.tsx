@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Icon } from '../../../components/Icon'
 import type { BloqueDisponibilidad } from '../models/bloque-disponibilidad'
+import './ListadoBloques.css'
 
 interface Propiedades {
   bloques: BloqueDisponibilidad[]
@@ -42,8 +42,7 @@ export function ListadoBloques({
 
   if (visibles.length === 0) {
     return (
-      <div className="empty-state">
-        <Icon name="calendar" size={30} />
+      <div className="listado-bloques__vacio">
         <h3>Aún no tienes bloques de disponibilidad</h3>
         <p>Usa el formulario para añadir tu primer horario.</p>
       </div>
@@ -51,15 +50,15 @@ export function ListadoBloques({
   }
 
   return (
-    <div className="schedule-list">
+    <div className="listado-bloques">
       {fechas.map((fecha) => {
         const bloquesDelDia = visibles
           .filter((bloque) => bloque.dia === fecha)
           .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
 
         return (
-          <section className="day-group" key={fecha}>
-            <header className="day-heading">
+          <section className="listado-bloques__dia" key={fecha}>
+            <div className="listado-bloques__cabecera">
               <h3>
                 <time dateTime={fecha}>
                   {formatearFecha(fecha)}
@@ -69,48 +68,52 @@ export function ListadoBloques({
                 {bloquesDelDia.length}{' '}
                 {bloquesDelDia.length === 1 ? 'bloque' : 'bloques'}
               </span>
-            </header>
+            </div>
 
-            <div className="day-blocks">
+            <div className="listado-bloques__bloques">
               {bloquesDelDia.map((bloque) => {
                 const modificable =
                   bloque.estadoBloque === 'DISPONIBLE' &&
                   !guardando
+                const reservado = bloque.estadoBloque === 'RESERVADO'
 
                 return (
                   <article
                     key={bloque.idBloque}
-                    className={`time-block ${
+                    className={`bloque-horario${
                       idEdicion === bloque.idBloque
-                        ? 'is-editing'
+                        ? ' is-editing'
                         : ''
                     }`}
                   >
-                    <div className="time-block__body">
-                      <div className="time-block__time">
-                        <span>{bloque.horaInicio}</span>
-                        <Icon name="arrow-right" />
+                    <div className="bloque-horario__datos">
+                      <strong className="bloque-horario__hora">
+                        <span>{bloque.horaInicio}</span> a{' '}
                         <span>{bloque.horaFin}</span>
-                      </div>
+                      </strong>
 
-                      <span className="tag">
-                        {bloque.estadoBloque === 'RESERVADO'
-                          ? 'Reservado'
-                          : 'Disponible'}
+                      <span
+                        className={
+                          reservado
+                            ? 'bloque-horario__estado bloque-horario__estado--reservado'
+                            : 'bloque-horario__estado bloque-horario__estado--disponible'
+                        }
+                      >
+                        {reservado ? 'Reservado' : 'Disponible'}
                       </span>
                     </div>
 
-                    <div className="time-block__side">
+                    <div className="bloque-horario__acciones">
                       {confirmando === bloque.idBloque ? (
                         <div
-                          className="inline-confirm"
+                          className="bloque-horario__confirmacion"
                           role="group"
                           aria-label="Confirmar eliminación"
                         >
                           <span>¿Eliminar?</span>
 
                           <button
-                            className="mini-button mini-button--danger"
+                            className="bloque-horario__mini-boton bloque-horario__mini-boton--peligro"
                             type="button"
                             disabled={!modificable}
                             onClick={async () => {
@@ -127,7 +130,7 @@ export function ListadoBloques({
                           </button>
 
                           <button
-                            className="mini-button"
+                            className="bloque-horario__mini-boton"
                             type="button"
                             disabled={guardando}
                             onClick={() => establecerConfirmando(null)}
@@ -136,20 +139,19 @@ export function ListadoBloques({
                           </button>
                         </div>
                       ) : (
-                        <div className="block-actions">
+                        <>
                           <button
-                            className="text-button"
+                            className="bloque-horario__accion"
                             type="button"
                             disabled={!modificable}
                             onClick={() => onEditar(bloque)}
                             aria-label={`Editar bloque del ${fecha}, ${bloque.horaInicio} a ${bloque.horaFin}`}
                           >
-                            <Icon name="pencil" />
                             Editar
                           </button>
 
                           <button
-                            className="text-button text-button--danger"
+                            className="bloque-horario__accion bloque-horario__accion--peligro"
                             type="button"
                             disabled={!modificable}
                             onClick={() =>
@@ -157,10 +159,9 @@ export function ListadoBloques({
                             }
                             aria-label={`Eliminar bloque del ${fecha}, ${bloque.horaInicio} a ${bloque.horaFin}`}
                           >
-                            <Icon name="trash" />
                             Eliminar
                           </button>
-                        </div>
+                        </>
                       )}
                     </div>
                   </article>

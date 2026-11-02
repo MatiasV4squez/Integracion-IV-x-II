@@ -124,12 +124,19 @@ export default function DisponibilidadContainer() {
 
   if (!sesion.roles.includes('TUTOR')) {
     return (
-      <main className="page">
-        <h1>Gestión de disponibilidad</h1>
-        <p role="alert">
-          Esta sección está disponible para tutores.
-        </p>
-        <Link to="/materias">Ir a materias</Link>
+      <main className="acceso-denegado">
+        <section
+          className="acceso-denegado__tarjeta"
+          aria-labelledby="disponibilidad-sin-acceso"
+        >
+          <h1 id="disponibilidad-sin-acceso">
+            Gestión de disponibilidad
+          </h1>
+          <p role="alert">Esta sección está disponible para tutores.</p>
+          <Link to="/materias" className="boton-global boton-global--primario">
+            Ir a materias
+          </Link>
+        </section>
       </main>
     )
   }

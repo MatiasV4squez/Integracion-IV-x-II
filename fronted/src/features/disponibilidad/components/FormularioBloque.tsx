@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
-import { Icon } from '../../../components/Icon'
 import type { BloqueDisponibilidad, HorarioDisponibilidad } from '../models/bloque-disponibilidad'
 import { validarHorario, type ErroresHorario } from '../utils/validar-horario'
+import './FormularioBloque.css'
 
 interface Propiedades {
   bloques: BloqueDisponibilidad[]
@@ -79,30 +79,23 @@ export function FormularioBloque({
 
   return (
     <aside
-      className="panel form-panel"
-      id="block-form"
+      className="formulario-bloque"
       aria-labelledby={`${id}-titulo`}
     >
-      <div className="form-heading">
-        <span className="form-heading__icon">
-          <Icon name={bloqueEditado ? 'pencil' : 'plus'} />
-        </span>
-
-        <div>
-          <h2 id={`${id}-titulo`}>
-            {bloqueEditado ? 'Editar bloque' : 'Nuevo bloque'}
-          </h2>
-          <p>Selecciona una fecha y un intervalo horario.</p>
-        </div>
+      <div className="formulario-bloque__cabecera">
+        <h2 id={`${id}-titulo`}>
+          {bloqueEditado ? 'Editar bloque' : 'Nuevo bloque'}
+        </h2>
+        <p>Selecciona una fecha y un intervalo horario.</p>
       </div>
 
       <form
-        className="availability-form"
+        className="formulario-bloque__campos"
         onSubmit={enviar}
         noValidate
         aria-busy={guardando}
       >
-        <label className="field">
+        <label className="formulario-bloque__campo">
           <span>Fecha</span>
           <input
             type="date"
@@ -116,13 +109,13 @@ export function FormularioBloque({
         </label>
 
         {errores.dia && (
-          <p className="field-error" id={`${id}-fecha-error`} role="alert">
+          <p className="formulario-bloque__error" id={`${id}-fecha-error`} role="alert">
             {errores.dia}
           </p>
         )}
 
-        <div className="time-fields">
-          <label className="field">
+        <div className="formulario-bloque__horas">
+          <label className="formulario-bloque__campo">
             <span>Desde</span>
             <input
               type="time"
@@ -140,11 +133,7 @@ export function FormularioBloque({
             />
           </label>
 
-          <span className="time-arrow" aria-hidden="true">
-            <Icon name="arrow-right" />
-          </span>
-
-          <label className="field">
+          <label className="formulario-bloque__campo">
             <span>Hasta</span>
             <input
               type="time"
@@ -164,29 +153,28 @@ export function FormularioBloque({
         </div>
 
         {errores.horaInicio && (
-          <p className="field-error" id={`${id}-inicio-error`} role="alert">
+          <p className="formulario-bloque__error" id={`${id}-inicio-error`} role="alert">
             {errores.horaInicio}
           </p>
         )}
 
         {errores.horaFin && (
-          <p className="field-error" id={`${id}-fin-error`} role="alert">
+          <p className="formulario-bloque__error" id={`${id}-fin-error`} role="alert">
             {errores.horaFin}
           </p>
         )}
 
         {errores.formulario && (
-          <p className="form-alert" role="alert">
+          <p className="formulario-bloque__alerta" role="alert">
             {errores.formulario}
           </p>
         )}
 
         <button
-          className="primary-button"
+          className="formulario-bloque__enviar"
           type="submit"
           disabled={bloqueado}
         >
-          <Icon name={bloqueEditado ? 'check' : 'plus'} />
           {guardando
             ? 'Guardando…'
             : bloqueEditado
@@ -196,7 +184,7 @@ export function FormularioBloque({
 
         {bloqueEditado && (
           <button
-            className="ghost-button"
+            className="formulario-bloque__cancelar"
             type="button"
             disabled={guardando}
             onClick={onCancelar}

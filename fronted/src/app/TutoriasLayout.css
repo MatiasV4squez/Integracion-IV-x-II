@@ -58,11 +58,6 @@
   color: var(--color-text-muted);
 }
 
-.disponibilidad-contenido {
-  background: var(--bg);
-  color: var(--text);
-}
-
 .saltar-contenido {
   position: fixed;
   z-index: 100;
