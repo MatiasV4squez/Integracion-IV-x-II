@@ -41,7 +41,7 @@ Completa `DATABASE_URL` con tu conexión PostgreSQL. Ejemplo de formato: `postgr
 - **`JWT_SECRET`:** Obligatoria: al menos 32 bytes; debe coincidir con Auth para aceptar sus tokens.
 - **`PORT`:** Opcional: `3000` por defecto; entero entre `1` y `65535`.
 - **`INTEGRACION_SECRET`:** Necesaria para las rutas internas y la asignación remota de rol. Si se define, debe tener al menos 32 bytes. Sin ella, las rutas internas responden `401`.
-- **`USUARIOS_AUTH_ASIGNAR_TUTOR_URL`:** Endpoint HTTP/HTTPS acordado con Auth. Necesario para completar una aprobación; sin configuración, se conserva `PENDIENTE_ROL` y se responde `503`.
+- **`USUARIOS_AUTH_ASIGNAR_TUTOR_URL`:** Endpoint HTTP/HTTPS de Auth: `POST /internal/usuarios/roles` (local: `http://localhost:3002/internal/usuarios/roles`). Configura el mismo `INTEGRACION_SECRET` en ambos micros. Necesario para completar una aprobación; sin configuración, se conserva `PENDIENTE_ROL` y se responde `503`.
 - **`CERTIFICADOS_DIR`:** Directorio privado y escribible para PDF/PNG; por defecto `./certificados`, relativo a esta carpeta.
 - **`TEST_DATABASE_URL`:** Solo para pruebas reales de reputación; si no se define, se utiliza `DATABASE_URL`.
 
@@ -104,6 +104,8 @@ La respuesta es un arreglo de objetos con `idBloque`, `dia`, `horaInicio`, `hora
 La consulta refleja los estados almacenados en `materias-tutores`. La suite del flujo Tutor comprueba por HTTP real que Agendamiento reserva los bloques al crear solicitudes y los libera al rechazarlas, conservando la reserva al aceptar. La edición comprueba solapamientos y la infraestructura serializa las escrituras de horario del mismo tutor para impedir altas o ediciones simultáneas incompatibles.
 
 ## Búsqueda de tutores por materia
+
+`GET /tutores` requiere `Authorization: Bearer <access_token>` de un usuario autenticado. Las consultas internas de sesiones utilizan `X-Integracion-Secret`, compartido exclusivamente entre servidores. Credenciales ausentes, inválidas o vencidas responden `401` antes de consultar la base de datos. El secreto interno nunca se envía desde la web.
 
 `GET /tutores` devuelve los tutores con una habilitación vigente para la materia indicada, sus calificaciones y sus horarios disponibles. La consulta pagina los tutores antes de consultar sus perfiles y horarios, y utiliza un orden ascendente por identificador de habilitación.
 
@@ -346,8 +348,8 @@ La revisión y corrección de las vulnerabilidades notificadas por `npm audit` q
 
 ## Integraciones y trabajo pendiente
 
-- **Búsqueda (RF09/CU07):** obtener el nombre mediante un contrato seguro de Auth y proteger la consulta con autenticación. Actualmente `GET /tutores` es pública y no incluye el nombre.
-- **Postulaciones:** acordar y comprobar el endpoint real de asignación de rol TUTOR. La llamada simulada en pruebas no confirma su compatibilidad con Auth.
+- **Búsqueda (RF09/CU07):** el micro exige JWT de usuario o secreto de integración y devuelve IDs. La web consulta los nombres mediante el contrato autenticado de usuarios-auth.
+- **Postulaciones:** la aprobación se comprobó con Auth real mediante `POST /internal/usuarios/roles`. Cada entorno debe configurar la URL y el secreto compartido; sin esa configuración se conserva `PENDIENTE_ROL`.
 - **Disponibilidad:** la reserva/liberación desde Agendamiento está comprobada por la suite del flujo Tutor en el alcance documentado. El PATCH actual solo cambia estados; no registra una operación propietaria ni verifica sesiones, habilitación por materia o solapamientos entre sesiones. El contrato nuevo de reservas se retiró y quedó para más adelante.
 - **Reputación:** verificar que Agendamiento envíe las calificaciones recibidas como tutor en sesiones completadas y que reintente los eventos conservando su identificador. El receptor está probado; el recorrido real entre micros sigue pendiente.
 - **Identidad:** integrar la consulta de revocaciones, suspensiones e inactividad de Auth. Verificar un JWT localmente no consulta esos estados.

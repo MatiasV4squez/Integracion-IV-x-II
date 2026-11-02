@@ -42,11 +42,11 @@ SELECT id_materia, codigo, nombre FROM materia ORDER BY codigo;
 Luego consulta dos páginas, reemplazando `1` por ese ID:
 
 ```powershell
-Invoke-RestMethod -Uri "$baseUrl/tutores?materiaId=1&page=1&limit=2" | ConvertTo-Json -Depth 8
-Invoke-RestMethod -Uri "$baseUrl/tutores?materiaId=1&page=2&limit=2" | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Uri "$baseUrl/tutores?materiaId=1&page=1&limit=2" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 8
+Invoke-RestMethod -Uri "$baseUrl/tutores?materiaId=1&page=2&limit=2" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 8
 ```
 
-La respuesta tiene `items`, `total`, `page`, `limit` y `totalPages`. Cada item tiene `idTutor`, `promedioCalificaciones`, `cantidadCalificaciones` y `horariosDisponibles`. No se devuelve el nombre y esta ruta aún no exige JWT.
+La respuesta tiene `items`, `total`, `page`, `limit` y `totalPages`. Cada item tiene `idTutor`, `promedioCalificaciones`, `cantidadCalificaciones` y `horariosDisponibles`. No se devuelve el nombre. La web debe enviar un JWT Bearer válido; sesiones consulta con `X-Integracion-Secret`. Sin credenciales válidas se responde `401`.
 
 Si solo ejecutaste la semilla, no hay tutores habilitados: es correcto obtener:
 
@@ -123,7 +123,7 @@ El dueño o un administrador descarga el archivo mediante `GET /postulaciones/:i
 
 ## Integraciones y reputación
 
-Las escrituras internas utilizan `X-Integracion-Secret`, no el JWT del cliente. El secreto configurado debe tener al menos 32 bytes; no se incluye ningún valor real en esta guía.
+Las escrituras internas y la consulta de tutores desde sesiones utilizan `X-Integracion-Secret`, no el JWT del cliente. El secreto configurado debe tener al menos 32 bytes; no se incluye ningún valor real en esta guía.
 
 **`PATCH /integraciones/bloques/:idBloque/estado`**
 

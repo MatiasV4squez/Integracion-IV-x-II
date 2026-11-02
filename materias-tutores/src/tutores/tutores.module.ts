@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
+import { IntegracionSecretGuard } from '../auth/integracion-secret.guard.js';
+import { ConsultaTutoresGuard } from '../auth/consulta-tutores.guard.js';
 import { TutoresController } from './infraestructura/http/tutores.controller.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { BuscarTutoresPorMateriaUseCase } from './aplicacion/buscar-tutores-por-materia.use-case.js';
@@ -9,9 +14,16 @@ import { DisponibilidadTutoresAdapter } from './infraestructura/disponibilidad-t
 import { DISPONIBILIDAD_TUTORES, type DisponibilidadTutoresPort } from './aplicacion/puertos/disponibilidad-tutores.port.js';
 
 @Module({
-  imports: [DatabaseModule, DisponibilidadModule],
+  imports: [DatabaseModule, DisponibilidadModule, ConfigModule, JwtModule.registerAsync({
+    imports: [ConfigModule],
+    inject: [ConfigService],
+    useFactory: (config: ConfigService) => ({ secret: config.getOrThrow<string>('JWT_SECRET') }),
+  })],
   controllers: [TutoresController],
   providers: [
+    AuthenticatedJwtGuard,
+    IntegracionSecretGuard,
+    ConsultaTutoresGuard,
     {
       provide: TUTORES_REPOSITORY,
       useClass: PrismaTutoresRepository,

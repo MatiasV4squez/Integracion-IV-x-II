@@ -1,4 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { Server } from 'node:http';
@@ -7,6 +9,15 @@ import { PrismaService } from '../src/database/prisma.service.js';
 
 describe('Busqueda de tutores por materia (HTTP)', () => {
   let app: INestApplication<Server>;
+  const jwt = new JwtService({ secret: process.env.JWT_SECRET });
+  function crearToken(opciones: { expiresIn?: number; issuer?: string; audience?: string } = {}) {
+    return jwt.sign({ sub: '10', jti: 'consulta-prueba', correo_institucional: 'persona@alu.uct.cl', roles: ['ESTUDIANTE'] }, {
+      algorithm: 'HS256', issuer: 'stp-usuarios-auth', audience: 'stp-clients', expiresIn: 1800, ...opciones,
+    });
+  }
+  function consultar(ruta: string) {
+    return request(app.getHttpServer()).get(ruta).set('Authorization', 'Bearer ' + crearToken());
+  }
   const prisma = {
     materia: { findMany: vi.fn() },
     tutorMateria: { findMany: vi.fn(), count: vi.fn() },
@@ -22,6 +33,8 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     prisma.bloqueHorario.findMany.mockResolvedValue([]);
 
     const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ConfigService)
+      .useValue(new ConfigService({ JWT_SECRET: process.env.JWT_SECRET, INTEGRACION_SECRET: 'i'.repeat(32) }))
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();
@@ -32,6 +45,38 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
   afterEach(async () => {
     vi.useRealTimers();
     await app.close();
+  });
+
+  it.each([
+    undefined, 'Bearer invalido', 'Basic abc',
+  ])('rechaza consultas sin identidad válida antes de acceder a Prisma: %s', async (authorization) => {
+    const peticion = request(app.getHttpServer()).get('/tutores?materiaId=1');
+    if (authorization) peticion.set('Authorization', authorization);
+    await peticion.expect(401);
+    expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { expiresIn: -1 }, { issuer: 'otro-emisor' }, { audience: 'otra-audiencia' },
+  ])('rechaza JWT vencido o con emisor/audiencia incorrectos: %j', async (opciones) => {
+    await request(app.getHttpServer()).get('/tutores?materiaId=1')
+      .set('Authorization', 'Bearer ' + crearToken(opciones)).expect(401);
+    expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
+  });
+
+  it('permite la consulta de sesiones con el secreto interno y rechaza secretos incorrectos', async () => {
+    await request(app.getHttpServer()).get('/tutores?materiaId=1')
+      .set('X-Integracion-Secret', 'incorrecto').expect(401);
+    expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).get('/tutores?materiaId=1')
+      .set('X-Integracion-Secret', 'i'.repeat(32)).expect(200)
+      .expect({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+  });
+
+  it('no sustituye un JWT inválido por credenciales internas', async () => {
+    await request(app.getHttpServer()).get('/tutores?materiaId=1')
+      .set('Authorization', 'Bearer invalido').set('X-Integracion-Secret', 'i'.repeat(32)).expect(401);
+    expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
   });
 
   it('conecta controller, caso de uso y adaptador y devuelve los tutores con sus promedios', async () => {
@@ -54,8 +99,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
       },
     ]);
 
-    await request(app.getHttpServer())
-      .get('/tutores?materiaId=2')
+    await consultar('/tutores?materiaId=2')
       .expect(200)
       .expect({
         items: [
@@ -98,7 +142,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
   });
 
   it('devuelve una lista vacia cuando no hay tutores habilitados', async () => {
-    await request(app.getHttpServer()).get('/tutores?materiaId=1').expect(200).expect({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+    await consultar('/tutores?materiaId=1').expect(200).expect({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 });
     expect(prisma.bloqueHorario.findMany).not.toHaveBeenCalled();
   });
 
@@ -107,11 +151,10 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     prisma.tutorMateria.findMany.mockResolvedValue([{ idUsuario: 10n }]);
     prisma.tutorMateria.count.mockResolvedValue(1);
 
-    const catalogo = await request(app.getHttpServer()).get('/materias').expect(200);
+    const catalogo = await consultar('/materias').expect(200);
     const materias = catalogo.body as { idMateria: string }[];
     expect(materias[0].idMateria).toBe('9007199254740993');
-    const respuesta = await request(app.getHttpServer())
-      .get('/tutores')
+    const respuesta = await consultar('/tutores')
       .query({ materiaId: materias[0].idMateria, page: 1, limit: 10 })
       .expect(200);
 
@@ -131,7 +174,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     '/tutores?materiaId=9223372036854775808',
     '/tutores?materiaId=1&materiaId=2',
   ])('rechaza el parametro invalido sin consultar Prisma: %s', async (ruta) => {
-    await request(app.getHttpServer()).get(ruta).expect(400);
+    await consultar(ruta).expect(400);
     expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
     expect(prisma.perfilTutor.findMany).not.toHaveBeenCalled();
     expect(prisma.tutorMateria.count).not.toHaveBeenCalled();
@@ -142,8 +185,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     prisma.tutorMateria.findMany.mockResolvedValue([{ idUsuario: 9007199254740993n }]);
     prisma.tutorMateria.count.mockResolvedValue(1);
 
-    await request(app.getHttpServer())
-      .get('/tutores?materiaId=9223372036854775807')
+    await consultar('/tutores?materiaId=9223372036854775807')
       .expect(200)
       .expect({
         items: [
@@ -178,8 +220,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
       [3, ['30']],
     ] as const) {
       prisma.bloqueHorario.findMany.mockClear();
-      await request(app.getHttpServer())
-        .get(`/tutores?materiaId=2&page=${page}&limit=2`)
+      await consultar(`/tutores?materiaId=2&page=${page}&limit=2`)
         .expect(200)
         .expect({
           items: ids.map((idTutor) => ({ idTutor, promedioCalificaciones: null, cantidadCalificaciones: 0, horariosDisponibles: [] })),
@@ -210,7 +251,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
 
   it('conserva el total y las páginas si se pide una página sin resultados', async () => {
     prisma.tutorMateria.count.mockResolvedValue(23);
-    await request(app.getHttpServer()).get('/tutores?materiaId=2&page=4&limit=10').expect(200).expect({ items: [], total: 23, page: 4, limit: 10, totalPages: 3 });
+    await consultar('/tutores?materiaId=2&page=4&limit=10').expect(200).expect({ items: [], total: 23, page: 4, limit: 10, totalPages: 3 });
     expect(prisma.bloqueHorario.findMany).not.toHaveBeenCalled();
   });
 
@@ -219,7 +260,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     { query: 'limit=2', page: 1, limit: 2 },
     { query: 'limit=100', page: 1, limit: 100 },
   ])('aplica valores predeterminados independientes y permite límite 100: $query', async ({ query, page, limit }) => {
-    await request(app.getHttpServer()).get(`/tutores?materiaId=1&${query}`).expect(200).expect({ items: [], total: 0, page, limit, totalPages: 0 });
+    await consultar(`/tutores?materiaId=1&${query}`).expect(200).expect({ items: [], total: 0, page, limit, totalPages: 0 });
     expect(prisma.tutorMateria.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: (page - 1) * limit, take: limit }));
   });
 
@@ -248,7 +289,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     'limit=2&limit=2',
     'limit=9007199254740992',
   ])('rechaza paginación inválida antes de consultar la base: %s', async (query) => {
-    await request(app.getHttpServer()).get(`/tutores?materiaId=1&${query}`).expect(400);
+    await consultar(`/tutores?materiaId=1&${query}`).expect(400);
     expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
     expect(prisma.tutorMateria.count).not.toHaveBeenCalled();
     expect(prisma.perfilTutor.findMany).not.toHaveBeenCalled();

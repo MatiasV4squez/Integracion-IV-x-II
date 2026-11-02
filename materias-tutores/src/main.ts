@@ -13,6 +13,7 @@ async function bootstrap() {
       .setDescription('Postulaciones, tutores y disponibilidad')
       .setVersion('1.0')
       .addBearerAuth()
+      .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Integracion-Secret' }, 'integracion')
       .build(),
   );
   SwaggerModule.setup('api', app, documento);

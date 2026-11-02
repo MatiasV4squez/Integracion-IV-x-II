@@ -136,7 +136,7 @@ before(
       try {
         const datos = [];
         for await (const c of req) datos.push(c);
-        const opciones = { method: req.method, headers: { 'Content-Type': 'application/json', 'X-Integracion-Secret': secret }, signal: AbortSignal.timeout(15000) };
+        const opciones = { method: req.method, headers: { 'Content-Type': 'application/json', ...(req.headers['x-integracion-secret'] ? { 'X-Integracion-Secret': req.headers['x-integracion-secret'] } : {}) }, signal: AbortSignal.timeout(15000) };
         if (!['GET', 'HEAD'].includes(req.method)) opciones.body = Buffer.concat(datos);
         const respuesta = await fetch(materiasUrl + req.url, opciones);
         const cuerpo = Buffer.from(await respuesta.arrayBuffer());
