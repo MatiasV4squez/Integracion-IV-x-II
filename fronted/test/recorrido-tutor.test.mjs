@@ -87,7 +87,7 @@ test('recorre disponibilidad, solicitud del estudiante, aceptación y nueva cons
     { ruta: rutaBloques, datos: [] },
     { ruta: rutaBloques, metodo: 'POST', cuerpo: horario, datos: bloque, estado: 201 },
     { ruta: rutaBloques, datos: [bloque] },
-    { ruta: 'materias-tutores/tutores?materiaId=3&page=1&limit=100', token: null, datos: {
+    { ruta: 'materias-tutores/tutores?materiaId=3&page=1&limit=100', token: tokenEstudiante, datos: {
       items: [{ idTutor: tutor.idUsuario, promedioCalificaciones: null, cantidadCalificaciones: 0,
         horariosDisponibles: [{ idBloque: bloque.idBloque, ...horario }] }], total: 1, page: 1, limit: 100, totalPages: 1,
     } },
@@ -106,7 +106,7 @@ test('recorre disponibilidad, solicitud del estudiante, aceptación y nueva cons
   assert.deepEqual(publicados, [creado])
   assert.match(verDisponibilidad(publicados), />Disponible<\/span>/)
 
-  const [encontrado] = await obtenerTutores('3', new AbortController().signal)
+  const [encontrado] = await obtenerTutores('3', new AbortController().signal, tokenEstudiante)
   const solicitud = await crearSolicitudTutoria({
     id_tutor: encontrado.idTutor, id_materia: '3', id_bloque: encontrado.horariosDisponibles[0].idBloque,
   }, tokenEstudiante)

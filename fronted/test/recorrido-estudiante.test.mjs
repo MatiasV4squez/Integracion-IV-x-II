@@ -64,19 +64,20 @@ test('la solicitud usa la URL configurada del Gateway y admite cancelación', as
 
 test('carga todos los tutores de la materia recorriendo las páginas de la búsqueda', async () => {
   const pedidas = []
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, opciones) => {
+    assert.equal(opciones.headers.Authorization, 'Bearer token-estudiante-prueba')
     const direccion = new URL(url)
     assert.equal(direccion.origin + direccion.pathname, base() + '/materias-tutores/tutores')
     const page = Number(direccion.searchParams.get('page'))
     pedidas.push([direccion.searchParams.get('materiaId'), page, direccion.searchParams.get('limit')])
     return Response.json(pagina([tutor(String(10 + page))], page, 3))
   }
-  const tutores = await obtenerTutores('3', new AbortController().signal)
+  const tutores = await obtenerTutores('3', new AbortController().signal, 'token-estudiante-prueba')
   assert.deepEqual(tutores.map((item) => item.idTutor), ['11', '12', '13'])
   assert.deepEqual(pedidas, [['3', 1, '100'], ['3', 2, '100'], ['3', 3, '100']])
 
   globalThis.fetch = async () => Response.json({ items: 'no' })
-  await assert.rejects(obtenerTutores('3', new AbortController().signal), /No pudimos leer los resultados/)
+  await assert.rejects(obtenerTutores('3', new AbortController().signal, 'token-estudiante-prueba'), /No pudimos leer los resultados/)
 })
 
 test('preselecciona el tutor elegido en la búsqueda solo si sigue disponible', () => {

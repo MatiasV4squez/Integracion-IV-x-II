@@ -21,7 +21,7 @@ export function usePerfilTutor(idTutor: string, materiaId: string, token?: strin
     if (!valido) return
     const controlador = new AbortController()
 
-    obtenerTutores(materiaId, controlador.signal)
+    obtenerTutores(materiaId, controlador.signal, token)
       .then((tutores) => completarNombresTutores(tutores.filter((item) => item.idTutor === idTutor), token, controlador.signal))
       .then(([tutor]) => {
         if (controlador.signal.aborted) return

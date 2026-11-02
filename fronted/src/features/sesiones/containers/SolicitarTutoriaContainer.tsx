@@ -33,7 +33,7 @@ function SolicitudDeMateria({ sesion, idMateria, nombreMateria, idTutorInicial }
       establecerTutores([])
 
       try {
-        const datos = await obtenerTutores(idMateria, controlador.signal)
+        const datos = await obtenerTutores(idMateria, controlador.signal, sesion.token)
         // Agendamiento rechaza que el estudiante se solicite tutoría a sí mismo.
         const disponibles = await completarNombresTutores(
           datos.filter((tutor) => tutor.idTutor !== sesion.idUsuario), sesion.token, controlador.signal)

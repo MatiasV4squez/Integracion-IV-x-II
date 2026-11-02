@@ -4,6 +4,7 @@ import type { ResultadoBusquedaTutores } from '../models/resultado-busqueda-tuto
 import { esResultadoBusqueda } from '../utils/validar-resultado-busqueda'
 
 interface BuscarTutoresOpciones {
+  token?: string
   materiaId: string
   page?: number
   limit?: number
@@ -19,7 +20,7 @@ export class ErrorConsultaTutores extends Error {
 
 const TIEMPO_ESPERA_MS = 10000
 
-export async function buscarTutores({ materiaId, page = 1, limit = 10, signal: externa }: BuscarTutoresOpciones): Promise<ResultadoBusquedaTutores> {
+export async function buscarTutores({ materiaId, page = 1, limit = 10, token, signal: externa }: BuscarTutoresOpciones): Promise<ResultadoBusquedaTutores> {
   externa?.throwIfAborted()
   if (!esIdentificador(materiaId) || !Number.isSafeInteger(page) || page < 1
     || !Number.isSafeInteger(limit) || limit < 1 || limit > 100
@@ -34,7 +35,7 @@ export async function buscarTutores({ materiaId, page = 1, limit = 10, signal: e
   try {
     const respuesta = await fetch(obtenerUrlApi('materias-tutores/tutores') + '?' + parametros, {
       signal,
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
     })
 
     if (!respuesta.ok) {
