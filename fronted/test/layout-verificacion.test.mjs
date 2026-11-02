@@ -12,11 +12,15 @@ let Encabezado
 let VerificacionCuentaPage
 let configuracion
 let verificacion
+let MenuUsuario
+let SelectorRol
 
 before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
   ;({ AppRoutes } = await vite.ssrLoadModule('/src/app/AppRoutes.tsx'))
   ;({ Encabezado } = await vite.ssrLoadModule('/src/shared/layout/Encabezado.tsx'))
+  ;({ MenuUsuario } = await vite.ssrLoadModule('/src/shared/layout/MenuUsuario.tsx'))
+  ;({ SelectorRol } = await vite.ssrLoadModule('/src/shared/layout/SelectorRol.tsx'))
   ;({ default: VerificacionCuentaPage } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/pages/VerificacionCuentaPage.tsx'))
   configuracion = await vite.ssrLoadModule('/src/shared/layout/configuracion-navegacion.ts')
   verificacion = await vite.ssrLoadModule('/src/features/verificacion-cuenta/models/estado-verificacion.ts')
@@ -82,6 +86,34 @@ test('una URL de demostración no puede presentar éxito en producción', () => 
   }
   assert.equal(verificacion.leerVistaVerificacion('valor-no-admitido', true), 'pendiente')
   assert.equal(verificacion.leerVistaVerificacion(null, true), 'pendiente')
+})
+
+test('el desplegable distingue estudiante sin tutoría y los dos contextos de una cuenta tutora', () => {
+  const menu = (rol, selectorRol) => renderizar(createElement(MenuUsuario, {
+    usuario: { etiqueta: 'Camila González', rol }, selectorRol, alCerrarSesion() {},
+  }))
+  const estudiante = menu('Estudiante')
+  assert.match(estudiante, /<details\b/)
+  assert.match(estudiante, /<summary\b[^>]*aria-label="Menú de usuario: Camila González, Estudiante"/)
+  assert.match(estudiante, /disabled=""[^>]*>Mi perfil/)
+  assert.match(estudiante, /href="\/panel"[^>]*>Mi panel/)
+  assert.match(estudiante, /href="\/postulacion-tutor"[^>]*>Ser tutor/)
+  assert.doesNotMatch(estudiante, /Mis postulaciones|Solicitudes|selector-rol/)
+  for (const [rolActivo, rol] of [['ESTUDIANTE', 'Estudiante'], ['TUTOR', 'Tutor']]) {
+    const html = menu(rol, createElement(SelectorRol, { rolActivo, alCambiar() {} }))
+    assert.match(html, /href="\/postulacion-tutor"[^>]*>Mis postulaciones/)
+    assert.match(html, /Cerrar sesión/)
+    assert.match(html, new RegExp('aria-pressed="true">' + rol + '</button>'))
+    assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 1)
+    assert.doesNotMatch(html, />Ser tutor</)
+    if (rolActivo === 'TUTOR') {
+      assert.match(html, /href="\/solicitudes\/recibidas"/)
+      assert.doesNotMatch(html, /href="\/panel"/)
+    } else {
+      assert.match(html, /href="\/panel"/)
+      assert.doesNotMatch(html, /href="\/solicitudes\/recibidas"/)
+    }
+  }
 })
 
 test('todos los estados visuales anuncian su contenido y se identifican como demostración', () => {

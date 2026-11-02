@@ -9,6 +9,7 @@ import { cerrarSesionUsuario } from '../shared/auth/usuario-autenticado'
 import { ErrorBoundary } from '../shared/components/ErrorBoundary'
 import { SelectorRol, type RolVista } from '../shared/layout/SelectorRol'
 import { tieneRol } from '../shared/auth/acceso-rutas'
+import { ContadorSolicitudes } from '../features/sesiones/components/ContadorSolicitudes'
 import './TutoriasLayout.css'
 
 export function TutoriasLayout() {
@@ -61,6 +62,7 @@ export function TutoriasLayout() {
         enlaces={obtenerNavegacion(rolesVista)}
         usuario={usuarioEncabezado}
         alCerrarSesion={cerrarSesion}
+        contadorSolicitudes={sesion && usuarioEncabezado?.rol === 'Tutor' ? <ContadorSolicitudes sesion={sesion} /> : null}
         selectorRol={
           puedeAlternar ? (
             <SelectorRol rolActivo={rolActivo} alCambiar={cambiarRol} />

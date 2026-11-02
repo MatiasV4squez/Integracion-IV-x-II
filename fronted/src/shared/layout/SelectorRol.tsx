@@ -8,30 +8,10 @@ interface Propiedades {
 }
 
 export function SelectorRol({ rolActivo, alCambiar }: Propiedades) {
-  const esTutor = rolActivo === 'TUTOR'
-
   return (
-    <button
-      type="button"
-      className="selector-rol"
-      role="switch"
-      aria-label="Usar como tutor"
-      aria-checked={esTutor}
-      onClick={() => alCambiar(esTutor ? 'ESTUDIANTE' : 'TUTOR')}
-    >
-      <span
-        aria-hidden="true"
-        className={!esTutor ? 'selector-rol__activo' : ''}
-      >
-        Estudiante
-      </span>
-
-      <span
-        aria-hidden="true"
-        className={esTutor ? 'selector-rol__activo' : ''}
-      >
-        Tutor
-      </span>
-    </button>
+    <div className="selector-rol" role="group" aria-label="Cambiar contexto">
+      <button type="button" aria-pressed={rolActivo === 'ESTUDIANTE'} onClick={() => alCambiar('ESTUDIANTE')}>Estudiante</button>
+      <button type="button" aria-pressed={rolActivo === 'TUTOR'} onClick={() => alCambiar('TUTOR')}>Tutor</button>
+    </div>
   )
 }

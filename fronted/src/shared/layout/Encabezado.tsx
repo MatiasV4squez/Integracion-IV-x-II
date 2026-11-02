@@ -1,15 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router'
 import type { EnlaceNavegacion, UsuarioEncabezado } from './configuracion-navegacion'
+import { MenuUsuario } from './MenuUsuario'
 
 interface Propiedades {
   enlaces: readonly EnlaceNavegacion[]
   usuario?: UsuarioEncabezado
   alCerrarSesion?: () => void
   selectorRol?: ReactNode
+  contadorSolicitudes?: ReactNode
 }
 
-export function Encabezado({ enlaces, usuario, alCerrarSesion, selectorRol }: Propiedades) {
+export function Encabezado({ enlaces, usuario, alCerrarSesion, selectorRol, contadorSolicitudes }: Propiedades) {
   const [abierto, setAbierto] = useState(false)
   const cerrarMenu = () => setAbierto(false)
 
@@ -43,20 +45,8 @@ export function Encabezado({ enlaces, usuario, alCerrarSesion, selectorRol }: Pr
             ))}
           </nav>
           {usuario ? (
-            <div className="usuario-global" aria-label={'Sesión de ' + usuario.etiqueta}>
-              {selectorRol}
-              <span className="usuario-global__avatar" aria-hidden="true">{usuario.rol.charAt(0)}</span>
-              <div><strong>{usuario.etiqueta}</strong><span>{usuario.rol}</span></div>
-              {alCerrarSesion && (
-                <button
-                  type="button"
-                  className="usuario-global__salir"
-                  onClick={() => { cerrarMenu(); alCerrarSesion() }}
-                >
-                  Cerrar sesión
-                </button>
-              )}
-            </div>
+            <MenuUsuario usuario={usuario} alCerrarSesion={alCerrarSesion} selectorRol={selectorRol}
+              contadorSolicitudes={contadorSolicitudes} alNavegar={cerrarMenu} />
           ) : (
             <div className="encabezado-global__acceso">
               <NavLink to="/login" onClick={cerrarMenu}>Iniciar sesión</NavLink>
