@@ -26,4 +26,9 @@ describe('Reglas de sesión independientes de infraestructura', () => {
       validarTransicion('CONFIRMADA', 'PENDIENTE_CIERRE'),
     ).not.toThrow();
   });
+
+  it('permite retirar una solicitud pendiente sin pasar por confirmada', () => {
+    expect(() => validarTransicion('PENDIENTE', 'CANCELADA')).not.toThrow();
+    expect(() => validarTransicion('CANCELADA', 'CONFIRMADA')).toThrow();
+  });
 });

@@ -261,6 +261,63 @@ describe('Gestionar sesiones mediante puertos', () => {
     expect(contexto.sesiones.cambiarEstado).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])(
+    'permite al estudiante retirar su pendiente aunque el horario haya comenzado: %s',
+    async (haComenzado) => {
+      jest.mocked(contexto.sesiones.haComenzado).mockResolvedValue(haComenzado);
+      jest.mocked(contexto.sesiones.cambiarEstado).mockResolvedValue({
+        ...sesion,
+        estado_sesion: 'CANCELADA',
+      });
+
+      const resultado = await aplicacion.cancelarSesion('9007199254740993', '3');
+
+      expect(resultado.estado_sesion).toBe('CANCELADA');
+      expect(contexto.sesiones.cambiarEstado).toHaveBeenCalledWith(
+        sesion,
+        'CANCELADA',
+        false,
+      );
+      expect(contexto.liberaciones.registrarPendiente).toHaveBeenCalledWith(
+        sesion.id_sesion,
+        sesion.id_bloque,
+      );
+      expect(liberarPendiente).toHaveBeenCalledWith(sesion.id_sesion);
+    },
+  );
+
+  it.each(['2', '99'])('impide que el usuario %s retire la pendiente de un estudiante', async (usuario) => {
+    await expect(
+      aplicacion.cancelarSesion('9007199254740993', usuario),
+    ).rejects.toMatchObject({ motivo: 'PROHIBIDO' });
+    expect(contexto.sesiones.cambiarEstado).not.toHaveBeenCalled();
+    expect(contexto.liberaciones.registrarPendiente).not.toHaveBeenCalled();
+    expect(liberarPendiente).not.toHaveBeenCalled();
+  });
+
+  it.each(['2', '3'])('mantiene la cancelación de confirmadas antes del inicio para %s', async (usuario) => {
+    sesion.estado_sesion = 'CONFIRMADA';
+    jest.mocked(contexto.sesiones.haComenzado).mockResolvedValue(false);
+    jest.mocked(contexto.sesiones.cambiarEstado).mockResolvedValue({
+      ...sesion,
+      estado_sesion: 'CANCELADA',
+    });
+
+    await expect(
+      aplicacion.cancelarSesion('9007199254740993', usuario),
+    ).resolves.toMatchObject({ estado_sesion: 'CANCELADA' });
+    expect(liberarPendiente).toHaveBeenCalledWith(sesion.id_sesion);
+  });
+
+  it('no libera el bloque si otra operación impide retirar la pendiente', async () => {
+    jest.mocked(contexto.sesiones.cambiarEstado).mockResolvedValue(null);
+    await expect(
+      aplicacion.cancelarSesion('9007199254740993', '3'),
+    ).rejects.toMatchObject({ motivo: 'CONFLICTO' });
+    expect(contexto.liberaciones.registrarPendiente).not.toHaveBeenCalled();
+    expect(liberarPendiente).not.toHaveBeenCalled();
+  });
+
   it('devuelve un error propio para una sesión inexistente', async () => {
     jest.mocked(contexto.sesiones.buscarPorId).mockResolvedValue(null);
     await expect(

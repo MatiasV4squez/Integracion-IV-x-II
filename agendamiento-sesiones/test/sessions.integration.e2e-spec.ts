@@ -749,7 +749,6 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     await act(session.id_sesion, 'reject').expect(409);
   });
   it.each([
-    'PENDIENTE',
     'RECHAZADA',
     'EXPIRADA',
     'CANCELADA',
@@ -760,6 +759,17 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     'EN_CONFLICTO',
   ] as const)('no cancela desde %s', async (state) => {
     await act((await fixture(state)).id_sesion, 'cancel').expect(409);
+  });
+  it('permite al estudiante retirar su pendiente y rechaza al tutor y a terceros', async () => {
+    const session = await fixture();
+    await act(session.id_sesion, 'cancel', tutor).expect(403);
+    await act(session.id_sesion, 'cancel', outsider)
+      .send({ id_usuario: tutee })
+      .expect(403);
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('PENDIENTE');
+    const respuesta = await act(session.id_sesion, 'cancel', tutee).expect(200);
+    expect(respuesta.body.estado_sesion).toBe('CANCELADA');
+    expect((await stateOf(session.id_sesion)).estado_sesion).toBe('CANCELADA');
   });
   it.each([tutor, tutee])(
     'permite cancelar antes del inicio al participante %s',
@@ -1766,12 +1776,23 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     expect(pendiente.intentos).toBe(1);
   });
 
-  it('cancelar una confirmada libera el bloque', async () => {
-    const id = await crearSesionReservada('CONFIRMADA');
-    await act(id, 'cancel', tutee).expect(200);
-    expect((await stateOf(id)).estado_sesion).toBe('CANCELADA');
-    expect(estadoBloque).toBe('DISPONIBLE');
-  });
+  it.each(['PENDIENTE', 'CONFIRMADA'] as const)(
+    'cancelar una %s libera el bloque y registra la entrega durable',
+    async (estado) => {
+      const id = await crearSesionReservada(estado);
+      await act(id, 'cancel', tutee).expect(200);
+      expect((await stateOf(id)).estado_sesion).toBe('CANCELADA');
+      expect(estadoBloque).toBe('DISPONIBLE');
+      expect(operacionesBloques).toEqual(['RESERVADO', 'DISPONIBLE']);
+      const liberacion = await prisma.liberacion_bloque_sesion.findUniqueOrThrow({
+        where: { id_sesion: id },
+      });
+      expect(liberacion.fecha_liberacion).toBeInstanceOf(Date);
+      expect(liberacion.intentos).toBe(1);
+      await act(id, 'cancel', tutee).expect(409);
+      expect(operacionesBloques).toEqual(['RESERVADO', 'DISPONIBLE']);
+    },
+  );
 
   it('expirar una pendiente de 24 horas libera el bloque una sola vez', async () => {
     const id = await crearSesionReservada();

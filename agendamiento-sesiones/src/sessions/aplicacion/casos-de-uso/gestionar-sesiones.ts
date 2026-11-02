@@ -160,12 +160,21 @@ export class GestionarSesiones {
       async (contexto) => {
         const sesion = await this.buscarSesion(contexto, id);
         validarParticipante(sesion, usuario);
-        validarEstado(sesion, 'CONFIRMADA');
-        if (await contexto.sesiones.haComenzado(sesion.inicio)) {
-          throw new ErrorSesion(
-            'CONFLICTO',
-            'La sesión ya comenzó; no se puede cancelar.',
-          );
+        if (sesion.estado_sesion === 'PENDIENTE') {
+          if (sesion.id_tutee !== usuario) {
+            throw new ErrorSesion(
+              'PROHIBIDO',
+              'Solo el estudiante que solicitó la sesión puede retirar la solicitud pendiente.',
+            );
+          }
+        } else {
+          validarEstado(sesion, 'CONFIRMADA');
+          if (await contexto.sesiones.haComenzado(sesion.inicio)) {
+            throw new ErrorSesion(
+              'CONFLICTO',
+              'La sesión ya comenzó; no se puede cancelar.',
+            );
+          }
         }
         return cambiarEstadoSesion(contexto, sesion, 'CANCELADA');
       },
