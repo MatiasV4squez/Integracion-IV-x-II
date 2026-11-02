@@ -21,7 +21,7 @@ const tutor = {
   horariosDisponibles: [{ idBloque: '31', dia: '2026-12-01', horaInicio: '10:00', horaFin: '11:00' }],
 }
 const resultado = { items: [tutor], total: 1, page: 1, limit: 10, totalPages: 1 }
-const opciones = { materiaId: materia.idMateria }
+const opciones = { materiaId: materia.idMateria, token: 'token-de-prueba' }
 
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
@@ -41,6 +41,8 @@ test('consulta exclusivamente el Gateway con el ID completo y los parámetros de
     assert.equal(String(url), server.config.env.VITE_API_BASE_URL.replace(/\/+$/, '')
       + '/materias-tutores/tutores?materiaId=9007199254740993&page=2&limit=2')
     assert.equal(config.headers.Accept, 'application/json')
+    assert.equal(config.headers.Authorization, 'Bearer token-de-prueba')
+    assert.equal(config.headers['X-Integracion-Secret'], undefined)
     assert.ok(config.signal instanceof AbortSignal)
     return Response.json({ ...resultado, total: 3, page: 2, limit: 2, totalPages: 2 })
   }

@@ -19,7 +19,7 @@ export function useBuscarTutores(materiaId: string, page: number, token?: string
     if (!materiaId) return
     const controlador = new AbortController()
 
-    buscarTutores({ materiaId, page, signal: controlador.signal })
+    buscarTutores({ materiaId, page, token, signal: controlador.signal })
       .then(async (resultado) => ({
         ...resultado, items: await completarNombresTutores(resultado.items, token, controlador.signal),
       }))
