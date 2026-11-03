@@ -1,0 +1,177 @@
+# Orquestación completa de Studia: PostgreSQL, los 4 microservicios, el API Gateway, Mailpit y la app web.
+# Uso:  cd orquestacion && docker compose up --build      (o: podman compose up --build)
+# Cada micro se construye desde su rama de GitHub (ver micro.Dockerfile); no se modifica su código.
+
+x-micro-build: &micro-build
+  context: .
+  dockerfile: micro.Dockerfile
+
+x-secretos: &secretos
+  JWT_SECRET: ${JWT_SECRET:-cambia_este_jwt_secreto_de_al_menos_32_bytes_123456}
+  INTEGRACION_SECRET: ${INTEGRACION_SECRET:-cambia_este_secreto_de_integracion_32_bytes_1234}
+  INTERNAL_SERVICE_API_KEY: ${INTERNAL_SERVICE_API_KEY:-cambia_esta_clave_interna_de_al_menos_32_bytes_12}
+  MODERACION_INTEGRACION_SECRET: ${MODERACION_INTEGRACION_SECRET:-cambia_este_secreto_de_moderacion_32_bytes_123}
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # ",z": etiqueta SELinux (Fedora/RHEL) para que el contenedor pueda leer el archivo; sin SELinux no afecta.
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Recibe los correos de verificación de usuarios-auth: http://localhost:8025
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.21
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+
+  usuarios-auth:
+    build:
+      <<: *micro-build
+      args:
+        REPO_URL: ${REPO_URL:-https://github.com/MatiasV4squez/Integracion-IV-x-II.git}
+        BRANCH: ${BRANCH_USUARIOS:-feature/micro_usuarios_auth}
+        DIR: usuarios-auth
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *secretos
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/usuarios_auth?schema=public
+      JWT_ACCESS_TTL_SECONDS: 1800
+      JWT_IDLE_TIMEOUT_SECONDS: 1800
+      SMTP_DISABLED: "false"
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      SMTP_FROM: "Studia <no-reply@studia.local>"
+      # El enlace del correo abre la pantalla de verificación de la app web.
+      EMAIL_VERIFICATION_URL: http://localhost:${WEB_PORT:-8081}/verificar-cuenta
+      EMAIL_VERIFICATION_SECRET: ${EMAIL_VERIFICATION_SECRET:-cambia_este_secreto_de_verificacion_32_bytes_12345}
+      EMAIL_VERIFICATION_TTL_MINUTES: 30
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  materias-tutores:
+    build:
+      <<: *micro-build
+      args:
+        REPO_URL: ${REPO_URL:-https://github.com/MatiasV4squez/Integracion-IV-x-II.git}
+        BRANCH: ${BRANCH_MATERIAS:-feature/micro_materias_tutores}
+        DIR: materias-tutores
+    # Las materias iniciales se cargan con un upsert: se puede repetir en cada arranque.
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/main.js"
+    environment:
+      <<: *secretos
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/materias
+      USUARIOS_AUTH_ASIGNAR_TUTOR_URL: http://usuarios-auth:3000/internal/usuarios/roles
+      CERTIFICADOS_DIR: /data/certificados
+    volumes:
+      - certificados:/data/certificados
+    depends_on:
+      db:
+        condition: service_healthy
+
+  agendamiento-sesiones:
+    build:
+      <<: *micro-build
+      args:
+        REPO_URL: ${REPO_URL:-https://github.com/MatiasV4squez/Integracion-IV-x-II.git}
+        BRANCH: ${BRANCH_SESIONES:-feature/agendamiento_sesiones}
+        DIR: agendamiento-sesiones
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *secretos
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/agendamiento_sesiones
+      MATERIAS_TUTORES_URL: http://materias-tutores:3000
+      REPORTES_MODERACION_URL: http://reportes-moderacion:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  reportes-moderacion:
+    build:
+      <<: *micro-build
+      args:
+        REPO_URL: ${REPO_URL:-https://github.com/MatiasV4squez/Integracion-IV-x-II.git}
+        BRANCH: ${BRANCH_REPORTES:-feature/micro_reportes_y_moderacion}
+        DIR: reportes-moderacion
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *secretos
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/reportes
+      SESIONES_SERVICE_URL: http://agendamiento-sesiones:3000
+      USUARIOS_AUTH_URL: http://usuarios-auth:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      <<: *micro-build
+      args:
+        REPO_URL: ${REPO_URL:-https://github.com/MatiasV4squez/Integracion-IV-x-II.git}
+        BRANCH: ${BRANCH_GATEWAY:-apigateway}
+        DIR: api-gateway
+    environment:
+      PORT: 8080
+      USUARIOS_AUTH_URL: http://usuarios-auth:3000
+      MATERIAS_TUTORES_URL: http://materias-tutores:3000
+      AGENDAMIENTO_SESIONES_URL: http://agendamiento-sesiones:3000
+      REPORTES_MODERACION_URL: http://reportes-moderacion:3000
+      CORS_ORIGIN: "*"
+      HTTP_TIMEOUT_MS: 10000
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - usuarios-auth
+      - materias-tutores
+      - agendamiento-sesiones
+      - reportes-moderacion
+
+  # App web de Studia (Expo exportado + nginx): http://localhost:8081
+  app:
+    build:
+      context: ../proyect-app-studia
+      dockerfile: ../orquestacion/app.Dockerfile
+      args:
+        EXPO_PUBLIC_API_URL: ${APP_API_URL:-http://localhost:8080/api}
+    ports:
+      - "${WEB_PORT:-8081}:80"
+    depends_on:
+      - api-gateway
+
+  # Carga las cuentas de prueba (una sola vez por base de datos; si ya existen, no las duplica).
+  seed:
+    image: docker.io/library/postgres:16-alpine
+    command: sh -c "apk add --no-cache nodejs >/dev/null && node /seed/seed.mjs"
+    environment:
+      GATEWAY_URL: http://api-gateway:8080/api
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./seed:/seed:ro,z
+    depends_on:
+      - api-gateway
+    restart: "no"
+
+volumes:
+  db-data:
+  certificados:

@@ -14,7 +14,7 @@ Funciona igual en **Windows** y **Linux** (y macOS).
 | Git | cualquiera | [git-scm.com](https://git-scm.com) | gestor de paquetes |
 | Expo Go (celular) | la de la tienda | Android / iOS | Android / iOS |
 
-La app necesita el API Gateway y los microservicios corriendo para usar el modo con backend.
+Para levantar también el backend, ver [`../orquestacion/README.md`](../orquestacion/README.md) (Docker).
 
 ## 1. Instalar
 
