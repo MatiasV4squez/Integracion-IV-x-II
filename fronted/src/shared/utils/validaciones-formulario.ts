@@ -8,6 +8,11 @@ export function validarLongitudMaxima(valor: string, maximo: number, etiqueta = 
   return valor.length <= maximo ? undefined : `${etiqueta} debe tener como máximo ${maximo} caracteres.`
 }
 
+// Quita caracteres de control y espacios repetidos de un texto libre antes de validarlo o enviarlo.
+export function sanitizarTexto(valor: string): string {
+  return valor.replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export function normalizarCorreo(valor: string): string {
   return valor.trim().toLowerCase()
 }

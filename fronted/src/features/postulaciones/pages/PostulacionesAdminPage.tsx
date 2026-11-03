@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import type { ConsultaPostulaciones, Postulacion } from '../models/postulacion'
+import { sanitizarTexto } from '../../../shared/utils/validaciones-formulario'
+import { convertirNota, validarMotivoIngresado, validarNotaIngresada } from '../utils/validar-revision'
 import './PostulacionesAdminPage.css'
 
 interface Propiedades {
@@ -11,6 +14,20 @@ interface Propiedades {
   onRecargar: () => void
   onSeleccionar: (id: string) => void
   onDescargar: (postulacion: Postulacion) => void
+  revisionEnCurso?: string | null
+  revisionBloqueada?: boolean
+  mensajeRevision?: string | null
+  errorRevision?: string | null
+  onAprobar: (postulacion: Postulacion, nota: number) => void
+  onRechazar: (postulacion: Postulacion, motivo: string) => void
+}
+
+interface PropiedadesRevision {
+  postulacion: Postulacion
+  procesando: boolean
+  deshabilitado: boolean
+  onAprobar: (postulacion: Postulacion, nota: number) => void
+  onRechazar: (postulacion: Postulacion, motivo: string) => void
 }
 
 function fechaLegible(fecha: string | null) {
@@ -18,9 +35,68 @@ function fechaLegible(fecha: string | null) {
   return new Date(fecha).toLocaleString('es-CL', { timeZone: 'America/Santiago' })
 }
 
+function FormularioRevision({ postulacion, procesando, deshabilitado, onAprobar, onRechazar }: PropiedadesRevision) {
+  const [nota, establecerNota] = useState('')
+  const [motivo, establecerMotivo] = useState('')
+  const [errorNota, establecerErrorNota] = useState<string | undefined>()
+  const [errorMotivo, establecerErrorMotivo] = useState<string | undefined>()
+
+  function aprobar() {
+    const error = validarNotaIngresada(nota)
+    establecerErrorNota(error)
+    if (!error) onAprobar(postulacion, convertirNota(nota))
+  }
+
+  function rechazar() {
+    const error = validarMotivoIngresado(motivo)
+    establecerErrorMotivo(error)
+    if (!error) onRechazar(postulacion, sanitizarTexto(motivo))
+  }
+
+  return (
+    <section aria-label="Revisar postulación">
+      <h3>Revisar postulación</h3>
+
+      <label htmlFor="nota-acreditada">Nota acreditada (5,0 a 7,0)</label>
+      <input
+        id="nota-acreditada"
+        type="number"
+        min="5"
+        max="7"
+        step="0.1"
+        value={nota}
+        disabled={deshabilitado}
+        aria-invalid={errorNota ? true : undefined}
+        aria-describedby={errorNota ? 'nota-acreditada-error' : undefined}
+        onChange={(evento) => establecerNota(evento.target.value)}
+      />
+      {errorNota && <p id="nota-acreditada-error" role="alert">{errorNota}</p>}
+      <button type="button" disabled={deshabilitado} onClick={aprobar}>
+        {procesando ? 'Procesando revisión…' : 'Aprobar postulación'}
+      </button>
+
+      <label htmlFor="motivo-rechazo">Motivo de rechazo</label>
+      <textarea
+        id="motivo-rechazo"
+        maxLength={500}
+        value={motivo}
+        disabled={deshabilitado}
+        aria-invalid={errorMotivo ? true : undefined}
+        aria-describedby={errorMotivo ? 'motivo-rechazo-error' : undefined}
+        onChange={(evento) => establecerMotivo(evento.target.value)}
+      />
+      {errorMotivo && <p id="motivo-rechazo-error" role="alert">{errorMotivo}</p>}
+      <button type="button" disabled={deshabilitado} onClick={rechazar}>
+        Rechazar postulación
+      </button>
+    </section>
+  )
+}
+
 export default function PostulacionesAdminPage({
   acceso, consulta, seleccionada = null, descargando = false, errorCertificado = null,
-  onRecargar, onSeleccionar, onDescargar,
+  revisionEnCurso = null, revisionBloqueada = false, mensajeRevision = null, errorRevision = null,
+  onRecargar, onSeleccionar, onDescargar, onAprobar, onRechazar,
 }: Propiedades) {
   if (acceso) return (
     <main className="post-admin">
@@ -41,7 +117,9 @@ export default function PostulacionesAdminPage({
     <main className="post-admin" aria-busy={consulta.estado === 'cargando'}>
       <h1>Administrar postulaciones</h1>
       <p>Consulta las postulaciones pendientes y revisa sus certificados.</p>
-      <button type="button" disabled={consulta.estado === 'cargando'} onClick={onRecargar}>
+      {mensajeRevision && <p role="status">{mensajeRevision}</p>}
+      {errorRevision && <p role="alert">{errorRevision}</p>}
+      <button type="button" disabled={consulta.estado === 'cargando' || revisionEnCurso !== null} onClick={onRecargar}>
         {consulta.estado === 'error' ? 'Reintentar consulta' : 'Actualizar listado'}
       </button>
 
@@ -91,6 +169,17 @@ export default function PostulacionesAdminPage({
           <button type="button" disabled={descargando} onClick={() => onDescargar(detalle)}>
             {descargando ? 'Descargando…' : 'Descargar certificado'}
           </button>
+          {detalle.estado === 'PENDIENTE' && (
+            // La key reinicia la nota y el motivo al cambiar de postulación.
+            <FormularioRevision
+              key={detalle.idPostulacion}
+              postulacion={detalle}
+              procesando={revisionEnCurso === detalle.idPostulacion}
+              deshabilitado={revisionEnCurso !== null || revisionBloqueada}
+              onAprobar={onAprobar}
+              onRechazar={onRechazar}
+            />
+          )}
           {errorCertificado && <p role="alert">{errorCertificado}</p>}
         </section>
       )}

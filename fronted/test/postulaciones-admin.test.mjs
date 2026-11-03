@@ -78,3 +78,106 @@ test('el menú administrativo enlaza al panel sin cambiar el menú de estudiante
     assert.ok(!obtenerNavegacion(roles).some((enlace) => enlace.destino === '/administracion/postulaciones'))
   }
 })
+
+test('muestra los botones de revision solo en postulaciones pendientes', () => {
+  const pendiente = {
+    ...postulacion,
+    estado: 'PENDIENTE',
+    notaAcreditada: null,
+    fechaRevision: null,
+    idAdministradorRevision: null,
+  }
+
+  const html = pagina(
+    { estado: 'listo', postulaciones: [pendiente] },
+    { seleccionada: '17' },
+  )
+
+  assert.match(html, /Aprobar postulación/)
+  assert.match(html, /Rechazar postulación/)
+  assert.match(html, /nota-acreditada/)
+  assert.match(html, /motivo-rechazo/)
+
+  const revisada = pagina(
+    { estado: 'listo', postulaciones: [postulacion] },
+    { seleccionada: '17' },
+  )
+
+  assert.doesNotMatch(revisada, /Aprobar postulación|Rechazar postulación/)
+})
+
+test('bloquea ambos botones mientras se procesa una revision', () => {
+  const pendiente = {
+    ...postulacion,
+    estado: 'PENDIENTE',
+    notaAcreditada: null,
+    fechaRevision: null,
+    idAdministradorRevision: null,
+  }
+
+  const html = pagina(
+    { estado: 'listo', postulaciones: [pendiente] },
+    { seleccionada: '17', revisionEnCurso: '17' },
+  )
+
+  assert.match(html, /Procesando revisión/)
+  assert.match(html, /disabled=""[^>]*>Procesando revisión/)
+  assert.match(html, /disabled=""[^>]*>Rechazar postulación/)
+})
+
+test('bloquea decisiones cuando el resultado necesita verificacion', () => {
+  const pendiente = {
+    ...postulacion,
+    estado: 'PENDIENTE',
+    notaAcreditada: null,
+    fechaRevision: null,
+  }
+
+  const html = pagina(
+    { estado: 'listo', postulaciones: [pendiente] },
+    { seleccionada: '17', revisionBloqueada: true },
+  )
+
+  assert.match(html, /Aprobar postulación/)
+  assert.match(html, /Rechazar postulación/)
+  assert.match(html, /disabled=""[^>]*>Aprobar postulación/)
+  assert.match(html, /disabled=""[^>]*>Rechazar postulación/)
+})
+
+test('impide actualizar el listado durante una revisión y permite hacerlo tras un resultado incierto', () => {
+  const consulta = { estado: 'listo', postulaciones: [postulacion] }
+  const revisando = pagina(consulta, { revisionEnCurso: '17' })
+  assert.match(revisando, /<button\b[^>]*disabled=""[^>]*>Actualizar listado<\/button>/)
+
+  for (const extras of [{}, { revisionBloqueada: true }]) {
+    const disponible = pagina(consulta, extras)
+    assert.match(disponible, /<button\b[^>]*>Actualizar listado<\/button>/)
+    assert.doesNotMatch(disponible, /<button\b[^>]*disabled=""[^>]*>Actualizar listado<\/button>/)
+  }
+})
+
+test('valida y sanitiza la nota y el motivo antes de enviar la revision', async () => {
+  const { validarNotaIngresada, validarMotivoIngresado, convertirNota } = await vite.ssrLoadModule('/src/features/postulaciones/utils/validar-revision.ts')
+  const { sanitizarTexto } = await vite.ssrLoadModule('/src/shared/utils/validaciones-formulario.ts')
+
+  assert.equal(validarNotaIngresada(''), 'El campo nota acreditada es obligatorio.')
+  assert.match(validarNotaIngresada('4.9'), /entre 5,0 y 7,0/)
+  assert.match(validarNotaIngresada('6.55'), /máximo de un decimal/)
+  assert.equal(validarNotaIngresada('6.5'), undefined)
+  assert.equal(convertirNota(' 6,5 '), 6.5)
+
+  assert.equal(validarMotivoIngresado('   '), 'El motivo de rechazo es obligatorio.')
+  assert.match(validarMotivoIngresado(' ab '), /al menos 3 caracteres/)
+  assert.match(validarMotivoIngresado('a'.repeat(501)), /como máximo 500/)
+  assert.equal(validarMotivoIngresado('Certificado ilegible'), undefined)
+  assert.equal(sanitizarTexto('\u0007 Certificado \n\t ilegible  '), 'Certificado ilegible')
+})
+
+test('muestra mensajes comprensibles ante errores de conexion, tiempo de espera o respuesta', async () => {
+  const { mensajeDeError } = await vite.ssrLoadModule('/src/shared/utils/mensaje-error.ts')
+
+  assert.match(mensajeDeError(new TypeError('Failed to fetch'), 'Por defecto'), /No pudimos conectar con el servidor/)
+  assert.match(mensajeDeError(new DOMException('Timeout', 'TimeoutError'), 'Por defecto'), /tardó demasiado/)
+  assert.equal(mensajeDeError(new Error('La postulación no está disponible.'), 'Por defecto'), 'La postulación no está disponible.')
+  assert.equal(mensajeDeError('respuesta inesperada', 'Por defecto'), 'Por defecto')
+})
