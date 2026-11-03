@@ -6,7 +6,7 @@ interface ErrorBoundaryProps {
 }
 
 interface ErrorBoundaryState {
-  error: unknown
+  fallo: boolean
 }
 
 interface ErrorRenderFallbackProps {
@@ -33,10 +33,10 @@ export function ErrorRenderFallback({ onReintentar }: ErrorRenderFallbackProps) 
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null }
+  state: ErrorBoundaryState = { fallo: false }
 
-  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
-    return { error }
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { fallo: true }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -44,8 +44,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   render() {
-    if (this.state.error !== null) {
-      return <ErrorRenderFallback onReintentar={() => this.setState({ error: null })} />
+    if (this.state.fallo) {
+      return <ErrorRenderFallback onReintentar={() => this.setState({ fallo: false })} />
     }
     return this.props.children
   }

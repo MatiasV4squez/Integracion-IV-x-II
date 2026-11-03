@@ -43,14 +43,15 @@ test('sin reintento disponible conserva recargar y volver al inicio', () => {
 })
 
 test('getDerivedStateFromError registra el fallo y el estado inicial no lo presenta', () => {
-  const fallo = new Error('boom')
-  assert.deepEqual(ErrorBoundary.getDerivedStateFromError(fallo), { error: fallo })
-  assert.deepEqual(new ErrorBoundary({ children: null }).state, { error: null })
+  for (const fallo of [new Error('boom'), null, undefined, 0, '']) {
+    assert.deepEqual(ErrorBoundary.getDerivedStateFromError(fallo), { fallo: true })
+  }
+  assert.deepEqual(new ErrorBoundary({ children: null }).state, { fallo: false })
 })
 
 test('con un fallo registrado muestra la alternativa y reintentar limpia el error', () => {
   const limite = new ErrorBoundary({ children: createElement('p', null, 'Contenido visible') })
-  limite.state = { error: new Error('boom') }
+  limite.state = { fallo: true }
 
   const html = renderToStaticMarkup(limite.render())
   assert.match(html, /Algo falló en esta página/)
@@ -59,5 +60,5 @@ test('con un fallo registrado muestra la alternativa y reintentar limpia el erro
   let nuevoEstado
   limite.setState = (estado) => { nuevoEstado = estado }
   limite.render().props.onReintentar()
-  assert.deepEqual(nuevoEstado, { error: null })
+  assert.deepEqual(nuevoEstado, { fallo: false })
 })
