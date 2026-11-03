@@ -1,3 +1,0 @@
-# Estos archivos corren dentro de contenedores Linux: siempre con finales de línea LF,
-# aunque el repositorio se clone en Windows (core.autocrlf=true).
-* text=auto eol=lf
