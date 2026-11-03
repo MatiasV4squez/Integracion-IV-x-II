@@ -1,56 +1,80 @@
-# Welcome to your Expo app 👋
+# Studia — app de tutorías entre pares
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App móvil y web (Expo + React Native + TypeScript) del Sistema de Tutorías entre Pares.
+Se conecta a los microservicios a través del API Gateway; sin backend funciona en **modo demo** con
+datos de ejemplo. La arquitectura (limpia + hexagonal) está en [`docs/arquitectura.md`](docs/arquitectura.md).
 
-## Get started
+Funciona igual en **Windows** y **Linux** (y macOS).
 
-1. Install dependencies
+## Requisitos
 
-   ```bash
-   npm install
-   ```
+| Qué | Versión | Windows | Linux |
+|---|---|---|---|
+| Node.js | 22.12 o superior | instalador de [nodejs.org](https://nodejs.org) | `nvm install 22` o el gestor de paquetes |
+| Git | cualquiera | [git-scm.com](https://git-scm.com) | gestor de paquetes |
+| Expo Go (celular) | la de la tienda | Android / iOS | Android / iOS |
 
-2. Start the app
+Para levantar también el backend, ver [`../orquestacion/README.md`](../orquestacion/README.md) (Docker).
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 1. Instalar
 
 ```bash
-npm run reset-project
+cd proyect-app-studia
+npm ci
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 2. Elegir modo
 
-### Other setup steps
+**Modo demo (sin backend):** no hay que configurar nada. Cuentas: `alumno.demo@uct.cl` / `demo1234`.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Con backend:** crea `.env.local` a partir del ejemplo y pon la URL del API Gateway.
 
-## Learn more
+| | Windows (PowerShell) | Linux |
+|---|---|---|
+| Copiar el ejemplo | `Copy-Item .env.example .env.local` | `cp .env.example .env.local` |
+| Ver la IP de tu PC | `ipconfig` (Adaptador Wi-Fi → Dirección IPv4) | `hostname -I` |
 
-To learn more about developing your project with Expo, look at the following resources:
+En `.env.local`:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```dotenv
+# Solo en el navegador del mismo PC:
+EXPO_PUBLIC_API_URL=http://localhost:8080/api
+# En el celular (Expo Go), con la IP de tu PC:
+# EXPO_PUBLIC_API_URL=http://192.168.1.10:8080/api
+```
 
-## Join the community
+Después de cambiar `.env.local`, reinicia Expo.
 
-Join our community of developers creating universal apps.
+## 3. Correr
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx expo start
+```
+
+- **Celular:** escanea el código QR con Expo Go (el celular y el PC en la misma red Wi-Fi).
+- **Navegador:** presiona `w` o abre http://localhost:8081.
+
+Cuentas de prueba con backend: `estudiante@alu.uct.cl` / `Estudiante123`, `tutor@alu.uct.cl` /
+`Tutor1234`, `tutor2@alu.uct.cl` / `Tutor1234`, `admin@alu.uct.cl` / `Admin1234`.
+
+## Si el celular no conecta
+
+El firewall del PC debe permitir los puertos **8081** (Expo) y **8080** (Gateway).
+
+| Windows (PowerShell como administrador) | Linux (Fedora) |
+|---|---|
+| `New-NetFirewallRule -DisplayName "Studia" -Direction Inbound -Protocol TCP -LocalPort 8080,8081 -Action Allow` | `sudo firewall-cmd --add-port=8080/tcp --add-port=8081/tcp` |
+
+Si la red no permite conexiones entre equipos (redes de universidad), usa `npx expo start --tunnel`
+para la app; el Gateway igual debe ser alcanzable desde el celular.
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npx expo start` | Servidor de desarrollo (celular y web) |
+| `npm run lint` | ESLint (incluye la regla que protege las capas de la arquitectura) |
+| `npx tsc --noEmit` | Revisión de tipos |
+| `npm test` | Pruebas (ejecutor nativo de Node, sin Jest) |
+
+Los tres últimos son los que corre el CI en cada push.

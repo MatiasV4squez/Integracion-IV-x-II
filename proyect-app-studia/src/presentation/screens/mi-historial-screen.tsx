@@ -10,6 +10,7 @@ import { Card } from '@/presentation/components/card';
 import { EmptyState } from '@/presentation/components/empty-state';
 import { ErrorState } from '@/presentation/components/error-state';
 import { FilterChip } from '@/presentation/components/filter-chip';
+import { KeyboardSafe, keyboardScrollProps } from '@/presentation/components/keyboard-safe';
 import { LoadingState } from '@/presentation/components/loading-state';
 import { NoticeBanner } from '@/presentation/components/notice-banner';
 import { RatingStars } from '@/presentation/components/rating-stars';
@@ -154,37 +155,39 @@ export default function MiHistorialScreen({ role }: { role: UserRole }) {
   return (
     <View style={[styles.root, { backgroundColor: ui.bg, paddingTop: insets.top }]}>
       {/* FlatList = lista virtualizada (NFR18) */}
-      <FlatList
-        data={page.items}
-        refreshing={misSesiones.isRefreshing}
-        onRefresh={misSesiones.refresh}
-        onEndReached={page.loadMore}
-        onEndReachedThreshold={0.4}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => <HistoryCard session={item} role={role} onPress={() => openDetail(item.id)} onRespond={respond} />}
-        ListEmptyComponent={
-          misSesiones.isLoading ? (
-            <LoadingState message="Cargando tus tutorías…" />
-          ) : misSesiones.error ? (
-            <ErrorState message={misSesiones.error.message} onRetry={misSesiones.refresh} />
-          ) : (
-            <EmptyState
-              icon="🎓"
-              title={vacio.title}
-              message={vacio.message}
-              action={
-                role === 'tutee'
-                  ? { label: 'Buscar tutorías', onPress: () => router.navigate('/buscar') }
-                  : { label: 'Publicar disponibilidad', onPress: () => router.navigate('/publicar-disponibilidad') }
-              }
-            />
-          )
-        }
-      />
+      <KeyboardSafe>
+        <FlatList
+          data={page.items}
+          refreshing={misSesiones.isRefreshing}
+          onRefresh={misSesiones.refresh}
+          onEndReached={page.loadMore}
+          onEndReachedThreshold={0.4}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.content}
+          {...keyboardScrollProps}
+          ListHeaderComponent={header}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={({ item }) => <HistoryCard session={item} role={role} onPress={() => openDetail(item.id)} onRespond={respond} />}
+          ListEmptyComponent={
+            misSesiones.isLoading ? (
+              <LoadingState message="Cargando tus tutorías…" />
+            ) : misSesiones.error ? (
+              <ErrorState message={misSesiones.error.message} onRetry={misSesiones.refresh} />
+            ) : (
+              <EmptyState
+                icon="🎓"
+                title={vacio.title}
+                message={vacio.message}
+                action={
+                  role === 'tutee'
+                    ? { label: 'Buscar tutorías', onPress: () => router.navigate('/buscar') }
+                    : { label: 'Publicar disponibilidad', onPress: () => router.navigate('/publicar-disponibilidad') }
+                }
+              />
+            )
+          }
+        />
+      </KeyboardSafe>
     </View>
   );
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardSafe, keyboardScrollProps } from '@/presentation/components/keyboard-safe';
 import { MaxContentWidth, Spacing } from '@/presentation/constants/theme';
 import { useUI } from '@/presentation/hooks/use-ui';
 
@@ -23,18 +24,20 @@ export function ScreenContainer({ children, scroll = true, topInset = true, refr
   return (
     <View style={[styles.root, { backgroundColor: ui.bg }]}>
       <SafeAreaView style={styles.root} edges={edges}>
-        {scroll ? (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={
-              onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.primary} colors={[ui.primary]} /> : undefined
-            }>
-            <View style={styles.inner}>{children}</View>
-          </ScrollView>
-        ) : (
-          <View style={[styles.inner, styles.root]}>{children}</View>
-        )}
+        <KeyboardSafe>
+          {scroll ? (
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              {...keyboardScrollProps}
+              refreshControl={
+                onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.primary} colors={[ui.primary]} /> : undefined
+              }>
+              <View style={styles.inner}>{children}</View>
+            </ScrollView>
+          ) : (
+            <View style={[styles.inner, styles.root]}>{children}</View>
+          )}
+        </KeyboardSafe>
       </SafeAreaView>
     </View>
   );

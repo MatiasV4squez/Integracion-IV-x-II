@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { isApiEnabled } from '@/di/container';
+import { KeyboardSafe, keyboardScrollProps } from '@/presentation/components/keyboard-safe';
 import { Txt } from '@/presentation/components/txt';
 import { APP_NAME } from '@/shared/app-config';
 import { useTheme } from '@/presentation/hooks/use-theme';
@@ -46,48 +47,50 @@ export function AccessLayout({ title, description, activeTab, children }: Props)
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: ui.band }}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}
-      keyboardShouldPersistTaps="handled">
-      <Text style={[styles.brand, { color: ui.navy }]}>{APP_NAME}</Text>
+    <KeyboardSafe>
+      <ScrollView
+        style={{ backgroundColor: ui.band }}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 32 }]}
+        {...keyboardScrollProps}>
+        <Text style={[styles.brand, { color: ui.navy }]}>{APP_NAME}</Text>
 
-      <LinearGradient colors={[colors.headerStart, '#1046AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.4 }} style={styles.panel}>
-        <Text style={[styles.panelLabel, { color: colors.headerAccent }]}>COMUNIDAD UNIVERSITARIA</Text>
-        <Text style={styles.panelTitle}>Aprender juntos comienza aquí</Text>
-        <Text style={styles.panelText}>Conecta con estudiantes verificados, agenda tutorías y fortalece tus materias desde una sola plataforma.</Text>
-        <View style={styles.list}>
-          {VENTAJAS.map((v) => (
-            <Text key={v} style={styles.panelText}>
-              ✓ {v}
-            </Text>
-          ))}
-        </View>
-      </LinearGradient>
-
-      <View style={[styles.card, { backgroundColor: ui.surface, borderColor: ui.border }]}>
-        <View style={styles.gap4}>
-          <Txt variant="h1">{title}</Txt>
-          <Txt variant="small" color="muted">
-            {description}
-          </Txt>
-        </View>
-        {activeTab ? (
-          <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: ui.primarySoft }]}>
-            {tab('login', 'Iniciar sesión', ROUTES.login)}
-            {tab('registro', 'Registrarse', ROUTES.registro)}
+        <LinearGradient colors={[colors.headerStart, '#1046AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.4 }} style={styles.panel}>
+          <Text style={[styles.panelLabel, { color: colors.headerAccent }]}>COMUNIDAD UNIVERSITARIA</Text>
+          <Text style={styles.panelTitle}>Aprender juntos comienza aquí</Text>
+          <Text style={styles.panelText}>Conecta con estudiantes verificados, agenda tutorías y fortalece tus materias desde una sola plataforma.</Text>
+          <View style={styles.list}>
+            {VENTAJAS.map((v) => (
+              <Text key={v} style={styles.panelText}>
+                ✓ {v}
+              </Text>
+            ))}
           </View>
-        ) : null}
-        {children}
-        {activeTab && isApiEnabled() ? (
-          <Pressable accessibilityRole="link" onPress={() => router.push(ROUTES.verificarCuenta)} style={styles.link}>
-            <Txt variant="label" color="primary">
-              ¿Ya creaste tu cuenta? Verifica tu correo
+        </LinearGradient>
+
+        <View style={[styles.card, { backgroundColor: ui.surface, borderColor: ui.border }]}>
+          <View style={styles.gap4}>
+            <Txt variant="h1">{title}</Txt>
+            <Txt variant="small" color="muted">
+              {description}
             </Txt>
-          </Pressable>
-        ) : null}
-      </View>
-    </ScrollView>
+          </View>
+          {activeTab ? (
+            <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: ui.primarySoft }]}>
+              {tab('login', 'Iniciar sesión', ROUTES.login)}
+              {tab('registro', 'Registrarse', ROUTES.registro)}
+            </View>
+          ) : null}
+          {children}
+          {activeTab && isApiEnabled() ? (
+            <Pressable accessibilityRole="link" onPress={() => router.push(ROUTES.verificarCuenta)} style={styles.link}>
+              <Txt variant="label" color="primary">
+                ¿Ya creaste tu cuenta? Verifica tu correo
+              </Txt>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+    </KeyboardSafe>
   );
 }
 
