@@ -1,9 +1,9 @@
 // Crea las cuentas de prueba de Studia con los flujos reales de la app:
 // registro -> verificación con el enlace (leído del log de usuarios-auth) -> postulación de tutor
 // con certificado -> aprobación del administrador. Repetible: no duplica nada.
-// Uso (con ./iniciar.sh corriendo):  node cuentas-prueba.mjs
+// Uso (con iniciar corriendo):  node cuentas-prueba.mjs   (Windows: cuentas-prueba.cmd)
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -79,12 +79,28 @@ async function asegurarCuentaActiva(cuenta) {
   exigir(await login(cuenta), 200);
 }
 
+// psql: variable PSQL, el PATH o (Windows) la instalación típica en Program Files.
+function rutaPsql() {
+  if (process.env.PSQL) return process.env.PSQL;
+  if (process.platform === 'win32') {
+    const base = join(process.env.ProgramFiles ?? 'C:\\Program Files', 'PostgreSQL');
+    if (existsSync(base)) {
+      const versiones = readdirSync(base).sort((a, b) => Number(b) - Number(a));
+      for (const v of versiones) {
+        const ruta = join(base, v, 'bin', 'psql.exe');
+        if (existsSync(ruta)) return ruta;
+      }
+    }
+  }
+  return 'psql';
+}
+
 function darRolAdministrador(correo) {
   // No existe un endpoint para crear administradores: se asigna el rol directo en la base.
   const sql = `INSERT INTO usuario_rol (id_usuario, id_rol)
     SELECT u.id_usuario, r.id_rol FROM usuario u, rol r
     WHERE u.correo_institucional = '${correo}' AND r.nombre = 'ADMINISTRADOR' ON CONFLICT DO NOTHING;`;
-  execFileSync('psql', ['-h', '127.0.0.1', '-U', 'postgres', '-d', 'usuarios_auth', '-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], {
+  execFileSync(rutaPsql(), ['-h', '127.0.0.1', '-U', 'postgres', '-d', 'usuarios_auth', '-v', 'ON_ERROR_STOP=1', '-q', '-c', sql], {
     stdio: 'inherit',
     env: { ...process.env, PGPASSWORD: process.env.PGPASSWORD ?? 'postgres' },
   });

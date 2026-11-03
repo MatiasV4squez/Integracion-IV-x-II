@@ -16,8 +16,9 @@ usuarios-auth    materias-tutores    agendamiento-sesiones    reportes-moderacio
 El código de cada micro **no se copia ni se modifica**: `preparar.sh` saca cada rama de GitHub a
 `levantar-local/.ramas/` (con `git worktree`) y la compila ahí.
 
-> Es una solución provisional para desarrollo y demos. Los scripts son de Bash (Linux o macOS;
-> en Windows, usar WSL). Los secretos de `config.sh` son solo para uso local.
+> Es una solución provisional para desarrollo y demos. Hay versión para **Linux/macOS** (`.sh`) y
+> para **Windows** (`.cmd`, ver [Windows](#windows)). Los secretos de `config.sh` / `config.ps1`
+> son solo para uso local.
 
 ## Requisitos
 
@@ -66,6 +67,38 @@ Después de `./iniciar.sh`:
 | API Gateway | http://localhost:8080/api/health |
 | Logs de cada servicio | `levantar-local/logs/<servicio>.log` |
 
+## Windows
+
+Los mismos pasos con los lanzadores `.cmd` (doble clic o desde la terminal, en `levantar-local\`).
+Llaman a los scripts de PowerShell sin cambiar la política de ejecución.
+
+**Requisitos:** Node.js 22.12+, Git y **PostgreSQL** con el instalador oficial de
+<https://www.postgresql.org/download/windows/>. Durante la instalación, pon `postgres` como
+contraseña del usuario `postgres` y deja el puerto `5432`. Ese instalador ya trae `uuid-ossp`.
+No hace falta agregar PostgreSQL al PATH: los scripts buscan `psql.exe` en
+`C:\Program Files\PostgreSQL\<versión>\bin`.
+
+| Paso | Comando |
+|---|---|
+| 1. Preparar | `preparar.cmd` |
+| 2. Levantar | `iniciar.cmd` |
+| 3. Cuentas de prueba | `cuentas-prueba.cmd` |
+| Detener | `detener.cmd` |
+
+Los servicios quedan en segundo plano (sin ventanas). Sus logs están en `levantar-local\logs\`:
+`<servicio>.log` y `<servicio>.error.log`.
+
+¿Otra contraseña de PostgreSQL? En PowerShell:
+
+```powershell
+$env:PGPASSWORD = "tu_clave"; .\iniciar.cmd
+```
+
+Para usar la app desde el celular: `$env:APP_API_URL = "http://192.168.1.10:8080/api"; .\iniciar.cmd`.
+
+Si Windows pregunta por el firewall al iniciar `node`, permite el acceso en redes privadas
+(solo hace falta para usar la app desde el celular).
+
 ## Cuentas de prueba
 
 `cuentas-prueba.mjs` las crea con los mismos flujos de la app (registro, verificación, postulación
@@ -95,9 +128,10 @@ con la IP de tu PC: `APP_API_URL=http://192.168.1.10:8080/api ./iniciar.sh`.
 
 | Mensaje | Solución |
 |---|---|
-| `PostgreSQL no responde en 127.0.0.1:5432` | PostgreSQL no está instalado o no corre: ver *Requisitos*. |
+| `PostgreSQL no responde en 127.0.0.1:5432` | PostgreSQL no está instalado o no corre: ver *Requisitos*. En Windows, revisa que el servicio `postgresql-x64-<versión>` esté iniciado (`services.msc`). |
+| `No se encontró psql` (Windows) | Instala PostgreSQL con el instalador oficial, o agrega su carpeta `bin` al PATH. |
 | `Falta la extensión uuid-ossp` | Instala `postgresql-contrib` y reinicia PostgreSQL. |
 | `Error: P3009 ... failed migrations` | Una migración falló antes (p. ej. sin contrib). Si la base es de prueba: `psql -h 127.0.0.1 -U postgres -c "drop database agendamiento_sesiones"` y vuelve a `./iniciar.sh`. |
-| `el puerto ... ya está ocupado` | Corre `./detener.sh`; si sigue, otro programa usa ese puerto. |
+| `el puerto ... ya está ocupado` | Corre `./detener.sh` (Windows: `detener.cmd`); si sigue, otro programa usa ese puerto. |
 | `<servicio> se cayó` | El script muestra las últimas líneas; el log completo está en `logs/`. |
 | `AVISO: package-lock.json desincronizado` | La rama tiene el lockfile desactualizado; se instaló con `npm install`. Conviene corregirlo en la rama. |
