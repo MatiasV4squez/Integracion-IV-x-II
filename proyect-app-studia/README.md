@@ -14,7 +14,7 @@ Funciona igual en **Windows** y **Linux** (y macOS).
 | Git | cualquiera | [git-scm.com](https://git-scm.com) | gestor de paquetes |
 | Expo Go (celular) | la de la tienda | Android / iOS | Android / iOS |
 
-Para levantar también el backend, ver [`../orquestacion/README.md`](../orquestacion/README.md) (Docker).
+Para conectarla al backend, levanta los microservicios y el API Gateway y define `EXPO_PUBLIC_API_URL` (ver `.env.example`).
 
 ## 1. Instalar
 

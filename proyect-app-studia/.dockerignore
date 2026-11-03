@@ -1,6 +1,0 @@
-# Lo que no entra a la imagen de la app web (orquestacion/app.Dockerfile).
-node_modules
-.expo
-dist
-web-build
-.env*.local
