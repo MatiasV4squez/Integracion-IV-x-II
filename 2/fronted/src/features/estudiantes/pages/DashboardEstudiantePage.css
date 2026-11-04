@@ -1,0 +1,280 @@
+.dashboard-estudiante {
+  background: #fff;
+  color: var(--color-text, #172a48);
+  color-scheme: light;
+}
+
+.dashboard-estudiante__interior {
+  width: min(100%, 1248px);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.dashboard-estudiante__bienvenida,
+.dashboard-estudiante__agenda {
+  background: #edf5ff;
+}
+
+.dashboard-estudiante__cabecera {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 40px;
+  min-height: 184px;
+  padding-block: 40px;
+}
+
+.dashboard-estudiante h1 {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 2.4vw, 30px);
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+}
+
+.dashboard-estudiante h2 {
+  margin: 0 0 18px;
+  font-size: 21px;
+  line-height: 1.35;
+  letter-spacing: -0.3px;
+}
+
+.dashboard-estudiante p {
+  margin: 0;
+  color: var(--color-text-muted, #526785);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dashboard-estudiante__buscador {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 5px 5px 5px 18px;
+  border: 1px solid var(--color-border, #d6e2f2);
+  border-radius: 12px;
+  background: #fff;
+  text-decoration: none;
+}
+
+.dashboard-estudiante__buscador > span:first-child {
+  color: var(--color-text-muted, #526785);
+  font-size: 14px;
+}
+
+.dashboard-estudiante__buscar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 9px;
+  background: var(--color-primary, #1467d5);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.dashboard-estudiante__buscador:hover .dashboard-estudiante__buscar {
+  background: var(--color-primary-hover, #1056b4);
+}
+
+.dashboard-estudiante__resumen {
+  padding-block: 32px 40px;
+}
+
+.dashboard-estudiante__columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: 44px;
+}
+
+.dashboard-estudiante__columnas > section {
+  min-width: 0;
+}
+
+.dashboard-estudiante__proxima {
+  min-height: 228px;
+  padding: 24px;
+  border-radius: 18px;
+  background: linear-gradient(110deg, #1979f3 0%, #1649ad 100%);
+  color: #fff;
+}
+
+.dashboard-estudiante__proxima-vacia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dashboard-estudiante__etiqueta {
+  color: #ffe29a;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-estudiante__proxima h3 {
+  max-width: 340px;
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.3;
+}
+
+.dashboard-estudiante__proxima p {
+  color: #f0f6ff;
+}
+
+.dashboard-estudiante__enlace-claro {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 10px 16px;
+  border-radius: 9px;
+  background: #fff;
+  color: #135ab8;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.dashboard-estudiante__enlace-claro:hover {
+  background: #edf4ff;
+}
+
+.dashboard-estudiante__tutores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-estudiante__vacio {
+  padding: 24px;
+  border: 1px solid var(--color-border, #d6e2f2);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(23 42 72 / 4%);
+}
+
+.dashboard-estudiante__vacio h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.dashboard-estudiante__vacio a,
+.dashboard-estudiante__titulo-agenda a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--color-primary-text, #135ab8);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.dashboard-estudiante__vacio a:hover,
+.dashboard-estudiante__titulo-agenda a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.dashboard-estudiante__tutores-vacios {
+  grid-column: 1 / -1;
+  min-height: 228px;
+}
+
+.dashboard-estudiante__avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: #ff9f19;
+  color: #172a48;
+}
+
+.dashboard-estudiante__agenda {
+  padding-block: 20px 28px;
+}
+
+.dashboard-estudiante__titulo-agenda {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: 12px;
+}
+
+.dashboard-estudiante__titulo-agenda h2 {
+  margin: 0;
+}
+
+.dashboard-estudiante__clases {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.dashboard-estudiante__clases-vacias {
+  grid-column: 1 / -1;
+  min-height: 144px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-estudiante__cabecera,
+  .dashboard-estudiante__columnas {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .dashboard-estudiante__clases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .dashboard-estudiante__interior {
+    padding-inline: 20px;
+  }
+
+  .dashboard-estudiante__cabecera {
+    padding-block: 28px;
+    gap: 20px;
+  }
+
+  .dashboard-estudiante__buscador {
+    gap: 8px;
+    padding-inline-start: 12px;
+  }
+
+  .dashboard-estudiante__buscador > span:first-child {
+    font-size: 12px;
+  }
+
+  .dashboard-estudiante__buscar {
+    padding-inline: 16px;
+  }
+
+  .dashboard-estudiante__tutores,
+  .dashboard-estudiante__clases {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-estudiante__proxima,
+  .dashboard-estudiante__vacio {
+    padding: 22px;
+  }
+}
+
+.dashboard-estudiante__clases > .sesiones-activas {
+  grid-column: 1 / -1;
+}

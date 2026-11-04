@@ -1,0 +1,92 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { UsuariosPersistenceModule } from '../usuarios/infraestructura/persistencia/usuarios-persistence.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { JWT_AUDIENCE, JWT_ISSUER } from './auth.constants';
+import {
+  PASSWORD_VERIFIER,
+  TOKEN_PROVIDER,
+  SESSION_REPOSITORY,
+  MODERACION_CUENTAS_REPOSITORY,
+  SESSION_IDLE_TIMEOUT_SECONDS,
+  ROLES_REPOSITORY,
+  type RolesRepository,
+} from './dominio/auth.ports';
+import { AuthService } from './aplicacion/auth.service';
+import { PasswordService } from './infraestructura/seguridad/password.service';
+import { TokenService } from './infraestructura/seguridad/token.service';
+import { PrismaAuthRepository } from './infraestructura/persistencia/prisma-auth.repository';
+import { SessionService } from './aplicacion/session.service';
+import { ModeracionCuentasService } from './aplicacion/moderacion-cuentas.service';
+import { JwtAuthGuard } from './infraestructura/http/jwt-auth.guard';
+import { InternalServiceGuard } from './infraestructura/http/internal-service.guard';
+import { AuthController } from './infraestructura/http/auth.controller';
+import { InternalModeracionController } from './infraestructura/http/internal-moderacion.controller';
+import { AsignarTutorUseCase } from './aplicacion/asignar-tutor.use-case';
+import { PrismaRolesRepository } from './infraestructura/persistencia/prisma-roles.repository';
+import { IntegracionSecretGuard } from './infraestructura/http/integracion-secret.guard';
+import { InternalRolesController } from './infraestructura/http/internal-roles.controller';
+
+@Module({
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    UsuariosPersistenceModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          algorithm: 'HS256',
+          expiresIn: config.getOrThrow<number>('JWT_ACCESS_TTL_SECONDS'),
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
+        },
+      }),
+    }),
+  ],
+  controllers: [
+    AuthController,
+    InternalModeracionController,
+    InternalRolesController,
+  ],
+  providers: [
+    {
+      provide: SESSION_IDLE_TIMEOUT_SECONDS,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        config.getOrThrow<number>('JWT_IDLE_TIMEOUT_SECONDS'),
+    },
+    PasswordService,
+    { provide: PASSWORD_VERIFIER, useExisting: PasswordService },
+    { provide: TOKEN_PROVIDER, useClass: TokenService },
+    { provide: ROLES_REPOSITORY, useClass: PrismaRolesRepository },
+    {
+      provide: AsignarTutorUseCase,
+      inject: [ROLES_REPOSITORY],
+      useFactory: (roles: RolesRepository) => new AsignarTutorUseCase(roles),
+    },
+    PrismaAuthRepository,
+    { provide: SESSION_REPOSITORY, useExisting: PrismaAuthRepository },
+    {
+      provide: MODERACION_CUENTAS_REPOSITORY,
+      useExisting: PrismaAuthRepository,
+    },
+    AuthService,
+    SessionService,
+    ModeracionCuentasService,
+    JwtAuthGuard,
+    InternalServiceGuard,
+    IntegracionSecretGuard,
+  ],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    TOKEN_PROVIDER,
+    SessionService,
+    PasswordService,
+  ],
+})
+export class AuthModule {}

@@ -1,0 +1,52 @@
+import { Component, type ErrorInfo, type ReactNode } from 'react'
+import './ErrorBoundary.css'
+
+interface ErrorBoundaryProps {
+  children: ReactNode
+}
+
+interface ErrorBoundaryState {
+  fallo: boolean
+}
+
+interface ErrorRenderFallbackProps {
+  onReintentar?: () => void
+}
+
+export function ErrorRenderFallback({ onReintentar }: ErrorRenderFallbackProps) {
+  return (
+    <main className="error-render">
+      <section className="error-render__tarjeta" role="alert">
+        <h1>Algo falló en esta página</h1>
+        <p>No pudimos mostrar el contenido. Puedes reintentar, recargar la página o volver al inicio.</p>
+        <div className="error-render__acciones">
+          {onReintentar && (
+            <button type="button" className="error-render__boton" onClick={onReintentar}>Reintentar</button>
+          )}
+          <button type="button" className="error-render__boton error-render__boton--secundario"
+            onClick={() => window.location.reload()}>Recargar la página</button>
+          <a className="error-render__boton error-render__boton--secundario" href="/">Volver al inicio</a>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { fallo: false }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { fallo: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('ErrorBoundary capturó un fallo de renderizado.', error, info.componentStack)
+  }
+
+  render() {
+    if (this.state.fallo) {
+      return <ErrorRenderFallback onReintentar={() => this.setState({ fallo: false })} />
+    }
+    return this.props.children
+  }
+}

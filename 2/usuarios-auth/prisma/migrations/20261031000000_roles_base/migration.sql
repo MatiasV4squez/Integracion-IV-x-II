@@ -1,0 +1,3 @@
+INSERT INTO "rol" ("nombre")
+VALUES ('ESTUDIANTE'), ('TUTOR'), ('ADMINISTRADOR')
+ON CONFLICT ("nombre") DO NOTHING;

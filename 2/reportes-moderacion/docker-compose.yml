@@ -1,0 +1,14 @@
+services:
+  db-reportes:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: reportes_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_reportes:/var/lib/postgresql/data
+
+volumes:
+  pgdata_reportes:

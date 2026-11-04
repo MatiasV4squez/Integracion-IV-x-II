@@ -1,0 +1,57 @@
+.materia-card {
+  display: block;
+  height: 100%;
+  min-height: 150px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow: 0 4px 12px rgb(23 42 72 / 4%);
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+@media (hover: hover) {
+  .materia-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary-text);
+    box-shadow: 0 8px 20px rgb(23 42 72 / 10%);
+  }
+}
+
+.materia-card--enlace {
+  cursor: pointer;
+}
+
+.materia-card--enlace:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--color-primary-text);
+  box-shadow: 0 8px 20px rgb(23 42 72 / 10%);
+}
+
+.materia-card h3 {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.materia-card__codigo {
+  margin: 0;
+  color: var(--color-primary-text);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .materia-card {
+    transition: none;
+  }
+
+  .materia-card:hover,
+  .materia-card--enlace:focus-visible {
+    transform: none;
+  }
+}

@@ -1,0 +1,52 @@
+.catalogo-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.catalogo-vacio__icono {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
+}
+
+.catalogo-vacio__icono svg {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.catalogo-vacio h3 {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.catalogo-vacio p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .catalogo-vacio {
+    min-height: 280px;
+    padding: 36px 20px;
+  }
+}

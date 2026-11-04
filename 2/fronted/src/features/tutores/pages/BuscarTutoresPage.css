@@ -1,0 +1,80 @@
+.buscar-tutores {
+  width: min(100%, 1296px);
+  margin-inline: auto;
+  padding: 38px 40px 80px;
+  line-height: 1.5;
+}
+
+.buscar-tutores h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height: 1.25;
+  letter-spacing: -0.8px;
+}
+
+.buscar-tutores__subtitulo {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+.buscar-tutores__contenido {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.buscar-tutores__resultados {
+  min-width: 0;
+}
+
+.buscar-tutores__resultados h2 {
+  margin: 0 0 18px;
+  font-size: 24px;
+  line-height: 1.35;
+  font-weight: 650;
+}
+
+.buscar-tutores__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buscar-tutores__materia-aplicada {
+  margin: -8px 0 18px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+  .buscar-tutores {
+    padding-inline: 28px;
+  }
+
+  .buscar-tutores__contenido {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 800px) {
+  .buscar-tutores__contenido {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .buscar-tutores {
+    padding: 28px 20px 48px;
+  }
+
+  .buscar-tutores__resultados h2 {
+    font-size: 21px;
+  }
+}

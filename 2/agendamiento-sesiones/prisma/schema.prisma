@@ -1,0 +1,136 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Referencias externas: sin relaciones hacia tablas de otros microservicios.
+model sesion {
+  id_sesion             BigInt                    @id @default(autoincrement())
+  id_tutee              BigInt
+  id_tutor              BigInt
+  id_materia            BigInt
+  id_bloque             BigInt
+  estado_sesion         sesion_estado_sesion_enum @default(PENDIENTE)
+  inicio                DateTime                  @db.Timestamptz(3)
+  fin                   DateTime                  @db.Timestamptz(3)
+  fecha_creacion        DateTime                  @default(now()) @db.Timestamp(6)
+  fecha_actualizacion   DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
+  resultado_provisional Boolean                   @default(false)
+  declaraciones         declaracion_cierre[]
+  resolucion_conflicto  resolucion_conflicto_sesion?
+  calificaciones        calificacion[]
+  liberacion_bloque      liberacion_bloque_sesion?
+  avisos_moderacion      aviso_moderacion_sesion[]
+
+  @@index([id_tutee, estado_sesion])
+  @@index([id_tutor, inicio, fin])
+  @@index([estado_sesion, fecha_creacion])
+}
+
+model declaracion_cierre {
+  id_declaracion         BigInt                @id @default(autoincrement())
+  id_sesion              BigInt
+  id_usuario             BigInt
+  resultado_declarado    resultado_cierre_enum
+  id_usuario_inasistente BigInt?
+  fecha_declaracion      DateTime              @default(now()) @db.Timestamptz(3)
+  sesion                 sesion                @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@unique([id_sesion, id_usuario])
+  @@index([id_sesion, fecha_declaracion])
+}
+
+// Auditoría propia de la transición administrativa; otros micros referencian el ID.
+model resolucion_conflicto_sesion {
+  id_resolucion     BigInt               @id @default(autoincrement())
+  id_sesion         BigInt               @unique
+  id_administrador  BigInt
+  estado_final      resultado_cierre_enum
+  motivo_resolucion String               @db.VarChar(500)
+  observaciones     String?              @db.Text
+  fecha_resolucion  DateTime             @default(now()) @db.Timestamptz(3)
+  sesion             sesion               @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+}
+
+model calificacion {
+  id_calificacion    BigInt   @id @default(autoincrement())
+  id_sesion          BigInt
+  id_evaluador       BigInt
+  id_evaluado        BigInt
+  puntuacion         Int
+  fecha_calificacion DateTime @default(now()) @db.Timestamptz(3)
+  sesion             sesion   @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+  entrega_reputacion entrega_reputacion_tutor?
+
+  @@unique([id_sesion, id_evaluador])
+  @@index([id_evaluado])
+}
+
+// Cola durable para sincronizar notas recibidas como tutor con materias-tutores.
+model entrega_reputacion_tutor {
+  id_calificacion BigInt       @id
+  fecha_creacion  DateTime     @default(now()) @db.Timestamptz(3)
+  fecha_entrega   DateTime?    @db.Timestamptz(3)
+  intentos        Int          @default(0)
+  calificacion    calificacion @relation(fields: [id_calificacion], references: [id_calificacion], onDelete: Restrict)
+
+  @@index([fecha_entrega, fecha_creacion])
+}
+
+// Solicitud durable de liberación, guardada junto a la transición de la sesión.
+model liberacion_bloque_sesion {
+  id_sesion        BigInt    @id
+  id_bloque        BigInt
+  fecha_creacion   DateTime  @default(now()) @db.Timestamptz(3)
+  fecha_liberacion DateTime? @db.Timestamptz(3)
+  intentos         Int       @default(0)
+  ultimo_error     String?   @db.VarChar(500)
+  sesion           sesion    @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@index([fecha_liberacion, fecha_creacion])
+}
+
+// Instantánea durable del conflicto o de su resolución para reportes/moderación.
+model aviso_moderacion_sesion {
+  id_aviso        BigInt                    @id @default(autoincrement())
+  id_sesion       BigInt
+  tipo            tipo_aviso_moderacion_enum
+  contenido       Json
+  fecha_creacion  DateTime                  @default(now()) @db.Timestamptz(3)
+  fecha_entrega   DateTime?                 @db.Timestamptz(3)
+  intentos        Int                       @default(0)
+  ultimo_error    String?                   @db.VarChar(500)
+  sesion          sesion                    @relation(fields: [id_sesion], references: [id_sesion], onDelete: Restrict)
+
+  @@unique([id_sesion, tipo])
+  @@index([fecha_entrega, fecha_creacion])
+}
+
+enum tipo_aviso_moderacion_enum {
+  CONFLICTO_DETECTADO
+  CONFLICTO_RESUELTO
+}
+
+enum resultado_cierre_enum {
+  COMPLETADA
+  NO_REALIZADA
+  INASISTENCIA
+}
+
+enum sesion_estado_sesion_enum {
+  PENDIENTE
+  CONFIRMADA
+  RECHAZADA
+  EXPIRADA
+  CANCELADA
+  PENDIENTE_CIERRE
+  COMPLETADA
+  NO_REALIZADA
+  INASISTENCIA
+  EN_CONFLICTO
+}

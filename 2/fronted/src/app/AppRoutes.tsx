@@ -1,0 +1,60 @@
+import { lazy, type ReactNode } from 'react'
+import { Route, Routes } from 'react-router'
+import { TutoriasLayout } from './TutoriasLayout'
+import { RutaInvitado, RutaProtegida } from '../shared/auth/RutasAcceso'
+import { inicioSesionHttp } from '../features/inicio-sesion/services/inicio-sesion-http'
+import { registroUsuarioHttp } from '../features/registro-usuario/services/registro-usuario-http'
+import { verificacionCuentaHttp } from '../features/verificacion-cuenta/services/verificacion-cuenta-http'
+
+const CatalogoMateriasContainer = lazy(() => import('../features/materias/containers/CatalogoMateriasContainer'))
+const BuscarTutoresContainer = lazy(() => import('../features/tutores/containers/BuscarTutoresContainer'))
+const PerfilTutorContainer = lazy(() => import('../features/tutores/containers/PerfilTutorContainer'))
+const SolicitudesRecibidasContainer = lazy(() => import('../features/sesiones/containers/SolicitudesRecibidasContainer'))
+const VerificacionCuentaContainer = lazy(() => import('../features/verificacion-cuenta/containers/VerificacionCuentaContainer'))
+const PanelTuteeContainer = lazy(() => import('../features/panel-tutee/containers/PanelTuteeContainer'))
+const PostulacionesAdminContainer = lazy(() => import('../features/postulaciones/containers/PostulacionesAdminContainer'))
+const DashboardEstudianteContainer = lazy(() => import('../features/estudiantes/containers/DashboardEstudianteContainer'))
+const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/containers/SolicitarTutoriaContainer'))
+const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
+const DisponibilidadContainer = lazy(() => import('../features/disponibilidad/containers/DisponibilidadContainer'))
+const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario/containers/RegistroUsuarioContainer'))
+const DashboardTutorContainer = lazy(() => import('../features/panel-tutor/containers/DashboardTutorContainer'))
+const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'))
+const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
+const InicioPublicoPage = lazy(() => import('../features/inicio-publico/pages/InicioPublicoPage'))
+
+export function AppRoutes({ children }: { children?: ReactNode }) {
+  return (
+    <Routes>
+      <Route element={<TutoriasLayout />}>
+        <Route path="/verificar-cuenta" element={<VerificacionCuentaContainer api={verificacionCuentaHttp} />} />
+        <Route element={<RutaInvitado />}>
+          <Route path="/" element={<InicioPublicoPage />} />
+          <Route path="/login" element={<InicioSesionContainer api={inicioSesionHttp} />} />
+          <Route path="/registro" element={<RegistroUsuarioContainer api={registroUsuarioHttp} />} />
+        </Route>
+        <Route element={<RutaProtegida />}>
+          <Route path="/materias" element={<CatalogoMateriasContainer />} />
+          <Route path="/tutores" element={<BuscarTutoresContainer />} />
+          <Route path="/tutores/:idTutor" element={<PerfilTutorContainer />} />
+          <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
+          <Route path="/inicio" element={<DashboardEstudianteContainer />} />
+          <Route path="/panel" element={<PanelTuteeContainer />} />
+          <Route path="/solicitudes/nueva" element={<SolicitarTutoriaContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['TUTOR']} />}>
+          <Route path="/tutor" element={<DashboardTutorContainer />} />
+          <Route path="/solicitudes/recibidas" element={<SolicitudesRecibidasContainer />} />
+          <Route path="/disponibilidad" element={<DisponibilidadContainer />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
+          <Route path="/administracion/postulaciones" element={<PostulacionesAdminContainer />} />
+        </Route>
+        {children}
+        <Route path="/*" element={<PantallasEquipo />} />
+      </Route>
+    </Routes>
+  )
+}

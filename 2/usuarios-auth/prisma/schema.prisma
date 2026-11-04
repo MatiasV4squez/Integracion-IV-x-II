@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+model Usuario {
+  id_usuario           BigInt    @id @default(autoincrement())
+  nombre               String    @db.VarChar(150)
+  correo_institucional String    @unique @db.VarChar(255)
+  password_hash        String    @db.VarChar(255)
+  carrera              String?   @db.VarChar(150) // Sin NN, es opcional
+  semestre_actual      Int?      // Sin NN, es opcional
+  biografia            String?   @db.Text         // Sin NN, es opcional
+  estado_cuenta        String    @db.VarChar(30)
+  correo_verificado    Boolean
+  fecha_registro       DateTime  @default(now())
+
+  // Relaciones hacia las otras tablas
+  roles                UsuarioRol[]
+  verificaciones       VerificacionCorreo[]
+  sesiones             Sesion[]
+
+  @@map("usuario")
+}
+
+model Rol {
+  id_rol Int          @id @default(autoincrement())
+  nombre String       @unique @db.VarChar(50)
+  
+  usuarios UsuarioRol[]
+
+  @@map("rol")
+}
+
+// Tabla intermedia para la relación de muchos a muchos
+model UsuarioRol {
+  id_usuario BigInt
+  id_rol     Int
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+  rol     Rol     @relation(fields: [id_rol], references: [id_rol])
+
+  @@id([id_usuario, id_rol])
+  @@map("usuario_rol")
+}
+
+model VerificacionCorreo {
+  id_verificacion   BigInt    @id @default(autoincrement())
+  id_usuario        BigInt
+  token             String    @unique @db.VarChar(255)
+  fecha_expiracion  DateTime
+  fecha_utilizacion DateTime? // Sin NN, es opcional
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("verificacion_correo")
+}
+
+model Sesion {
+  id_sesion        BigInt    @id @default(autoincrement())
+  jti              String    @unique @db.VarChar(64)
+  id_usuario       BigInt
+  fecha_expiracion DateTime  @db.Timestamp(6)
+  ultima_actividad DateTime  @default(now()) @db.Timestamp(6)
+  fecha_revocacion DateTime? @db.Timestamp(6)
+  usuario          Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@index([id_usuario, fecha_expiracion])
+  @@map("sesion")
+}

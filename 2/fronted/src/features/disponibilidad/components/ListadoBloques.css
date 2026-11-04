@@ -1,0 +1,199 @@
+.listado-bloques {
+  display: grid;
+  gap: 24px;
+}
+
+.listado-bloques__dia {
+  display: grid;
+  gap: 10px;
+}
+
+.listado-bloques__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.listado-bloques__cabecera h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.listado-bloques__cabecera span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.listado-bloques__bloques {
+  display: grid;
+  gap: 10px;
+}
+
+.bloque-horario {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+}
+
+.bloque-horario.is-editing {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.bloque-horario__datos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.bloque-horario__hora {
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.bloque-horario__estado {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.bloque-horario__estado--disponible {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.bloque-horario__estado--reservado {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
+}
+
+.bloque-horario__acciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bloque-horario__accion {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-primary-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.bloque-horario__accion:hover {
+  background: var(--color-primary-soft);
+}
+
+.bloque-horario__accion--peligro {
+  color: #b42318;
+}
+
+.bloque-horario__accion--peligro:hover {
+  background: #fef3f2;
+}
+
+.bloque-horario__accion:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.bloque-horario__accion:disabled:hover {
+  background: transparent;
+}
+
+.bloque-horario__confirmacion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bloque-horario__mini-boton {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-primary-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bloque-horario__mini-boton--peligro {
+  border-color: transparent;
+  background: #b42318;
+  color: #fff;
+}
+
+.bloque-horario__mini-boton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.listado-bloques__vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 40px 24px;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.listado-bloques__vacio h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.listado-bloques__vacio p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .bloque-horario {
+    padding: 12px 14px;
+  }
+
+  .bloque-horario__acciones {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
