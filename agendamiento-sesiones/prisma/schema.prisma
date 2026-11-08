@@ -21,6 +21,9 @@ model sesion {
   fecha_creacion        DateTime                  @default(now()) @db.Timestamp(6)
   fecha_actualizacion   DateTime                  @default(now()) @updatedAt @db.Timestamp(6)
   resultado_provisional Boolean                   @default(false)
+  modalidad             modalidad_encuentro_enum?
+  lugar                 String?                   @db.VarChar(255)
+  enlace                String?                   @db.VarChar(2048)
   declaraciones         declaracion_cierre[]
   resolucion_conflicto  resolucion_conflicto_sesion?
   calificaciones        calificacion[]
@@ -120,6 +123,11 @@ enum resultado_cierre_enum {
   COMPLETADA
   NO_REALIZADA
   INASISTENCIA
+}
+
+enum modalidad_encuentro_enum {
+  PRESENCIAL
+  EN_LINEA
 }
 
 enum sesion_estado_sesion_enum {

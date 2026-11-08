@@ -1,5 +1,5 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards, UseFilters } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, ForbiddenException, Get, Header, Param, Patch, Post, Req, UseGuards, UseFilters } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../../auth/autenticacion-request';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import { CalificarSesionDto } from './calificar-sesion.dto';
@@ -8,15 +8,20 @@ import { SesionCreadaResponseDto } from './sesion-creada.response.dto';
 import { DeclararCierreDto } from './declarar-cierre.dto';
 import { ResolveConflictDto } from './resolve-conflict.dto';
 import { GestionarSesiones } from '../../aplicacion/casos-de-uso/gestionar-sesiones';
+import { ConsultarDetalleSesion } from '../../aplicacion/casos-de-uso/consultar-detalle-sesion';
+import { DetalleSesionResponseDto } from './detalle-sesion.response.dto';
 import { ErrorSesionFilter } from './error-sesion.filter';
-import { aRespuestaSesion, aRespuestaDeclaracion, aRespuestaCalificacion } from './respuestas-sesion';
+import { aRespuestaSesion, aRespuestaDeclaracion, aRespuestaCalificacion, aRespuestaDetalleSesion } from './respuestas-sesion';
 
 @ApiTags('Sessions')
 @ApiBearerAuth()
 @UseFilters(ErrorSesionFilter)
 @Controller('sessions')
 export class SessionsController {
-  constructor(private readonly sesiones: GestionarSesiones) {}
+  constructor(
+    private readonly sesiones: GestionarSesiones,
+    private readonly detalle: ConsultarDetalleSesion,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -105,6 +110,28 @@ export class SessionsController {
   async obtenerReputacionTutor(@Param('id') idTutor: string) {
     const reputacion = await this.sesiones.obtenerReputacionTutor(idTutor);
     return { ...reputacion, id_tutor: reputacion.id_tutor.toString() };
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Consultar el detalle de una sesión',
+    description: 'Acceso exclusivo a participantes y administradores. La identidad y los roles provienen del JWT. Incluye datos del encuentro, declaraciones, calificaciones y acciones disponibles, sin modificar la sesión ni consultar otros microservicios.',
+  })
+  @ApiParam({ name: 'id', type: String, example: '100', description: 'Identificador BIGINT positivo de la sesión, enviado como texto.' })
+  @ApiResponse({ status: 200, description: 'Detalle de la sesión autorizado.', type: DetalleSesionResponseDto })
+  @ApiResponse({ status: 400, description: 'Identificador inválido o fuera del rango BIGINT.' })
+  @ApiResponse({ status: 401, description: 'JWT ausente, inválido o expirado.' })
+  @ApiResponse({ status: 403, description: 'El usuario no participa en la sesión ni es administrador.' })
+  @ApiResponse({ status: 404, description: 'La sesión no existe.' })
+  async consultarDetalle(
+    @Param('id') idSesion: string,
+    @Req() solicitud: AuthenticatedRequest,
+  ) {
+    return aRespuestaDetalleSesion(
+      await this.detalle.ejecutar(idSesion, solicitud.user.idUsuario, solicitud.user.roles),
+    );
   }
 
   @Patch(':id/accept')

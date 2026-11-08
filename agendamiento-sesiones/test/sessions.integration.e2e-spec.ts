@@ -382,6 +382,143 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     });
   }
 
+  it('consulta un detalle real, serializa BIGINT y no modifica la sesión', async () => {
+    const sesion = await fixture('PENDIENTE_CIERRE');
+    await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {
+      modalidad: 'PRESENCIAL', lugar: 'Biblioteca, sala 2',
+    } });
+    const declaracion = await prisma.declaracion_cierre.create({ data: {
+      id_sesion: sesion.id_sesion, id_usuario: BigInt(tutee),
+      resultado_declarado: 'INASISTENCIA', id_usuario_inasistente: BigInt(tutor),
+    } });
+    const antes = await stateOf(sesion.id_sesion);
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.headers['cache-control']).toBe('no-store');
+    expect(respuesta.body).toMatchObject({
+      id_sesion: sesion.id_sesion.toString(), id_tutor: tutor, id_tutee: tutee,
+      id_materia: materia, id_bloque: '9007199254741000',
+      inicio: sesion.inicio.toISOString(), fin: sesion.fin.toISOString(),
+      datos_encuentro: { modalidad: 'PRESENCIAL', lugar: 'Biblioteca, sala 2', enlace: null },
+      declaraciones: [{ id_declaracion: declaracion.id_declaracion.toString(),
+        id_usuario: tutee, id_usuario_inasistente: tutor, resultado_declarado: 'INASISTENCIA' }],
+      calificaciones: [],
+      acciones_disponibles: { aceptar: false, rechazar: false, cancelar: false,
+        declarar_cierre: false, calificar: false, resolver_conflicto: false },
+    });
+    const contraparte = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutor)}`).expect(200);
+    expect(contraparte.body.acciones_disponibles.declarar_cierre).toBe(true);
+    expect(await stateOf(sesion.id_sesion)).toEqual(antes);
+    expect(await prisma.declaracion_cierre.count()).toBe(1);
+    expect(await prisma.aviso_moderacion_sesion.count()).toBe(0);
+    expect(operacionesBloques).toEqual([]);
+  });
+
+  it('devuelve encuentro sin definir para sesiones existentes y no cambia el contrato de listas', async () => {
+    const sesion = await fixture();
+    const detalle = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(detalle.body.datos_encuentro).toEqual({ modalidad: null, lugar: null, enlace: null });
+    for (const ruta of ['active', 'history']) {
+      const lista = await request(app.getHttpServer()).get(`/sessions/${ruta}`)
+        .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+      expect(Array.isArray(lista.body)).toBe(true);
+      expect(lista.body[0]).not.toHaveProperty('modalidad');
+      expect(lista.body[0]).not.toHaveProperty('datos_encuentro');
+      expect(lista.body[0]).not.toHaveProperty('acciones_disponibles');
+    }
+  });
+
+  it('recupera el enlace persistido y las calificaciones para impedir repetir la propia', async () => {
+    const sesion = await fixture('COMPLETADA');
+    await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {
+      modalidad: 'EN_LINEA', enlace: 'https://meet.example.test/sesion',
+    } });
+    const calificacion = await prisma.calificacion.create({ data: {
+      id_sesion: sesion.id_sesion, id_evaluador: BigInt(tutee), id_evaluado: BigInt(tutor), puntuacion: 4,
+    } });
+    const propia = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(propia.body.datos_encuentro).toEqual({ modalidad: 'EN_LINEA', lugar: null, enlace: 'https://meet.example.test/sesion' });
+    expect(propia.body.calificaciones[0]).toMatchObject({
+      id_calificacion: calificacion.id_calificacion.toString(), id_evaluador: tutee, id_evaluado: tutor, puntuacion: 4,
+    });
+    expect(propia.body.acciones_disponibles.calificar).toBe(false);
+    const otra = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutor)}`).expect(200);
+    expect(otra.body.acciones_disponibles.calificar).toBe(true);
+  });
+
+  it('impide consultar encuentros ajenos aunque se envíe la identidad de un participante en query', async () => {
+    const sesion = await fixture('CONFIRMADA');
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}?id_usuario=${tutee}&roles=ADMINISTRADOR`)
+      .set('Authorization', `Bearer ${token(outsider)}`).expect(403);
+    expect(respuesta.body).not.toHaveProperty('datos_encuentro');
+    expect(respuesta.body).not.toHaveProperty('declaraciones');
+  });
+
+  it.each(['ADMIN', 'ADMINISTRADOR'])('permite consultar y resolver al rol %s sin habilitar acciones ajenas', async (rol) => {
+    const sesion = await fixture('EN_CONFLICTO');
+    const detalle = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(outsider, { roles: [rol] })}`).expect(200);
+    expect(detalle.body.acciones_disponibles).toEqual({ aceptar: false, rechazar: false,
+      cancelar: false, declarar_cierre: false, calificar: false, resolver_conflicto: true });
+  });
+
+  it.each(['0', '-1', '1.5', '01', 'no-es-id', '9223372036854775808'])('el detalle rechaza el ID inválido %s', async (id) => {
+    await request(app.getHttpServer()).get(`/sessions/${id}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(400);
+  });
+
+  it('el detalle responde 404 para una sesión inexistente', async () => {
+    await request(app.getHttpServer()).get('/sessions/9223372036854775807')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(404);
+  });
+
+  it.each(['ausente', 'malformado', 'vencido', 'firma', 'emisor', 'audiencia'])('el detalle rechaza JWT %s', async (tipo) => {
+    const sesion = await fixture();
+    const consulta = request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`);
+    const valores: Record<string, string> = {
+      malformado: 'invalido', vencido: token(tutee, { exp: 1 }),
+      firma: token(tutee, {}, 'otro-secreto'), emisor: token(tutee, { iss: 'otro' }),
+      audiencia: token(tutee, { aud: 'otra' }),
+    };
+    if (tipo !== 'ausente') consulta.set('Authorization', `Bearer ${valores[tipo]}`);
+    await consulta.expect(401);
+  });
+
+  it('refleja las acciones reales después de aceptar y cancelar mediante las rutas existentes', async () => {
+    const id = await crearSesionReservada();
+    const detalle = (usuario: string) => request(app.getHttpServer()).get(`/sessions/${id}`)
+      .set('Authorization', `Bearer ${token(usuario)}`);
+    const pendienteTutor = await detalle(tutor).expect(200);
+    expect(pendienteTutor.body.acciones_disponibles).toMatchObject({ aceptar: true, rechazar: true, cancelar: false });
+    const pendienteEstudiante = await detalle(tutee).expect(200);
+    expect(pendienteEstudiante.body.acciones_disponibles).toMatchObject({ aceptar: false, rechazar: false, cancelar: true });
+    await act(id, 'accept').expect(200);
+    const confirmada = await detalle(tutee).expect(200);
+    expect(confirmada.body.estado_sesion).toBe('CONFIRMADA');
+    expect(confirmada.body.acciones_disponibles.cancelar).toBe(true);
+    await act(id, 'cancel', tutee).expect(200);
+    const cancelada = await detalle(tutor).expect(200);
+    expect(cancelada.body.estado_sesion).toBe('CANCELADA');
+    expect(Object.values(cancelada.body.acciones_disponibles)).not.toContain(true);
+    expect(estadoBloque).toBe('DISPONIBLE');
+  });
+
+  it('documenta el detalle y sus errores en Swagger', () => {
+    const documento = SwaggerModule.createDocument(app, new DocumentBuilder().addBearerAuth().build());
+    const operacion = documento.paths['/sessions/{id}']?.get;
+    expect(operacion?.security).toEqual([{ bearer: [] }]);
+    expect(Object.keys(operacion!.responses)).toEqual(['200', '400', '401', '403', '404']);
+    const esquema = documento.components!.schemas!.DetalleSesionResponseDto;
+    expect(esquema).toHaveProperty('properties.datos_encuentro');
+    expect(esquema).toHaveProperty('properties.declaraciones');
+    expect(esquema).toHaveProperty('properties.calificaciones');
+    expect(esquema).toHaveProperty('properties.acciones_disponibles');
+  });
+
   it('consulta las sesiones activas propias como estudiante, con orden estable y sin alterar el historial', async () => {
     const confirmada = await fixture('CONFIRMADA', '2099-06-21');
     const pendiente = await fixture('PENDIENTE', '2099-06-20');

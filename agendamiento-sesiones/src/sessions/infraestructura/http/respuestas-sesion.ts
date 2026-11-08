@@ -1,6 +1,22 @@
 import type { Sesion } from '../../dominio/entidades/sesion';
 import type { DeclaracionCierre } from '../../dominio/entidades/declaracion-cierre';
 import type { Calificacion } from '../../dominio/entidades/calificacion';
+import type { ConsultarDetalleSesion } from '../../aplicacion/casos-de-uso/consultar-detalle-sesion';
+
+export function aRespuestaDetalleSesion(resultado: Awaited<ReturnType<ConsultarDetalleSesion['ejecutar']>>) {
+  const { sesion, acciones_disponibles } = resultado;
+  return {
+    ...aRespuestaSesion(sesion),
+    datos_encuentro: {
+      modalidad: sesion.modalidad,
+      lugar: sesion.lugar,
+      enlace: sesion.enlace,
+    },
+    declaraciones: sesion.declaraciones.map(aRespuestaDeclaracion),
+    calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
+    acciones_disponibles,
+  };
+}
 
 export function aRespuestaSesion(session: Sesion) {
   return {
