@@ -26,6 +26,7 @@ Los consumidores importan el guard y el DTO de correo directamente desde `infrae
 
 | Método y ruta                                | Acceso                   | Resultado                                       |
 | -------------------------------------------- | ------------------------ | ----------------------------------------------- |
+| `POST /usuarios/registro` | Público | Cuenta inactiva y solicitud automática del primer enlace. |
 | `POST /auth/login`                           | Público                  | JWT y datos públicos del usuario.               |
 | `POST /usuarios/login`                       | Público                  | Mismo flujo y respuesta que Auth.               |
 | `GET /usuarios/:id` | JWT y sesión vigentes | Datos públicos de un usuario; 404 si no existe. |
@@ -37,11 +38,19 @@ Los consumidores importan el guard y el DTO de correo directamente desde `infrae
 
 El login recibe `correo_institucional` y `password`. Devuelve `usuario`, `access_token`, `token_type`, `expires_in` y `mensaje`, sin incluir la contraseña ni su hash.
 
-Se rechazan credenciales incorrectas (401), cuentas suspendidas (403) y cuentas inactivas (403). Una cuenta ACTIVO con correo aún sin verificar conserva el acceso anterior; conectar registro y verificación de correo queda como tarea separada.
+Se rechazan credenciales incorrectas (401), cuentas suspendidas (403), correos sin verificar (403, `AUTH_EMAIL_NOT_VERIFIED`) y cuentas inactivas (403). La creación y validación de sesiones en Auth exigen cuenta ACTIVO y correo verificado, incluidas las cuentas anteriores al cambio.
 
 El guard verifica HS256, emisor, audiencia e identidad, además de la sesión persistida, su expiración, revocación y estado vigente de la cuenta. El token tiene vencimiento absoluto. Una sesión inactiva se revoca cuando se intenta utilizar nuevamente.
 
 El endpoint interno admite `{ "estado": "SUSPENDIDO" }` o `{ "estado": "ACTIVO" }`. Suspensión y revocación se realizan en una transacción. Login y suspensión toman el mismo bloqueo de cuenta para impedir la creación de sesiones después de suspender. Reactivar no recupera sesiones revocadas: requiere un login nuevo.
+
+## Registro y activación (S1)
+
+- El registro normaliza nombre y correo, valida el dominio institucional, guarda la contraseña hasheada y crea `INACTIVO`, `correo_verificado=false` y rol ESTUDIANTE. Después solicita el primer enlace mediante el servicio de verificación existente.
+- La respuesta sigue siendo 201 con `id`, `nombre`, `correo` y `estado`; añade `verificacion` y `mensaje`. `ENLACE_GENERADO` indica que el adaptador SMTP o de logs procesó el enlace. No se devuelve el token ni un JWT.
+- Si falla la entrega, conserva la cuenta inactiva y responde 201 con `verificacion=PENDIENTE_ENVIO`. Se recupera con `POST /auth/reenviar-verificacion`, sin repetir el registro. El error interno de SMTP no se expone.
+- La confirmación válida marca el correo como verificado y activa solo cuentas INACTIVO; una cuenta suspendida permanece suspendida. Se conservan vencimiento, uso único y respuestas de error de los enlaces.
+- Con `SMTP_DISABLED=true`, el primer enlace aparece automáticamente en los logs de Auth; con `false`, se envía por SMTP. No se cambian los datos de las cuentas existentes ni se requieren migraciones. La adaptación de Web corresponde a S2.
 
 ## Asignación de TUTOR (U1)
 
@@ -87,7 +96,7 @@ Swagger se publica en `/api` solo cuando `NODE_ENV` es distinto de `production`.
 
 Las rutas CRUD y la autorización de `roles` y `usuario-rol` siguen pendientes de la decisión del equipo. Se retiró el CRUD antiguo `GET/POST /verificacion-correo`, sin consumidores encontrados en el proyecto; ambas rutas responden 404. La verificación se mantiene bajo `/auth/reenviar-verificacion` y `/auth/verificar-correo`.
 
-El registro conserva su contrato y la validación global existente. No envía automáticamente el enlace de verificación. `GET /usuarios` consulta únicamente los IDs solicitados; no expone un listado general. La antigua ruta raíz `POST /usuarios` no forma parte del controlador actual.
+`GET /usuarios` consulta únicamente los IDs solicitados; no expone un listado general. La antigua ruta raíz `POST /usuarios` no forma parte del controlador actual.
 
 ## Configuración y comprobación
 

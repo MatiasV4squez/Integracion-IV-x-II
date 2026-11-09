@@ -71,21 +71,46 @@ describe('AuthService con puertos sustituidos', () => {
       login.login(usuario.correo_institucional, 'contraseña'),
     ).rejects.toMatchObject({ status: 403 });
   });
-  it('conserva el login de cuentas activas con correo aún sin verificar', async () => {
+  it.each(['ACTIVO', 'INACTIVO'])(
+    'rechaza cuentas %s sin verificar antes de emitir o guardar un JWT',
+    async (estado) => {
+      usuarios.buscarPorCorreo.mockResolvedValueOnce(
+        new Usuario(
+          usuario.id_usuario,
+          usuario.nombre,
+          usuario.correo_institucional,
+          usuario.password_hash,
+          estado,
+          false,
+          usuario.roles,
+        ),
+      );
+      await expect(
+        login.login(usuario.correo_institucional, 'contraseña'),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'AUTH_EMAIL_NOT_VERIFIED' },
+      });
+      expect(tokens.emitir).not.toHaveBeenCalled();
+      expect(repositorioSesiones.crearSiCuentaActiva).not.toHaveBeenCalled();
+    },
+  );
+
+  it('mantiene el bloqueo por suspension aunque el correo no este verificado', async () => {
     usuarios.buscarPorCorreo.mockResolvedValueOnce(
       new Usuario(
         usuario.id_usuario,
         usuario.nombre,
         usuario.correo_institucional,
         usuario.password_hash,
-        usuario.estado_cuenta,
+        'SUSPENDIDO',
         false,
         usuario.roles,
       ),
     );
-    expect(
-      (await login.login(usuario.correo_institucional, 'contraseña'))
-        .access_token,
-    ).toBe('token-simulado');
+    await expect(
+      login.login(usuario.correo_institucional, 'contraseña'),
+    ).rejects.toMatchObject({ response: { code: 'AUTH_ACCOUNT_SUSPENDED' } });
+    expect(tokens.emitir).not.toHaveBeenCalled();
   });
 });

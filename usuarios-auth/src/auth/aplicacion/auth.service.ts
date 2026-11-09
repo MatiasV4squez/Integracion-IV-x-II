@@ -60,6 +60,14 @@ export class AuthService {
         message: 'La cuenta se encuentra suspendida.',
       });
     }
+    if (!usuario.correo_verificado) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'AUTH_EMAIL_NOT_VERIFIED',
+        message:
+          'Debes verificar tu correo institucional antes de iniciar sesión.',
+      });
+    }
     if (usuario.estado_cuenta !== 'ACTIVO') {
       throw new ForbiddenException({
         statusCode: 403,

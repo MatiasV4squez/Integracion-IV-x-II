@@ -109,7 +109,11 @@ export class PrismaAuthRepository
   ): Promise<boolean> {
     // Login y suspensión toman el mismo bloqueo para impedir sesiones posteriores a la suspensión.
     const cuenta = await tx.usuario.updateMany({
-      where: { id_usuario: idUsuario, estado_cuenta: 'ACTIVO' },
+      where: {
+        id_usuario: idUsuario,
+        estado_cuenta: 'ACTIVO',
+        correo_verificado: true,
+      },
       data: { estado_cuenta: 'ACTIVO' },
     });
     return cuenta.count === 1;
