@@ -29,7 +29,7 @@ model sesion {
   calificaciones        calificacion[]
   liberacion_bloque      liberacion_bloque_sesion?
   avisos_moderacion      aviso_moderacion_sesion[]
-
+  fecha_confirmacion    DateTime? @db.Timestamptz(3)
   @@index([id_tutee, estado_sesion])
   @@index([id_tutor, inicio, fin])
   @@index([estado_sesion, fecha_creacion])

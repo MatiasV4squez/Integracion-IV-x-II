@@ -15,6 +15,7 @@ describe('Consulta del detalle mediante un puerto', () => {
       inicio: new Date('2026-11-10T13:00:00Z'), fin: new Date('2026-11-10T14:00:00Z'),
       fecha_creacion: ahora, fecha_actualizacion: ahora, resultado_provisional: false,
       modalidad: null, lugar: null, enlace: null, declaraciones: [], calificaciones: [],
+      fecha_confirmacion: null,
     };
     buscar = jest.fn().mockResolvedValue(sesion);
     consulta = new ConsultarDetalleSesion({ buscarPorId: buscar }, { ahora: () => ahora });

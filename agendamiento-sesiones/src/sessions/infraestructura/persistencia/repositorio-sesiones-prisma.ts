@@ -106,7 +106,14 @@ export class RepositorioSesionesPrisma implements RepositorioSesiones {
         id_sesion: sesion.id_sesion,
         estado_sesion: sesion.estado_sesion,
       },
-      data: { estado_sesion: nuevoEstado, resultado_provisional: provisional },
+      data: {
+        estado_sesion: nuevoEstado,
+        resultado_provisional: provisional,
+        ...(sesion.estado_sesion === 'PENDIENTE' && nuevoEstado === 'CONFIRMADA'
+          ? {fecha_confirmacion: new Date()}
+          : {}),
+    },
+
     });
     if (resultado.count !== 1) return null;
     return this.cliente.sesion.findUniqueOrThrow({

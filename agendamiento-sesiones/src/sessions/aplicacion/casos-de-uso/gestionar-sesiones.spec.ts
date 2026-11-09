@@ -107,6 +107,7 @@ describe('Gestionar sesiones mediante puertos', () => {
       fin: new Date('2099-01-01T11:00:00Z'),
       fecha_creacion: new Date(),
       fecha_actualizacion: new Date(),
+      fecha_confirmacion: null,
       resultado_provisional: false,
     };
     jest.mocked(contexto.sesiones.buscarPorId).mockResolvedValue(sesion);

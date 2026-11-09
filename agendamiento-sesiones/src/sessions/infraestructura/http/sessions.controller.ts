@@ -11,6 +11,7 @@ import { GestionarSesiones } from '../../aplicacion/casos-de-uso/gestionar-sesio
 import { ConsultarDetalleSesion } from '../../aplicacion/casos-de-uso/consultar-detalle-sesion';
 import { DetalleSesionResponseDto } from './detalle-sesion.response.dto';
 import { ErrorSesionFilter } from './error-sesion.filter';
+import { IntegracionSecretGuard } from '../../../auth/integracion-secret.guard';
 import { aRespuestaSesion, aRespuestaDeclaracion, aRespuestaCalificacion, aRespuestaDetalleSesion } from './respuestas-sesion';
 
 @ApiTags('Sessions')
@@ -255,5 +256,12 @@ export class SessionsController {
       request.user.idUsuario,
     );
     return aRespuestaSesion(sesion);
+  }
+
+  @Get(':id/validacion-reporte')
+  @UseGuards(IntegracionSecretGuard)
+  @Header('Cache-Control', 'no-store')
+  consultarValidacionReporte(@Param('id') idSesion: string) {
+    return this.sesiones.consultarValidacionReporte(idSesion);
   }
 }

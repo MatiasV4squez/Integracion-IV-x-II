@@ -260,6 +260,32 @@ export class GestionarSesiones {
     return { sesion: resultado.sesion, declaracion: resultado.declaracion };
   }
 
+  async consultarValidacionReporte(idSesion: string) {
+    const id = interpretarIdentificador(idSesion, 'id_sesion');
+    const sesion = await this.sesiones.buscarPorId(id);
+
+    if (!sesion) {
+      throw new ErrorSesion('NO_ENCONTRADA', 'La sesion no existe.');
+    }
+
+    const estadosConConfirmacion: EstadoSesion[] = [
+      'CONFIRMADA',
+      'PENDIENTE_CIERRE',
+      'COMPLETADA',
+      'NO_REALIZADA',
+      'INASISTENCIA',
+      'EN_CONFLICTO',
+    ];
+
+    return {
+      alcanzo_estado_confirmada:
+        sesion.fecha_confirmacion !== null ||
+        estadosConConfirmacion.includes(sesion.estado_sesion),
+      id_tutor: sesion.id_tutor.toString(),
+      id_tutee: sesion.id_tutee.toString(),
+    };
+  }
+
   consultarHistorial(idUsuario: string) {
     return this.sesiones.consultarHistorial(
       interpretarIdentificador(idUsuario, 'id_usuario'),
