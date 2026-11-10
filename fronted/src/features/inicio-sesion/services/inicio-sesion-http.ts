@@ -49,7 +49,11 @@ export const inicioSesionHttp: InicioSesionPuerto = {
     if (respuesta.status === 400) throw new ErrorInicioSesion('invalido')
     if (respuesta.status === 401) throw new ErrorInicioSesion('credenciales')
     if (respuesta.status === 403) {
-      throw new ErrorInicioSesion(await leerCodigoError(respuesta) === 'AUTH_ACCOUNT_SUSPENDED' ? 'suspendida' : 'inactiva')
+      const codigo = await leerCodigoError(respuesta)
+      const estado = codigo === 'AUTH_EMAIL_NOT_VERIFIED' ? 'pendiente'
+        : codigo === 'AUTH_ACCOUNT_SUSPENDED' ? 'suspendida'
+        : codigo === 'AUTH_ACCOUNT_INACTIVE' ? 'inactiva' : 'error'
+      throw new ErrorInicioSesion(estado)
     }
     throw new ErrorInicioSesion('error')
   },

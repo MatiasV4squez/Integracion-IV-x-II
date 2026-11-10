@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useLocation, useSearchParams } from 'react-router'
 import { ErrorVerificacion, type VerificacionCuentaPuerto } from '../aplicacion/verificacion-cuenta.puerto'
-import { leerVistaVerificacion, type EstadoVerificacion } from '../models/estado-verificacion'
+import { leerContextoVerificacion, leerVistaVerificacion, type EstadoVerificacion } from '../models/estado-verificacion'
 import VerificacionCuentaPage from '../pages/VerificacionCuentaPage'
 
 export default function VerificacionCuentaContainer({ api }: { api: VerificacionCuentaPuerto }) {
   const [parametros] = useSearchParams()
+  const ubicacion = useLocation()
+  const contexto = leerContextoVerificacion(ubicacion.state)
   const tokens = parametros.getAll('token')
   const vista = parametros.get('vista')
   const demostracion = import.meta.env.DEV && !tokens.length && vista !== null
-  return <Verificacion key={parametros.toString()} api={api} token={tokens[0] ?? null}
-    inicial={demostracion ? leerVistaVerificacion(vista, true) : tokens.length > 1 || tokens[0] === '' ? 'invalida' : 'pendiente'}
+  return <Verificacion key={ubicacion.key + parametros.toString()} api={api} token={tokens[0] ?? null} correo={contexto.correo}
+    inicial={demostracion ? leerVistaVerificacion(vista, true) : tokens.length > 1 || tokens[0] === '' ? 'invalida'
+      : tokens.length ? 'pendiente' : contexto.estado}
     demostracion={demostracion} />
 }
 
-function Verificacion({ api, token, inicial, demostracion }: {
-  api: VerificacionCuentaPuerto; token: string | null; inicial: EstadoVerificacion; demostracion: boolean
+function Verificacion({ api, token, inicial, demostracion, correo }: {
+  api: VerificacionCuentaPuerto; token: string | null; inicial: EstadoVerificacion; demostracion: boolean; correo: string
 }) {
   const [estado, setEstado] = useState(inicial)
   const [reenvio, setReenvio] = useState<'inactivo' | 'enviando' | 'enviado' | 'error'>('inactivo')
@@ -42,7 +45,7 @@ function Verificacion({ api, token, inicial, demostracion }: {
     }
   }
 
-  return <VerificacionCuentaPage estado={estado} demostracion={demostracion} reenvio={reenvio}
+  return <VerificacionCuentaPage estado={estado} demostracion={demostracion} reenvio={reenvio} correoInicial={correo}
     confirmar={token && inicial !== 'invalida' && reenvio !== 'enviado' && (estado === 'pendiente' || estado === 'error')
       ? () => { void ejecutar('confirmar', token) } : undefined}
     reenviar={(correo) => { void ejecutar('reenviar', correo) }} />

@@ -17,7 +17,7 @@ npm.cmd run dev -- --port 5173 --strictPort
 
 Abre `http://localhost:5173/login`, `/registro` o `/verificar-cuenta`.
 En desarrollo, prueba `/verificar-cuenta?vista=verificada` cambiando el valor por
-`pendiente`, `verificando`, `vencida`, `invalida`, `utilizada` o `error`. Son demostraciones:
+`pendiente`, `registrada`, `envio_pendiente`, `verificando`, `vencida`, `invalida`, `utilizada` o `error`. Son demostraciones:
 no validan tokens, no llaman a la API ni modifican cuentas. En producción se ignora
 el parámetro de demostración. Un token real siempre prevalece sobre `vista`.
 La barra de vistas del equipo se habilita
@@ -49,20 +49,26 @@ PORT=3002
 EMAIL_VERIFICATION_URL=http://localhost:5173/verificar-cuenta
 ```
 
-Auth necesita además su base de datos, SMTP y secretos ya configurados. El enlace
+Auth necesita además su base de datos y secretos ya configurados. Con
+`SMTP_DISABLED=true` el enlace aparece en los logs de Auth; con `false`, se envía
+por el SMTP configurado. Web no necesita conocer ese ajuste. El enlace
 del correo debe apuntar a la web; las peticiones de la web apuntan al Gateway.
 Reinicia los procesos después de cambiar sus variables.
 
-1. Inicia Auth, Gateway y la web. Abre `/verificar-cuenta`, introduce el correo de
-   una cuenta de prueba sin verificar y pulsa **Solicitar nuevo enlace**.
-2. En Red del navegador comprueba `POST /api/usuarios-auth/auth/reenviar-verificacion`,
-   cuerpo `{ "correo_institucional": "..." }` y respuesta `202`. El mensaje es
-   neutro tanto si la cuenta existe como si no; no garantiza la entrega del correo.
+1. Inicia Auth, Gateway y la web. Registra una cuenta nueva en `/registro` con
+   dominio `@alu.uct.cl`. El `201` lleva a `/verificar-cuenta` con el correo precargado.
+   Auth genera el primer enlace automáticamente. Si devuelve `PENDIENTE_ENVIO`,
+   se informa que la cuenta existe y que hay que solicitar otro enlace.
+2. Intenta iniciar sesión antes de confirmar: `403 AUTH_EMAIL_NOT_VERIFIED` muestra
+   el aviso de correo pendiente y un acceso a verificación. **Solicitar nuevo enlace**
+   es opcional y llama a `POST /api/usuarios-auth/auth/reenviar-verificacion` (`202`).
+   Su mensaje es neutro: no confirma que la cuenta exista ni garantiza la entrega.
 3. Abre el enlace recibido (`/verificar-cuenta?token=...`) y pulsa **Confirmar correo**.
    Debe salir un único `POST /api/usuarios-auth/auth/verificar-correo`, cuerpo
    `{ "token": "..." }`, sin JWT. El `200` muestra la confirmación; la pantalla no
    inicia sesión automáticamente.
-4. Recarga el mismo enlace y vuelve a confirmar: `409` muestra enlace utilizado.
+4. Inicia sesión después de confirmar. Una cuenta suspendida permanece bloqueada.
+   Recarga el mismo enlace y vuelve a confirmar: `409` muestra enlace utilizado.
    Un token inexistente da `400`; uno vencido da `410`. Usa cuentas y enlaces de
    prueba para estos casos. Apaga Auth para comprobar el error de comunicación.
 
@@ -70,12 +76,14 @@ Las llamadas tienen un límite de 15 segundos, se cancelan al salir y no se
 reintentan automáticamente. Abrir o recargar el enlace no consume el token: se
 requiere pulsar Confirmar. Tras solicitar otro enlace hay que abrir el más reciente.
 Las vistas `?vista=...` sin token solo permiten revisar el diseño en desarrollo y
-deshabilitan las acciones. El login del equipo conserva su integración pendiente:
-esta tarea conecta únicamente la verificación y el reenvío.
+deshabilitan las acciones. Entrar o recargar la espera no envía otro enlace.
+El correo y el resultado de envío se trasladan por el estado de navegación;
+no se guardan contraseñas ni tokens de sesión durante el registro.
 
-Se comprobó el recorrido desde Chrome con el Gateway y el controlador/servicio
-reales de Auth, sustituyendo persistencia y SMTP por datos en memoria. Esto cubre
-confirmación, reenvío y errores; no comprueba la entrega con un proveedor SMTP real.
+S2 se comprobó en Chrome con respuestas simuladas del Gateway: registro, espera,
+recarga, login pendiente, reenvío, confirmación y acceso posterior. También cubre
+fallo de entrega, suspensión y enlaces inválidos, vencidos o utilizados, incluida
+la espera en móvil. Esta comprobación no envía correos ni modifica cuentas reales.
 
 Para ejecutar las pruebas sin servicios, configura la base pública utilizada por
 sus respuestas HTTP simuladas: `$env:VITE_API_BASE_URL = 'http://localhost:8080/api'`;
@@ -223,9 +231,11 @@ la cancelación y el estado del resultado; `pages/RegistroUsuarioPage.tsx` prese
 el formulario, el resultado y los errores; `utils/validar-registro.ts` y `models/`
 contienen las validaciones y los mensajes. `AppRoutes` conecta el adaptador.
 
-La llamada es `POST /api/usuarios-auth/auth/registro` en el Gateway, con cuerpo
-`{ "nombre": "...", "correo_institucional": "...", "contrasena": "..." }`, sin JWT
-ni credenciales. Solo un `201` se considera cuenta creada; un `400` se presenta
+La llamada es `POST /api/usuarios-auth/usuarios/registro` en el Gateway, con cuerpo
+`{ "nombre": "...", "correo_institucional": "...", "password_hash": "..." }`;
+`password_hash` recibe la contraseña y Auth calcula el hash. No envía JWT
+ni credenciales de cookies. El `201` debe incluir `estado=INACTIVO`, el correo
+registrado y `verificacion=ENLACE_GENERADO` o `PENDIENTE_ENVIO`; un `400` se presenta
 como datos rechazados, un `409` como correo ya registrado y cualquier otro estado,
 fallo de red o timeout como error genérico, sin exponer detalles internos. No hay
 reintentos automáticos, la espera está limitada a quince segundos, salir de la
@@ -233,10 +243,11 @@ pantalla cancela la petición y el contenedor bloquea envíos simultáneos, incl
 el doble clic.
 
 Antes de enviar, la web valida el nombre (obligatorio, hasta 120 caracteres), el
-correo (formato y hasta 254 caracteres), la contraseña (8 a 128 caracteres) y la
+correo (dominio `@alu.uct.cl` y hasta 254 caracteres), la contraseña (8 a 128 caracteres) y la
 confirmación coincidente; la validación definitiva de negocio permanece en Auth.
-El éxito no inicia sesión automáticamente: muestra la confirmación y enlaza a la
-verificación de correo y al login.
+El éxito lleva a la espera de verificación y no inicia sesión automáticamente.
+El login distingue correo sin verificar, suspensión y cuenta inactiva mediante
+los códigos de Auth; un `403` desconocido se presenta como error genérico.
 
 `test/registro-usuario.test.mjs` cubre las validaciones, el contrato HTTP con
 normalización de nombre y correo, la distinción 400/409/fallos, la ausencia de

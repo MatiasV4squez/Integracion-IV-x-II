@@ -70,7 +70,9 @@ test('diferencia datos rechazados, credenciales, cuentas no disponibles y fallos
     [401, { code: 'AUTH_INVALID_CREDENTIALS', message: 'Correo o contraseña incorrectos.' }, 'credenciales'],
     [403, { code: 'AUTH_ACCOUNT_SUSPENDED' }, 'suspendida'],
     [403, { code: 'AUTH_ACCOUNT_INACTIVE' }, 'inactiva'],
-    [403, 'sin json', 'inactiva'],
+    [403, { code: 'AUTH_EMAIL_NOT_VERIFIED' }, 'pendiente'],
+    [403, { code: 'DESCONOCIDO' }, 'error'],
+    [403, 'sin json', 'error'],
     [429, {}, 'error'],
     [502, 'detalle interno', 'error'],
   ]
@@ -166,6 +168,7 @@ test('muestra el estado del envío y los errores del inicio de sesión', () => {
   for (const [envio, esperado] of [
     ['credenciales', /Correo o contraseña incorrectos/],
     ['suspendida', /Tu cuenta está suspendida/],
+    ['pendiente', /Debes verificar tu correo antes de iniciar sesión/],
     ['inactiva', /Tu cuenta aún no está activa/],
     ['invalido', /No pudimos validar tus datos/],
     ['error', /No pudimos iniciar sesión/],
@@ -179,6 +182,11 @@ test('muestra el estado del envío y los errores del inicio de sesión', () => {
   assert.match(enviando, /Iniciando sesión…/)
   assert.match(enviando, /disabled/)
   assert.doesNotMatch(pagina('inactivo'), /role="alert"/)
+  assert.match(pagina('pendiente'), /href="\/verificar-cuenta"[^>]*>Verificar mi correo/)
+  for (const estado of ['suspendida', 'inactiva', 'credenciales', 'error']) {
+    assert.doesNotMatch(pagina(estado), />Verificar mi correo</)
+  }
+  assert.doesNotMatch(pagina('inactiva'), /Abre el enlace de verificación/)
 })
 
 test('la cabecera identifica al usuario por su nombre y permite cerrar sesión', () => {

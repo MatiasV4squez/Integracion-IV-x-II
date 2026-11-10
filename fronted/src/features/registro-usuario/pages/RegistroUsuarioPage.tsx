@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { AccesoLayout } from '../../../shared/layout/AccesoLayout'
-import { LONGITUD_MAXIMA_CORREO } from '../../../shared/utils/validaciones-formulario'
+import { LONGITUD_MAXIMA_CORREO, normalizarCorreo } from '../../../shared/utils/validaciones-formulario'
 import type { DatosRegistroUsuario, FormularioRegistroUsuario } from '../models/datos-registro'
 import { MENSAJES_RESULTADO_REGISTRO, type EstadoEnvioRegistro } from '../models/estado-registro'
 import {
@@ -28,8 +28,7 @@ export default function RegistroUsuarioPage({ envio, registrar }: {
   const [formulario, setFormulario] = useState(FORMULARIO_INICIAL)
   const [errores, setErrores] = useState<ErroresRegistro>({})
   const enviando = envio === 'enviando'
-  const exitoso = envio === 'exitoso'
-  const resultado = exitoso || envio === 'invalido' || envio === 'duplicado' || envio === 'error'
+  const resultado = envio === 'invalido' || envio === 'duplicado' || envio === 'error'
     ? MENSAJES_RESULTADO_REGISTRO[envio] : undefined
 
   function cambiar(campo: CampoRegistro) {
@@ -66,47 +65,45 @@ export default function RegistroUsuarioPage({ envio, registrar }: {
     <AccesoLayout
       idTitulo="registro-titulo"
       pestanaActiva="register"
-      titulo={exitoso && resultado ? resultado.titulo : 'Crea tu cuenta'}
-      descripcion={exitoso && resultado ? resultado.detalle : 'Regístrate con tu correo institucional.'}
+      titulo="Crea tu cuenta"
+      descripcion="Regístrate con tu correo institucional."
       cargando={enviando}
       anunciarEstado
     >
-      {resultado && !exitoso && (
+      {resultado && (
         <p className="registro-resultado" role="alert">
           <strong>{resultado.titulo}.</strong> {resultado.detalle}
         </p>
       )}
-      {!exitoso && (
-        <form className="registro-formulario" onSubmit={enviar} noValidate>
-          {CAMPOS.map(({ campo, etiqueta, tipo, autoComplete, placeholder, maximo }) => (
-            <div className="registro-campo" key={campo}>
-              <label htmlFor={`registro-${campo}`}>{etiqueta}</label>
-              <input
-                type={tipo}
-                id={`registro-${campo}`}
-                name={campo}
-                autoComplete={autoComplete}
-                placeholder={placeholder}
-                maxLength={maximo}
-                required
-                disabled={enviando}
-                value={formulario[campo]}
-                onChange={cambiar(campo)}
-                aria-invalid={errores[campo] ? true : undefined}
-                aria-describedby={errores[campo] ? `error-registro-${campo}` : undefined}
-              />
-              {errores[campo] && (
-                <p id={`error-registro-${campo}`} className="registro-campo__error" role="alert">{errores[campo]}</p>
-              )}
-            </div>
-          ))}
-          <button type="submit" className="boton-global boton-global--primario" disabled={enviando}>
-            {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
-          </button>
-        </form>
-      )}
-      {exitoso && <Link to="/login" className="boton-global boton-global--primario">Ir a iniciar sesión <span aria-hidden="true">→</span></Link>}
-      {exitoso && <Link to="/verificar-cuenta" className="boton-global boton-global--secundario">Solicitar enlace de verificación</Link>}
+      <form className="registro-formulario" onSubmit={enviar} noValidate>
+        {CAMPOS.map(({ campo, etiqueta, tipo, autoComplete, placeholder, maximo }) => (
+          <div className="registro-campo" key={campo}>
+            <label htmlFor={`registro-${campo}`}>{etiqueta}</label>
+            <input
+              type={tipo}
+              id={`registro-${campo}`}
+              name={campo}
+              autoComplete={autoComplete}
+              placeholder={placeholder}
+              maxLength={maximo}
+              required
+              disabled={enviando}
+              value={formulario[campo]}
+              onChange={cambiar(campo)}
+              aria-invalid={errores[campo] ? true : undefined}
+              aria-describedby={errores[campo] ? `error-registro-${campo}` : undefined}
+            />
+            {errores[campo] && (
+              <p id={`error-registro-${campo}`} className="registro-campo__error" role="alert">{errores[campo]}</p>
+            )}
+          </div>
+        ))}
+        <button type="submit" className="boton-global boton-global--primario" disabled={enviando}>
+          {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
+        </button>
+      </form>
+      {envio === 'duplicado' && <Link to="/verificar-cuenta" state={{ correo: normalizarCorreo(formulario.correo) }}
+        className="boton-global boton-global--secundario">Verificar mi correo</Link>}
     </AccesoLayout>
   )
 }

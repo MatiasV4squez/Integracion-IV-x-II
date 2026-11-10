@@ -1,9 +1,4 @@
 export const MENSAJES_RESULTADO_REGISTRO = {
-  exitoso: {
-    titulo: '¡Cuenta creada!',
-    // Auth no envía el enlace al registrar: se solicita desde Verificar cuenta.
-    detalle: 'Ya puedes iniciar sesión. Para verificar tu correo institucional, solicita el enlace de verificación.',
-  },
   invalido: {
     titulo: 'No pudimos crear tu cuenta',
     detalle: 'Revisa los datos ingresados e inténtalo nuevamente.',
