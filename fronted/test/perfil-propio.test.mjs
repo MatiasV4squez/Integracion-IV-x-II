@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
 import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
-let vite, api, formulario, Page, AppRoutes, actualizarNombreUsuario
+let vite, api, formulario, Page, AppRoutes, actualizarNombreUsuario, MenuUsuario
 const fetchOriginal = globalThis.fetch
 const sesion = { token: 'token-perfil', idUsuario: '23', roles: ['ESTUDIANTE'], expiraEn: Date.now() + 3600000 }
 const perfil = {
@@ -27,6 +27,7 @@ before(async () => {
   ;({ default: Page } = await vite.ssrLoadModule('/src/features/perfil/pages/PerfilPage.tsx'))
   ;({ AppRoutes } = await vite.ssrLoadModule('/src/app/AppRoutes.tsx'))
   ;({ actualizarNombreUsuario } = await vite.ssrLoadModule('/src/shared/auth/usuario-autenticado.ts'))
+  ;({ MenuUsuario } = await vite.ssrLoadModule('/src/shared/layout/MenuUsuario.tsx'))
 })
 afterEach(() => { globalThis.fetch = fetchOriginal })
 after(async () => { await vite?.close() })
@@ -58,7 +59,7 @@ test('descarta perfiles de otro usuario o con datos fuera de los límites', asyn
 test('distingue sesión vencida, cuenta inexistente, datos rechazados y fallos de conexión', async () => {
   for (const [status, tipo, mensaje] of [
     [401, 'sesion', /sesión/], [404, 'no-encontrado', /No encontramos tu cuenta/],
-    [400, 'invalido', /no son válidos/], [503, 'consulta', /No pudimos cargar tu perfil/],
+    [400, 'consulta', /No pudimos cargar tu perfil/], [503, 'consulta', /No pudimos cargar tu perfil/],
   ]) {
     globalThis.fetch = async () => Response.json({ message: 'detalle interno' }, { status })
     await assert.rejects(api.consultarPerfil(sesion), (error) => {
@@ -87,6 +88,13 @@ test('guarda solo los cambios con PATCH y no envía una edición vacía', async 
   assert.equal(llamadas[0].opciones.headers['Content-Type'], 'application/json')
   assert.equal(llamadas[0].opciones.headers.Authorization, 'Bearer ' + sesion.token)
   assert.deepEqual(JSON.parse(llamadas[0].opciones.body), { carrera: null, asignaturas_interes: ['9'] })
+
+  globalThis.fetch = async () => Response.json({ message: ['nombre must be a string'] }, { status: 400 })
+  await assert.rejects(api.actualizarPerfil(sesion, { nombre: 'x' }), (error) => {
+    assert.equal(error.tipo, 'invalido', 'Al guardar, un 400 sí indica datos rechazados')
+    assert.match(error.message, /no son válidos/)
+    return true
+  })
 
   globalThis.fetch = () => { assert.fail('No debe enviar una edición sin cambios') }
   await assert.rejects(api.actualizarPerfil(sesion, {}), /No hay cambios/)
@@ -130,7 +138,7 @@ const casilla = (html, id, atributo) =>
 const render = (propiedades = {}) => renderToStaticMarkup(createElement(MemoryRouter, null, createElement(Page, {
   consulta: { estado: 'listo', perfil }, materias, cargandoMaterias: false, editando: false,
   guardado: { estado: 'inactivo' },
-  onReintentar() {}, onEditar() {}, onCancelar() {}, onGuardar() {},
+  onReintentar() {}, onEditar() {}, onCancelar() {}, onGuardar() {}, onIniciarSesionNuevamente() {},
   ...propiedades,
 })))
 
@@ -160,7 +168,33 @@ test('presenta la carga y los errores; solo ofrece reintentar ante fallos de con
   const fallo = render({ consulta: { estado: 'error', mensaje: 'No pudimos cargar tu perfil. Inténtalo de nuevo.', tipo: 'consulta' } })
   assert.match(fallo, /role="alert"/)
   assert.match(fallo, />Reintentar</)
-  assert.doesNotMatch(render({ consulta: { estado: 'error', mensaje: 'Tu sesión no es válida.', tipo: 'sesion' } }), />Reintentar</)
+  for (const tipo of ['sesion', 'no-encontrado']) {
+    const sinSesion = render({ consulta: { estado: 'error', mensaje: 'Tu sesión no es válida.', tipo } })
+    assert.doesNotMatch(sinSesion, />Reintentar</, tipo)
+    assert.match(sinSesion, />Iniciar sesión nuevamente</, tipo)
+    assert.doesNotMatch(sinSesion, /href="\/login"/, 'Un enlace a /login volvería aquí mientras el token local siga vigente')
+  }
+  assert.doesNotMatch(render({ consulta: { estado: 'error', mensaje: 'Algunos datos no son válidos.', tipo: 'invalido' } }), /Reintentar|Iniciar sesión nuevamente/)
+})
+
+test('si Auth revoca la sesión al guardar, ofrece iniciarla de nuevo sin perder el aviso', () => {
+  const revocada = render({ editando: true, guardado: { estado: 'error', mensaje: 'Tu sesión no es válida o ha vencido.', sesionInvalida: true } })
+  assert.match(revocada, /role="alert"><p>Tu sesión no es válida o ha vencido\.<\/p><button[^>]*>Iniciar sesión nuevamente/)
+  const rechazo = render({ editando: true, guardado: { estado: 'error', mensaje: 'Algunos datos del perfil no son válidos.', sesionInvalida: false } })
+  assert.doesNotMatch(rechazo, /Iniciar sesión nuevamente/)
+})
+
+test('todas las cuentas, incluida la de administrador, llegan a Mi perfil desde el menú', () => {
+  for (const rol of ['Estudiante', 'Tutor', 'Administrador']) {
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MenuUsuario, {
+      usuario: { etiqueta: 'Camila', rol }, alCerrarSesion() {},
+    })))
+    assert.match(html, /href="\/perfil"[^>]*>Mi perfil</, rol)
+  }
+  const admin = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MenuUsuario, {
+    usuario: { etiqueta: 'Camila', rol: 'Administrador' }, alCerrarSesion() {},
+  })))
+  assert.doesNotMatch(admin, /Mi panel|Ser tutor|Cambiar contexto/)
 })
 
 test('el formulario de edición parte de los datos guardados y protege el correo', () => {
@@ -199,8 +233,8 @@ test('durante y tras un guardado fallido conserva el formulario y explica el err
   assert.match(guardando, /Guardando…/)
   assert.match(guardando, /aria-busy="true"/)
   assert.match(guardando, /name="nombre"[^>]*disabled=""|disabled=""[^>]*name="nombre"/)
-  const error = render({ editando: true, guardado: { estado: 'error', mensaje: 'Algunos datos del perfil no son válidos.' } })
-  assert.match(error, /role="alert">Algunos datos del perfil no son válidos\./)
+  const error = render({ editando: true, guardado: { estado: 'error', mensaje: 'Algunos datos del perfil no son válidos.', sesionInvalida: false } })
+  assert.match(error, /role="alert"><p>Algunos datos del perfil no son válidos\./)
   assert.match(error, /name="nombre"/)
   assert.match(render({ editando: true, cargandoMaterias: true }), /Cargando asignaturas…/)
 })

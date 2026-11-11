@@ -65,6 +65,13 @@ export function MenuUsuario({ usuario, alCerrarSesion, selectorRol, contadorSoli
         </svg>
       </summary>
       <div className="menu-usuario__desplegable">
+        {!(esEstudiante || esTutor) && (
+          <div className="menu-usuario__cuerpo">
+            <nav className="menu-usuario__enlaces" aria-label="Mi cuenta">
+              <Link className="menu-usuario__opcion" to="/perfil" onClick={cerrar}>Mi perfil</Link>
+            </nav>
+          </div>
+        )}
         {(esEstudiante || esTutor) && (
           <div className="menu-usuario__cuerpo">
             <nav className="menu-usuario__enlaces" aria-label="Mi cuenta">

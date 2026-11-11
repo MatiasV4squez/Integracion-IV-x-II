@@ -18,10 +18,16 @@ interface Propiedades {
   onEditar: () => void
   onCancelar: () => void
   onGuardar: (cambios: CambiosPerfil) => void
+  onIniciarSesionNuevamente: () => void
+}
+
+function BotonNuevaSesion({ onClick }: { onClick: () => void }) {
+  return <button type="button" className="boton-global boton-global--primario" onClick={onClick}>Iniciar sesión nuevamente</button>
 }
 
 export default function PerfilPage({
   consulta, materias, cargandoMaterias, editando, guardado, onReintentar, onEditar, onCancelar, onGuardar,
+  onIniciarSesionNuevamente,
 }: Propiedades) {
   return (
     <main className="perfil-propio" aria-labelledby="perfil-propio-titulo">
@@ -35,6 +41,7 @@ export default function PerfilPage({
           {consulta.tipo === 'consulta' && (
             <button type="button" className="boton-global boton-global--secundario" onClick={onReintentar}>Reintentar</button>
           )}
+          {(consulta.tipo === 'sesion' || consulta.tipo === 'no-encontrado') && <BotonNuevaSesion onClick={onIniciarSesionNuevamente} />}
         </section>
       ) : editando ? (
         <FormularioEdicion
@@ -45,6 +52,7 @@ export default function PerfilPage({
           guardado={guardado}
           onCancelar={onCancelar}
           onGuardar={onGuardar}
+          onIniciarSesionNuevamente={onIniciarSesionNuevamente}
         />
       ) : (
         <ResumenPerfil perfil={consulta.perfil} materias={materias} guardado={guardado} onEditar={onEditar} />
@@ -91,13 +99,14 @@ function ResumenPerfil({ perfil, materias, guardado, onEditar }: {
   )
 }
 
-function FormularioEdicion({ perfil, materias, cargandoMaterias, guardado, onCancelar, onGuardar }: {
+function FormularioEdicion({ perfil, materias, cargandoMaterias, guardado, onCancelar, onGuardar, onIniciarSesionNuevamente }: {
   perfil: PerfilUsuario
   materias: Materia[]
   cargandoMaterias: boolean
   guardado: EstadoGuardadoPerfil
   onCancelar: () => void
   onGuardar: (cambios: CambiosPerfil) => void
+  onIniciarSesionNuevamente: () => void
 }) {
   const [formulario, setFormulario] = useState(() => desdePerfil(perfil))
   const [errores, setErrores] = useState<ErroresPerfil>({})
@@ -133,7 +142,12 @@ function FormularioEdicion({ perfil, materias, cargandoMaterias, guardado, onCan
 
   return (
     <form className="perfil-propio__tarjeta perfil-propio__formulario" onSubmit={enviar} noValidate aria-busy={guardando}>
-      {guardado.estado === 'error' && <p className="perfil-propio__aviso perfil-propio__aviso--error" role="alert">{guardado.mensaje}</p>}
+      {guardado.estado === 'error' && (
+        <div className="perfil-propio__aviso perfil-propio__aviso--error" role="alert">
+          <p>{guardado.mensaje}</p>
+          {guardado.sesionInvalida && <BotonNuevaSesion onClick={onIniciarSesionNuevamente} />}
+        </div>
+      )}
       <p className="perfil-propio__ayuda">Correo institucional: <strong>{perfil.correo_institucional}</strong> (no se puede modificar)</p>
 
       {textos.map(({ campo, etiqueta, maximo, autoComplete, placeholder }) => (

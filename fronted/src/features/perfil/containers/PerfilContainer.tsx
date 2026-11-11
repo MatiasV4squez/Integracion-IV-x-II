@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
-import { actualizarNombreUsuario } from '../../../shared/auth/usuario-autenticado'
+import { actualizarNombreUsuario, cerrarSesionUsuario } from '../../../shared/auth/usuario-autenticado'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import type { CambiosPerfil, ConsultaPerfil, EstadoGuardadoPerfil } from '../models/perfil'
 import PerfilPage from '../pages/PerfilPage'
@@ -50,7 +50,11 @@ function PerfilDelUsuario({ sesion }: { sesion: SesionUsuario }) {
       if (cambios.nombre !== undefined) actualizarNombreUsuario(sesion.idUsuario, perfil.nombre)
     } catch (error) {
       if (control.signal.aborted) return
-      setGuardado({ estado: 'error', mensaje: error instanceof Error ? error.message : 'No pudimos guardar tu perfil.' })
+      setGuardado({
+        estado: 'error',
+        mensaje: error instanceof Error ? error.message : 'No pudimos guardar tu perfil.',
+        sesionInvalida: error instanceof ErrorPerfil && (error.tipo === 'sesion' || error.tipo === 'no-encontrado'),
+      })
     } finally {
       if (envio.current === control) envio.current = null
     }
@@ -67,6 +71,8 @@ function PerfilDelUsuario({ sesion }: { sesion: SesionUsuario }) {
       onEditar={() => { setGuardado({ estado: 'inactivo' }); setEditando(true) }}
       onCancelar={() => { setGuardado({ estado: 'inactivo' }); setEditando(false) }}
       onGuardar={(cambios) => { void guardar(cambios) }}
+      // Auth puede revocar la sesión aunque el JWT local siga vigente: se retira para que la ruta lleve al login.
+      onIniciarSesionNuevamente={cerrarSesionUsuario}
     />
   )
 }

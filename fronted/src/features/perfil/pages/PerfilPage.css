@@ -213,6 +213,24 @@
   font-size: 13px;
 }
 
+.perfil-propio__aviso p {
+  margin: 0 0 10px;
+}
+
+.perfil-propio__aviso p:last-child {
+  margin-bottom: 0;
+}
+
+.perfil-propio__tarjeta[role='alert'] {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.perfil-propio__tarjeta[role='alert'] p {
+  margin: 0;
+}
+
 .perfil-propio__aviso--exito {
   border-color: #067647;
   background: #ecfdf3;

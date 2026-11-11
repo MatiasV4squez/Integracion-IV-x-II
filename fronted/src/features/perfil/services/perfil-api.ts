@@ -50,6 +50,8 @@ async function solicitar(sesion: SesionUsuario, opciones: RequestInit, externa: 
     })
     if (respuesta.status === 401) throw new ErrorPerfil('Tu sesión no es válida o ha vencido. Inicia sesión nuevamente.', 'sesion')
     if (respuesta.status === 404) throw new ErrorPerfil('No encontramos tu cuenta. Inicia sesión nuevamente.', 'no-encontrado')
+    // Una consulta no envía datos: un 400 indica que Auth aún no expone /usuarios/perfil, no un error del usuario.
+    if (respuesta.status === 400 && opciones.method === 'GET') throw new ErrorPerfil(`No pudimos ${accion} tu perfil. Inténtalo de nuevo.`)
     if (respuesta.status === 400) throw new ErrorPerfil('Algunos datos del perfil no son válidos. Revísalos e inténtalo nuevamente.', 'invalido')
     if (!respuesta.ok) throw new ErrorPerfil(`No pudimos ${accion} tu perfil. Inténtalo de nuevo.`)
     let datos: unknown

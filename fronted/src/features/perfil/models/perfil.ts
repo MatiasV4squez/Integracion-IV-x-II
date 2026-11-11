@@ -32,4 +32,4 @@ export type EstadoGuardadoPerfil =
   | { estado: 'inactivo' }
   | { estado: 'guardando' }
   | { estado: 'exitoso' }
-  | { estado: 'error'; mensaje: string }
+  | { estado: 'error'; mensaje: string; sesionInvalida: boolean }
