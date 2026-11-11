@@ -21,6 +21,7 @@ const RegistroUsuarioContainer = lazy(() => import('../features/registro-usuario
 const DashboardTutorContainer = lazy(() => import('../features/panel-tutor/containers/DashboardTutorContainer'))
 const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/containers/PostulacionTutorContainer'))
 const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
+const PerfilContainer = lazy(() => import('../features/perfil/containers/PerfilContainer'))
 const InicioPublicoPage = lazy(() => import('../features/inicio-publico/pages/InicioPublicoPage'))
 
 export function AppRoutes({ children }: { children?: ReactNode }) {
@@ -38,6 +39,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
           <Route path="/tutores" element={<BuscarTutoresContainer />} />
           <Route path="/tutores/:idTutor" element={<PerfilTutorContainer />} />
           <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
+          <Route path="/perfil" element={<PerfilContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
           <Route path="/inicio" element={<DashboardEstudianteContainer />} />
