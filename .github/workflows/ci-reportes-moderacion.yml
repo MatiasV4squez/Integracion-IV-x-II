@@ -1,0 +1,34 @@
+name: CI Reportes Moderacion
+
+on:
+  push:
+    branches: [feature/micro_reportes_y_moderacion]
+  pull_request:
+    branches: [feature/micro_reportes_y_moderacion]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: reportes-moderacion
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: reportes-moderacion/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
