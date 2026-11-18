@@ -1,8 +1,9 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ServiceUnavailableException, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -23,6 +24,7 @@ import { EntregarAvisosModeracion } from '../src/sessions/aplicacion/casos-de-us
 // Pruebas de sesiones y JWT con PostgreSQL real en un esquema aislado.
 describe('Aceptar, rechazar y cancelar sesiones', () => {
   let app: INestApplication;
+  const validarSesion = jest.fn();
   let prisma: PrismaClient;
   let admin: Client;
   let service: ProcesarSesiones;
@@ -64,6 +66,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     const payload = Object.fromEntries(
       Object.entries({
         sub,
+        jti: randomUUID(),
         iss: 'stp-usuarios-auth',
         aud: 'stp-clients',
         exp: Math.floor(Date.now() / 1000) + 600,
@@ -285,12 +288,17 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     });
     await prisma.$connect();
     const module = await Test.createTestingModule({ imports: [SessionsModule] })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue({ validar: validarSesion })
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
           JWT_SECRET: secret,
+          // Evita usar receptores reales definidos en el .env del desarrollador.
+          REPORTES_MODERACION_URL: '',
+          MODERACION_INTEGRACION_SECRET: '',
         }),
       )
       .compile();
@@ -322,6 +330,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     urlMaterias = `http://127.0.0.1:${direccion.port}`;
   }, 30000);
   beforeEach(async () => {
+    validarSesion.mockReset().mockResolvedValue(undefined);
     estadoBloque = 'DISPONIBLE';
     errorConsulta = errorReserva = errorLiberacion = 0;
     tutorHabilitado = true;
@@ -381,6 +390,14 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       where: { id_sesion: BigInt(id) },
     });
   }
+
+  it.each([401, 503])('no modifica una sesión si Auth rechaza el acceso o no está disponible (%s)', async (estado) => {
+    const sesion = await fixture();
+    validarSesion.mockRejectedValueOnce(estado === 401
+      ? new UnauthorizedException() : new ServiceUnavailableException());
+    await act(sesion.id_sesion, 'accept').expect(estado);
+    expect((await stateOf(sesion.id_sesion)).estado_sesion).toBe('PENDIENTE');
+  });
 
   it('pagina sesiones propias de ambos roles con orden estable y conserva el historial anterior', async () => {
     const primera = await fixture('COMPLETADA');
@@ -957,6 +974,9 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     ['audiencia', { aud: 'otro' }, secret],
     ['sub numérico', { sub: 2 }, secret],
     ['sub fuera de rango', { sub: '9223372036854775808' }, secret],
+    ['sin sesión', { jti: undefined }, secret],
+    ['sesión vacía', { jti: '' }, secret],
+    ['sesión demasiado larga', { jti: 'x'.repeat(65) }, secret],
   ])('rechaza JWT inválido: %s', async (_name, claims, signingSecret) => {
     await request(app.getHttpServer())
       .patch('/sessions/1/accept')
