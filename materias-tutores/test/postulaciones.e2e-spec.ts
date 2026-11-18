@@ -1,3 +1,5 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
 import { type INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -54,6 +56,8 @@ describe('Postulaciones HTTP', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(crearSesionAuthMock())
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(PostularTutorUseCase)

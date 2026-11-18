@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
 import { TutorJwtGuard } from '../auth/tutor-jwt.guard.js';
+import { HttpSesionAuthClient } from '../auth/http-sesion-auth.client.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { ConsultaDisponibilidadController } from './infraestructura/http/consulta-disponibilidad.controller.js';
 import { DisponibilidadController } from './infraestructura/http/disponibilidad.controller.js';
@@ -18,6 +19,7 @@ import { RelojSistemaAdapter } from './infraestructura/reloj-sistema.adapter.js'
 
 @Module({
   imports: [
+    ConfigModule,
     DatabaseModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -29,6 +31,7 @@ import { RelojSistemaAdapter } from './infraestructura/reloj-sistema.adapter.js'
   ],
   controllers: [DisponibilidadController, ConsultaDisponibilidadController],
   providers: [
+    HttpSesionAuthClient,
     TutorJwtGuard,
     AuthenticatedJwtGuard,
     { provide: DISPONIBILIDAD_REPOSITORY, useClass: PrismaDisponibilidadRepository },

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
+import { HttpSesionAuthClient } from '../auth/http-sesion-auth.client.js';
 import { IntegracionSecretGuard } from '../auth/integracion-secret.guard.js';
 import { ConsultaTutoresGuard } from '../auth/consulta-tutores.guard.js';
 import { TutoresController } from './infraestructura/http/tutores.controller.js';
@@ -21,6 +22,7 @@ import { DISPONIBILIDAD_TUTORES, type DisponibilidadTutoresPort } from './aplica
   })],
   controllers: [TutoresController],
   providers: [
+    HttpSesionAuthClient,
     AuthenticatedJwtGuard,
     IntegracionSecretGuard,
     ConsultaTutoresGuard,

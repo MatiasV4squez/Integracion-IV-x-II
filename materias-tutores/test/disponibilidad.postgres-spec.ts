@@ -1,3 +1,5 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
 import 'dotenv/config';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -85,6 +87,8 @@ describe('Disponibilidad con HTTP y PostgreSQL reales', () => {
     const modulo = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ ignoreEnvFile: true, load: [() => ({ DATABASE_URL: databaseUrl, JWT_SECRET: secreto })] }), DisponibilidadModule],
     })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(crearSesionAuthMock())
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(RELOJ_DISPONIBILIDAD)

@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../database/database.module.js';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
+import { HttpSesionAuthClient } from '../auth/http-sesion-auth.client.js';
 import { IntegracionSecretGuard } from '../auth/integracion-secret.guard.js';
 import { RegistrarCalificacionUseCase } from './aplicacion/registrar-calificacion.use-case.js';
 import { ConsultarReputacionUseCase } from './aplicacion/consultar-reputacion.use-case.js';
@@ -23,6 +24,7 @@ import { ReputacionController } from './infraestructura/http/reputacion.controll
   ],
   controllers: [CalificacionesController, ReputacionController],
   providers: [
+    HttpSesionAuthClient,
     AuthenticatedJwtGuard,
     IntegracionSecretGuard,
     { provide: REPUTACION_REPOSITORY, useClass: PrismaReputacionRepository },

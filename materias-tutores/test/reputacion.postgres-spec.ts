@@ -1,3 +1,5 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
 import 'dotenv/config';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -76,6 +78,8 @@ describe('Reputación con PostgreSQL real en esquema temporal', () => {
     const modulo = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ DATABASE_URL: databaseUrl, JWT_SECRET: secreto, INTEGRACION_SECRET: secreto })] }), ReputacionModule],
     })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(crearSesionAuthMock())
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();

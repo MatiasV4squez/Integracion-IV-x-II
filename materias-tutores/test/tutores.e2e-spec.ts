@@ -1,4 +1,7 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
 import type { INestApplication } from '@nestjs/common';
+import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -9,6 +12,7 @@ import { PrismaService } from '../src/database/prisma.service.js';
 
 describe('Busqueda de tutores por materia (HTTP)', () => {
   let app: INestApplication<Server>;
+  let sesiones: ReturnType<typeof crearSesionAuthMock>;
   const jwt = new JwtService({ secret: process.env.JWT_SECRET });
   function crearToken(opciones: { expiresIn?: number; issuer?: string; audience?: string } = {}) {
     return jwt.sign({ sub: '10', jti: 'consulta-prueba', correo_institucional: 'persona@alu.uct.cl', roles: ['ESTUDIANTE'] }, {
@@ -27,6 +31,7 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    sesiones = crearSesionAuthMock();
     prisma.tutorMateria.findMany.mockResolvedValue([]);
     prisma.tutorMateria.count.mockResolvedValue(0);
     prisma.perfilTutor.findMany.mockResolvedValue([]);
@@ -35,6 +40,8 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     const modulo = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ConfigService)
       .useValue(new ConfigService({ JWT_SECRET: process.env.JWT_SECRET, INTEGRACION_SECRET: 'i'.repeat(32) }))
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(sesiones)
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .compile();
@@ -77,6 +84,26 @@ describe('Busqueda de tutores por materia (HTTP)', () => {
     await request(app.getHttpServer()).get('/tutores?materiaId=1')
       .set('Authorization', 'Bearer invalido').set('X-Integracion-Secret', 'i'.repeat(32)).expect(401);
     expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
+  });
+
+  it('consulta Auth antes de acceder a los datos', async () => {
+    await consultar('/tutores?materiaId=1').expect(200);
+    expect(sesiones.validar).toHaveBeenCalledWith(expect.any(String), '10', 'consulta-prueba');
+  });
+
+  it.each([401, 503])('bloquea la operación si Auth responde con %s sin recurrir al secreto interno', async (estado) => {
+    sesiones.validar.mockRejectedValue(estado === 401
+      ? new UnauthorizedException() : new ServiceUnavailableException());
+    await consultar('/tutores?materiaId=1')
+      .set('X-Integracion-Secret', 'i'.repeat(32)).expect(estado);
+    expect(prisma.tutorMateria.findMany).not.toHaveBeenCalled();
+  });
+
+  it('mantiene la integración interna aunque Auth no esté disponible', async () => {
+    sesiones.validar.mockRejectedValue(new ServiceUnavailableException());
+    await request(app.getHttpServer()).get('/tutores?materiaId=1')
+      .set('X-Integracion-Secret', 'i'.repeat(32)).expect(200);
+    expect(sesiones.validar).not.toHaveBeenCalled();
   });
 
   it('conecta controller, caso de uso y adaptador y devuelve los tutores con sus promedios', async () => {
