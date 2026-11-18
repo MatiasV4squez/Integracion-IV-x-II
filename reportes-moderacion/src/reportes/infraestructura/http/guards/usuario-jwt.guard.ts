@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -8,6 +9,7 @@ import {
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
 import { idEntidadValido } from '../../../../compartido/identificadores.js';
+import { HttpSesionAuthClient } from '../../clientes/http-sesion-auth.client.js';
 
 const JWT_ISSUER = 'stp-usuarios-auth';
 const JWT_AUDIENCE = 'stp-clients';
@@ -109,7 +111,9 @@ function usuarioDesdePayload(
 
 @Injectable()
 export class UsuarioJwtGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(@Inject(HttpSesionAuthClient) private readonly sesiones: HttpSesionAuthClient) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const secret = process.env.JWT_SECRET;
     if (!secret) throw authNoDisponible();
 
@@ -140,6 +144,7 @@ export class UsuarioJwtGuard implements CanActivate {
     const usuario = payload ? usuarioDesdePayload(payload) : undefined;
     if (!usuario) throw noAutorizado();
 
+    await this.sesiones.validar(token, usuario.sub, usuario.jti);
     request.user = usuario;
     return true;
   }

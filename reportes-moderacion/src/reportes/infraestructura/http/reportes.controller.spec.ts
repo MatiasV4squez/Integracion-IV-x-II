@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportesController } from './reportes.controller.js';
+import { HttpSesionAuthClient } from '../clientes/http-sesion-auth.client.js';
 import { CrearReporteUseCase } from '../../aplicacion/crear-reporte.use-case.js';
 import { ConsultarReportesAdminUseCase } from '../../aplicacion/consultar-reportes-admin.use-case.js';
 import { ResolverReporteUseCase } from '../../aplicacion/resolver-reporte.use-case.js';
@@ -33,6 +34,7 @@ describe('ReportesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReportesController],
       providers: [
+        { provide: HttpSesionAuthClient, useValue: { validar: vi.fn() } },
         { provide: CrearReporteUseCase, useValue: { ejecutar: mockCrear } },
         { provide: ConsultarReportesAdminUseCase, useValue: { ejecutar: mockConsultar } },
         { provide: ResolverReporteUseCase, useValue: { ejecutar: mockResolver } },
