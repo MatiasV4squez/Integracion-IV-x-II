@@ -382,6 +382,135 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     });
   }
 
+  it('pagina sesiones propias de ambos roles con orden estable y conserva el historial anterior', async () => {
+    const primera = await fixture('COMPLETADA');
+    const segunda = await fixture('CANCELADA');
+    const tercera = await fixture('PENDIENTE');
+    const comoTutor = await fixture('CONFIRMADA', '2099-06-20', outsider, tutee);
+    await fixture('COMPLETADA', '2099-06-20', outsider, tutor);
+    await prisma.sesion.updateMany({ data: { fecha_creacion: new Date('2026-11-01T12:00:00Z') } });
+    const calificacion = await prisma.calificacion.create({ data: {
+      id_sesion: primera.id_sesion, id_evaluador: BigInt(tutee), id_evaluado: BigInt(tutor), puntuacion: 5,
+    } });
+    const consultar = (page: number) => request(app.getHttpServer())
+      .get(`/sessions/history/paginated?page=${page}&limit=2`)
+      .set('Authorization', `Bearer ${token(tutee)}`);
+    const pagina1 = await consultar(1).expect(200);
+    const pagina2 = await consultar(2).expect(200);
+    expect(pagina1.headers['cache-control']).toBe('no-store');
+    expect(pagina1.body).toMatchObject({ total: 4, page: 1, limit: 2, totalPages: 2 });
+    expect(pagina2.body).toMatchObject({ total: 4, page: 2, limit: 2, totalPages: 2 });
+    const items = [...pagina1.body.items, ...pagina2.body.items];
+    expect(items.map((fila: { id_sesion: string }) => fila.id_sesion)).toEqual(
+      [comoTutor, tercera, segunda, primera].map((fila) => fila.id_sesion.toString()),
+    );
+    expect(new Set(items.map((fila: { id_sesion: string }) => fila.id_sesion)).size).toBe(4);
+    expect(items[3]).toMatchObject({ id_tutor: tutor, id_tutee: tutee,
+      calificaciones: [{ id_calificacion: calificacion.id_calificacion.toString(), id_evaluador: tutee, puntuacion: 5 }],
+    });
+    const repetida = await consultar(1).expect(200);
+    expect(repetida.body).toEqual(pagina1.body);
+    const fuera = await consultar(3).expect(200);
+    expect(fuera.body).toEqual({ items: [], total: 4, page: 3, limit: 2, totalPages: 2 });
+
+    const legacy = await request(app.getHttpServer()).get('/sessions/history')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(Array.isArray(legacy.body)).toBe(true);
+    expect(legacy.body).toHaveLength(4);
+    for (const item of items) {
+      const anterior = legacy.body.find((fila: { id_sesion: string }) => fila.id_sesion === item.id_sesion);
+      expect(item).toEqual(anterior);
+      expect(item).not.toHaveProperty('fecha_confirmacion');
+      expect(item).not.toHaveProperty('datos_encuentro');
+    }
+  });
+
+  it('combina el rol de participación y el estado dentro de la consulta del usuario', async () => {
+    const estudiante = await fixture('COMPLETADA');
+    await fixture('CANCELADA');
+    const docente = await fixture('COMPLETADA', '2099-06-20', outsider, tutee);
+    await fixture('COMPLETADA', '2099-06-20', outsider, tutor);
+    for (const [rol, esperada] of [['ESTUDIANTE', estudiante], ['TUTOR', docente]] as const) {
+      const respuesta = await request(app.getHttpServer())
+        .get(`/sessions/history/paginated?rol=${rol}&estado=COMPLETADA`)
+        .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+      expect(respuesta.body).toMatchObject({ total: 1, page: 1, limit: 20, totalPages: 1 });
+      expect(respuesta.body.items.map((fila: { id_sesion: string }) => fila.id_sesion)).toEqual([esperada.id_sesion.toString()]);
+    }
+    const soloEstado = await request(app.getHttpServer()).get('/sessions/history/paginated?estado=COMPLETADA')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(soloEstado.body.total).toBe(2);
+  });
+
+  it.each([
+    'PENDIENTE', 'CONFIRMADA', 'RECHAZADA', 'EXPIRADA', 'CANCELADA',
+    'PENDIENTE_CIERRE', 'COMPLETADA', 'NO_REALIZADA', 'INASISTENCIA', 'EN_CONFLICTO',
+  ] as const)('filtra el estado %s', async (estado) => {
+    const propia = await fixture(estado);
+    await fixture(estado, '2099-06-20', outsider);
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/history/paginated?estado=${estado}&rol=ESTUDIANTE`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.body.total).toBe(1);
+    expect(respuesta.body.items[0]).toMatchObject({ id_sesion: propia.id_sesion.toString(), estado_sesion: estado });
+  });
+
+  it('devuelve una página vacía para un usuario sin sesiones, incluso si es administrador', async () => {
+    await fixture();
+    for (const claims of [{}, { roles: ['ADMINISTRADOR'] }]) {
+      const respuesta = await request(app.getHttpServer()).get('/sessions/history/paginated')
+        .set('Authorization', `Bearer ${token(outsider, claims)}`).expect(200);
+      expect(respuesta.body).toEqual({ items: [], total: 0, page: 1, limit: 20, totalPages: 0 });
+    }
+  });
+
+  it('la cuenta de una sesión que participa en ambos roles no se duplica', async () => {
+    await fixture('COMPLETADA', '2099-06-20', tutee, tutee);
+    const respuesta = await request(app.getHttpServer()).get('/sessions/history/paginated')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.body.total).toBe(1);
+    expect(respuesta.body.items).toHaveLength(1);
+  });
+
+  it.each([
+    'page=0', 'page=-1', 'page=1.5', 'page=01', 'page=1e2', 'page=', 'page=1000001',
+    'limit=0', 'limit=101', 'limit=2.5', 'limit=', 'limit=0x10',
+    'rol=ADMINISTRADOR', 'rol=tutor', 'estado=INVENTADO', 'estado=',
+    'page=1&page=2', 'limit=1&limit=2', 'rol=TUTOR&rol=ESTUDIANTE',
+    'estado=PENDIENTE&estado=COMPLETADA', 'id_usuario=123', 'id_tutor=123',
+  ])('rechaza filtros, parámetros o paginación inválidos: %s', async (consulta) => {
+    await request(app.getHttpServer()).get(`/sessions/history/paginated?${consulta}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(400);
+  });
+
+  it.each(['ausente', 'malformado', 'vencido', 'firma', 'emisor', 'audiencia'])('el historial paginado rechaza JWT %s', async (tipo) => {
+    const consulta = request(app.getHttpServer()).get('/sessions/history/paginated');
+    const valores: Record<string, string> = {
+      malformado: 'invalido', vencido: token(tutee, { exp: 1 }),
+      firma: token(tutee, {}, 'otro-secreto'), emisor: token(tutee, { iss: 'otro' }),
+      audiencia: token(tutee, { aud: 'otra' }),
+    };
+    if (tipo !== 'ausente') consulta.set('Authorization', `Bearer ${valores[tipo]}`);
+    await consulta.expect(401);
+  });
+
+  it('documenta el historial paginado en Swagger sin retirar la ruta antigua ni el detalle', () => {
+    const documento = SwaggerModule.createDocument(app, new DocumentBuilder().addBearerAuth().build());
+    const operacion = documento.paths['/sessions/history/paginated']?.get;
+    expect(operacion?.security).toEqual([{ bearer: [] }]);
+    expect(Object.keys(operacion!.responses)).toEqual(['200', '400', '401']);
+    expect(operacion!.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'page', in: 'query', required: false }),
+      expect.objectContaining({ name: 'limit', in: 'query', required: false }),
+      expect.objectContaining({ name: 'rol', in: 'query', required: false }),
+      expect.objectContaining({ name: 'estado', in: 'query', required: false }),
+    ]));
+    expect(documento.paths['/sessions/history']?.get).toBeDefined();
+    expect(documento.paths['/sessions/{id}']?.get).toBeDefined();
+    const esquema = documento.components!.schemas!.SesionHistorialResponseDto;
+    expect(esquema).toHaveProperty('properties.calificaciones');
+    expect(esquema).not.toHaveProperty('properties.datos_encuentro');
+  });
+
   it('consulta un detalle real, serializa BIGINT y no modifica la sesión', async () => {
     const sesion = await fixture('PENDIENTE_CIERRE');
     await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {

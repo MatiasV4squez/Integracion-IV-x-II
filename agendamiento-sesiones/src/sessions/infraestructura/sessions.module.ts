@@ -5,6 +5,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuthModule } from '../../auth/auth.module';
 import { GestionarSesiones } from '../aplicacion/casos-de-uso/gestionar-sesiones';
 import { ConsultarDetalleSesion } from '../aplicacion/casos-de-uso/consultar-detalle-sesion';
+import { ConsultarHistorialPaginado } from '../aplicacion/casos-de-uso/consultar-historial-paginado';
+import { RepositorioHistorialPrisma } from './persistencia/repositorio-historial-prisma';
 import { RepositorioDetalleSesionPrisma } from './persistencia/repositorio-detalle-sesion-prisma';
 import { ProcesarSesiones } from '../aplicacion/casos-de-uso/procesar-sesiones';
 import { EntregarReputacion } from '../aplicacion/casos-de-uso/entregar-reputacion';
@@ -25,6 +27,12 @@ const RELOJ = { ahora: () => new Date() };
   imports: [DatabaseModule, AuthModule, ConfigModule],
   controllers: [SessionsController],
   providers: [
+    {
+      provide: ConsultarHistorialPaginado,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) =>
+        new ConsultarHistorialPaginado(new RepositorioHistorialPrisma(prisma)),
+    },
     {
       provide: ConsultarDetalleSesion,
       inject: [PrismaService],

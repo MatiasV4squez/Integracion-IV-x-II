@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Header, Param, Patch, Post, Req, UseGuards, UseFilters } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Header, Param, Patch, Post, Query, Req, UseGuards, UseFilters } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../../auth/autenticacion-request';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
@@ -9,6 +9,9 @@ import { DeclararCierreDto } from './declarar-cierre.dto';
 import { ResolveConflictDto } from './resolve-conflict.dto';
 import { GestionarSesiones } from '../../aplicacion/casos-de-uso/gestionar-sesiones';
 import { ConsultarDetalleSesion } from '../../aplicacion/casos-de-uso/consultar-detalle-sesion';
+import { ConsultarHistorialPaginado } from '../../aplicacion/casos-de-uso/consultar-historial-paginado';
+import { ConsultaHistorialDto } from './consulta-historial.dto';
+import { HistorialPaginadoResponseDto } from './historial-paginado.response.dto';
 import { DetalleSesionResponseDto } from './detalle-sesion.response.dto';
 import { ErrorSesionFilter } from './error-sesion.filter';
 import { IntegracionSecretGuard } from '../../../auth/integracion-secret.guard';
@@ -22,6 +25,7 @@ export class SessionsController {
   constructor(
     private readonly sesiones: GestionarSesiones,
     private readonly detalle: ConsultarDetalleSesion,
+    private readonly historialPaginado: ConsultarHistorialPaginado,
   ) {}
 
   @Post()
@@ -83,6 +87,30 @@ export class SessionsController {
       ...aRespuestaSesion(sesion),
       calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
     }));
+  }
+
+  @Get('history/paginated')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Consultar el historial propio paginado por rol y estado',
+    description: 'La identidad proviene del JWT, incluso para administradores. Filtra por participación como ESTUDIANTE o TUTOR y por estado; sin filtros incluye todas las sesiones propias. Ordena por fecha de creación e ID descendentes. La ruta /sessions/history conserva su arreglo original.',
+  })
+  @ApiResponse({ status: 200, description: 'Página del historial propio con calificaciones y totales.', type: HistorialPaginadoResponseDto })
+  @ApiResponse({ status: 400, description: 'Paginación o filtros inválidos, repetidos o parámetros no admitidos.' })
+  @ApiResponse({ status: 401, description: 'JWT ausente, inválido o expirado.' })
+  async consultarHistorialPaginado(
+    @Req() solicitud: AuthenticatedRequest,
+    @Query() consulta: ConsultaHistorialDto,
+  ) {
+    const pagina = await this.historialPaginado.ejecutar(solicitud.user.idUsuario, consulta);
+    return {
+      ...pagina,
+      items: pagina.items.map((sesion) => ({
+        ...aRespuestaSesion(sesion),
+        calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
+      })),
+    };
   }
 
   @Get('active')
