@@ -12,6 +12,7 @@
 .listado-sesiones-activas th { padding: 16px; background: var(--color-primary-soft); font-size: 12px; font-weight: 600; }
 .listado-sesiones-activas td { padding: 16px; border: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
 .listado-sesiones-activas td p { margin: 4px 0 0; color: var(--color-text-muted); }
+.listado-sesiones-activas__detalle { display: inline-flex; align-items: center; min-height: 44px; margin-top: 6px; color: var(--color-primary-text); font-size: 14px; font-weight: 600; text-underline-offset: 3px; }
 .listado-sesiones-activas__etiqueta { color: var(--color-primary-text); font-weight: 600; }
 .listado-sesiones-activas__etiqueta--cancelada { color: #b42318; }
 .listado-sesiones-activas__estado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }

@@ -138,6 +138,7 @@ test('muestra las sesiones activas con materia, tutor, horario y estado', () => 
   assert.match(html, /Cálculo intermedio · MAT1188/)
   assert.match(html, /Tutor #12/)
   assert.match(html, /Confirmada/)
+  assert.match(html, /href="\/panel\/tutorias\/81\?vista=activas"/)
   assert.match(html, />Actualizar<\/button>/)
   assert.doesNotMatch(html, /<header|<footer|Diego Muñoz|Martina Rojas/)
   assert.match(renderPanel({ estado: 'listo', sesiones: [activa] }), /Materia #3/)
@@ -151,8 +152,8 @@ test('registra la ruta del panel del estudiante dentro del layout compartido', a
   assert.equal((html.match(/<main\b/g) ?? []).length, 1)
 })
 
-test('la navegación del estudiante incluye el panel y la del tutor no', async () => {
+test('el estudiante entra a las activas y el tutor a su historial desde Mi panel', async () => {
   const { obtenerNavegacion } = await vite.ssrLoadModule('/src/shared/layout/configuracion-navegacion.ts')
   assert.ok(obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/panel'))
-  assert.ok(!obtenerNavegacion(['TUTOR']).some((enlace) => enlace.destino === '/panel'))
+  assert.ok(obtenerNavegacion(['TUTOR']).some((enlace) => enlace.destino === '/panel?vista=historial&rol=TUTOR'))
 })

@@ -1,7 +1,7 @@
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import { ESTADOS_SESION, type Sesion } from '../models/sesion'
 
-function esFecha(valor: unknown): valor is string {
+export function esFecha(valor: unknown): valor is string {
   if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(valor)) return false
   const fecha = new Date(valor)
   return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 19) === valor.slice(0, 19)

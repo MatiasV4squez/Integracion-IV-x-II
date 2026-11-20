@@ -1,0 +1,82 @@
+import { Link } from 'react-router'
+import type { ConsultaTutorias, DetalleTutoria } from '../models/tutoria'
+import { EstadoConsultaTutorias } from '../components/EstadoConsultaTutorias'
+import { EstadoTutoria } from '../components/EstadoTutoria'
+import { enlaceEncuentroSeguro, ETIQUETAS_SESION } from '../utils/filtros-tutorias'
+import { formatearHorarioSesion } from '../utils/solicitudes-recibidas'
+import './Tutorias.css'
+
+interface Propiedades {
+  consulta: ConsultaTutorias<DetalleTutoria>
+  idUsuario: string
+  materia?: string
+  nombres: ReadonlyMap<string, string>
+  volver: string
+  onRecargar: () => void
+}
+
+const fechaDeclaracion = new Intl.DateTimeFormat('es-CL', {
+  dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago',
+})
+
+export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, onRecargar }: Propiedades) {
+  const tutoria = consulta.estado === 'listo' ? consulta.datos : null
+  const nombre = (id: string) => nombres.get(id) ?? (id === tutoria?.id_tutor ? 'Tutor #' : 'Estudiante #') + id
+  const encuentro = tutoria?.datos_encuentro
+  const enlace = encuentro ? enlaceEncuentroSeguro(encuentro.enlace) : undefined
+  return <main className="tutorias" aria-labelledby="detalle-tutoria-titulo">
+    <Link className="tutorias__volver" to={volver}>← Volver a Mi panel</Link>
+    <div className="tutorias__encabezado"><div><h1 id="detalle-tutoria-titulo">Detalle de tutoría</h1>
+      <p className="tutorias__subtitulo">La información de tu encuentro y el resultado de la sesión.</p></div>
+      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando'}>Actualizar</button></div>
+    {consulta.estado === 'cargando' ? <EstadoConsultaTutorias estado="cargando" />
+      : consulta.estado === 'error' ? <EstadoConsultaTutorias estado="error" tipo={consulta.tipo} mensaje={consulta.mensaje} onReintentar={onRecargar} />
+        : tutoria && encuentro && <>
+          <section className="tutorias__destacado" aria-label="Resumen de la tutoría">
+            <div><p className="tutorias__referencia">Tutoría #{tutoria.id_sesion}</p><h2>{materia ?? 'Materia #' + tutoria.id_materia}</h2>
+              <p><time dateTime={tutoria.inicio}>{formatearHorarioSesion(tutoria.inicio, tutoria.fin)}</time></p></div>
+            <EstadoTutoria estado={tutoria.estado_sesion} />
+          </section>
+          {tutoria.resultado_provisional && <div className="tutorias__aviso" role="status">Este resultado es provisional: se registró al vencer el plazo de respuesta de la contraparte.</div>}
+          <div className="tutorias__detalle-columnas">
+            <section className="tutorias__panel" aria-labelledby="datos-encuentro-titulo"><h2 id="datos-encuentro-titulo">Datos del encuentro</h2>
+              <dl className="tutorias__datos"><div><dt>Modalidad</dt><dd>{encuentro.modalidad === 'PRESENCIAL' ? 'Presencial' : encuentro.modalidad === 'EN_LINEA' ? 'En línea' : 'Por definir'}</dd></div>
+                <div><dt>Lugar</dt><dd>{encuentro.lugar?.trim() || 'Por definir'}</dd></div>
+                <div><dt>Enlace de reunión</dt><dd>{enlace ? <a href={enlace} target="_blank" rel="noopener noreferrer" className="tutorias__enlace-reunion">Abrir reunión <span className="tutorias__solo-lectores">(se abre en otra pestaña)</span></a>
+                  : encuentro.enlace ? 'El enlace de reunión no está disponible.' : 'Por definir'}</dd></div>
+                <div><dt>Horario</dt><dd>Hora de Chile continental · America/Santiago</dd></div></dl>
+            </section>
+            <section className="tutorias__panel" aria-labelledby="participantes-titulo"><h2 id="participantes-titulo">Participantes</h2>
+              <dl className="tutorias__datos">{([['Tutor', tutoria.id_tutor], ['Estudiante', tutoria.id_tutee]] as const).map(([rol, id]) =>
+                <div key={rol}><dt>{rol}</dt><dd>{nombre(id)}{id === idUsuario && <span className="tutorias__tu">Tú</span>}</dd></div>)}</dl>
+              {tutoria.id_tutor === idUsuario && tutoria.acciones_disponibles.aceptar &&
+                <Link className="boton-global boton-global--secundario" to="/solicitudes/recibidas">Gestionar solicitud</Link>}
+              {tutoria.id_tutee === idUsuario && tutoria.acciones_disponibles.cancelar &&
+                <Link className="boton-global boton-global--secundario" to="/panel">Gestionar en mi panel</Link>}
+            </section>
+            <section className="tutorias__panel" aria-labelledby="cierre-tutoria-titulo"><h2 id="cierre-tutoria-titulo">Cierre de la sesión</h2>
+              {tutoria.declaraciones.length === 0 ? <p className="tutorias__texto-secundario">Todavía no hay declaraciones de cierre para esta sesión.</p>
+                : <ul className="tutorias__registros">{tutoria.declaraciones.map((declaracion) => <li key={declaracion.id_declaracion}>
+                  <strong>{nombre(declaracion.id_usuario)}{declaracion.id_usuario === idUsuario ? ' (tú)' : ''}</strong>
+                  <p>{ETIQUETAS_SESION[declaracion.resultado_declarado]}</p>
+                  {declaracion.id_usuario_inasistente && <p>Inasistencia de {nombre(declaracion.id_usuario_inasistente)}</p>}
+                  <time dateTime={declaracion.fecha_declaracion}>{fechaDeclaracion.format(new Date(declaracion.fecha_declaracion))}</time>
+                </li>)}</ul>}
+              {tutoria.acciones_disponibles.declarar_cierre && <p className="tutorias__nota">Tu declaración de cierre está pendiente.</p>}
+              {tutoria.estado_sesion === 'EN_CONFLICTO' && <p className="tutorias__nota">Las declaraciones requieren revisión de administración.</p>}
+            </section>
+            <section className="tutorias__panel" aria-labelledby="calificaciones-titulo"><h2 id="calificaciones-titulo">Calificaciones</h2>
+              {tutoria.calificaciones.length === 0 ? <p className="tutorias__texto-secundario">Esta sesión todavía no tiene calificaciones.</p>
+                : <ul className="tutorias__registros">{tutoria.calificaciones.map((nota) => <li key={nota.id_calificacion}>
+                  <strong>{nota.id_evaluador === idUsuario ? 'Tu calificación a ' + nombre(nota.id_evaluado)
+                    : nota.id_evaluado === idUsuario ? 'Calificación recibida de ' + nombre(nota.id_evaluador)
+                      : nombre(nota.id_evaluador) + ' a ' + nombre(nota.id_evaluado)}</strong>
+                  <p className="tutorias__puntuacion"><span aria-hidden="true">★ </span>{nota.puntuacion} de 5</p>
+                  <time dateTime={nota.fecha_calificacion}>{fechaDeclaracion.format(new Date(nota.fecha_calificacion))}</time>
+                </li>)}</ul>}
+              {tutoria.acciones_disponibles.calificar && <p className="tutorias__nota">Aún no has calificado esta sesión completada.</p>}
+            </section>
+          </div>
+        </>}
+  </main>
+}

@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { Materia } from '../../materias/models/materia'
 import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import type { Sesion } from '../models/sesion'
@@ -29,6 +30,8 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
               <td data-etiqueta="Materia / Tutor">
                 <strong>{materia ? materia.nombre + ' · ' + materia.codigo : 'Materia #' + sesion.id_materia}</strong>
                 <p>{nombresTutores?.get(sesion.id_tutor) ?? 'Tutor #' + sesion.id_tutor}</p>
+                <Link className="listado-sesiones-activas__detalle" to={'/panel/tutorias/' + sesion.id_sesion + '?vista=activas'}
+                  aria-label={'Ver detalle de la tutoría #' + sesion.id_sesion}>Ver detalle</Link>
               </td>
               <td data-etiqueta="Fecha y horario">
                 <time dateTime={sesion.inicio}>{formatearHorarioSesion(sesion.inicio, sesion.fin)}</time>

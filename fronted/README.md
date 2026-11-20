@@ -89,6 +89,35 @@ Para ejecutar las pruebas sin servicios, configura la base pública utilizada po
 sus respuestas HTTP simuladas: `$env:VITE_API_BASE_URL = 'http://localhost:8080/api'`;
 después ejecuta `npm.cmd test`, `npm.cmd run build` y `npm.cmd run lint`.
 
+## Mi panel, historial y detalle
+
+`/panel` conserva por defecto las sesiones activas del estudiante y su acción
+de cancelación. La sección **Historial** (`/panel?vista=historial`) consulta el
+historial paginado mediante el Gateway, con filtros de participación, estado
+y tamaño de página. Solo se consulta la sección visible. El acceso del tutor
+apunta a su historial con `rol=TUTOR`; las cuentas sin rol de estudiante no
+presentan la sección de activas del estudiante.
+
+Los filtros, la página y la sección de regreso se conservan al consultar
+`/panel/tutorias/:idSesion`. Las sesiones activas también ofrecen **Ver detalle**.
+Las direcciones anteriores `/mis-tutorias` y `/mis-tutorias/:idSesion` redirigen
+a Mi panel conservando los parámetros del historial, sin duplicar pantallas
+ni enlaces en la navegación.
+El selector de participación aparece únicamente para cuentas con ambos roles.
+Las cuentas con un solo rol consultan automáticamente su participación como
+estudiante o tutor, incluso si reciben una URL con el filtro contrario.
+
+El detalle consulta la sesión autorizada por el backend y muestra encuentro,
+participantes, declaraciones de cierre, resultado provisional y calificaciones.
+Los horarios se presentan en `America/Santiago`. Si falta el nombre de una
+materia o participante se conserva su identificador, sin bloquear la consulta.
+Las vistas reutilizan el layout global y mantienen las rutas anteriores de
+solicitudes. Las consultas se cancelan al cambiar de sección, vista o filtros.
+
+La implementación está en `features/sesiones`, separando modelos, adaptadores
+HTTP, validación, hooks, contenedores, páginas y componentes. Se comprueba con
+`node --test test/mis-tutorias.test.mjs`, además de la suite general, build y lint.
+
 ## Requisitos e instalación de la web
 
 Requiere **Node.js 22.22.0 o superior**; se recomienda Node.js 24 LTS. React Router exige ese mínimo. Comprueba tu versión con `node --version`.

@@ -23,6 +23,8 @@ const PostulacionTutorContainer = lazy(() => import('../features/postulaciones/c
 const InicioSesionContainer = lazy(() => import('../features/inicio-sesion/containers/InicioSesionContainer'))
 const PerfilContainer = lazy(() => import('../features/perfil/containers/PerfilContainer'))
 const InicioPublicoPage = lazy(() => import('../features/inicio-publico/pages/InicioPublicoPage'))
+const RedireccionTutorias = lazy(() => import('../features/sesiones/containers/RedireccionTutorias'))
+const DetalleTutoriaContainer = lazy(() => import('../features/sesiones/containers/DetalleTutoriaContainer'))
 
 export function AppRoutes({ children }: { children?: ReactNode }) {
   return (
@@ -40,10 +42,15 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
           <Route path="/tutores/:idTutor" element={<PerfilTutorContainer />} />
           <Route path="/postulacion-tutor" element={<PostulacionTutorContainer />} />
           <Route path="/perfil" element={<PerfilContainer />} />
+          <Route path="/panel/tutorias/:idSesion" element={<DetalleTutoriaContainer />} />
+          <Route path="/mis-tutorias/:idSesion" element={<RedireccionTutorias />} />
+        </Route>
+        <Route element={<RutaProtegida roles={['ESTUDIANTE', 'TUTOR']} />}>
+          <Route path="/panel" element={<PanelTuteeContainer />} />
+          <Route path="/mis-tutorias" element={<RedireccionTutorias />} />
         </Route>
         <Route element={<RutaProtegida roles={['ESTUDIANTE']} />}>
           <Route path="/inicio" element={<DashboardEstudianteContainer />} />
-          <Route path="/panel" element={<PanelTuteeContainer />} />
           <Route path="/solicitudes/nueva" element={<SolicitarTutoriaContainer />} />
         </Route>
         <Route element={<RutaProtegida roles={['TUTOR']} />}>
