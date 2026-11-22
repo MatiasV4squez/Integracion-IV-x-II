@@ -49,6 +49,20 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
                         {cancelacion.cancelando === sesion.id_sesion ? 'Cancelando…' : 'Cancelar'}
                       </button>
                     )}
+                    {[
+                      'CONFIRMADA',
+                      'PENDIENTE_CIERRE',
+                      'COMPLETADA',
+                      'NO_REALIZADA',
+                      'INASISTENCIA',
+                      'EN_CONFLICTO',
+                    ].includes(sesion.estado_sesion) && (
+                      <Link
+                        to={`/reportes/nuevo?sesionId=${sesion.id_sesion}&usuarioReportadoId=${sesion.id_tutor}`}
+                      >
+                        Reportar problema
+                      </Link>
+                    )}
                   </div>
                 )}
               </td>

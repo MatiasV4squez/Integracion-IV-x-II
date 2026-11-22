@@ -53,6 +53,25 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
                 <Link className="boton-global boton-global--secundario" to="/solicitudes/recibidas">Gestionar solicitud</Link>}
               {tutoria.id_tutee === idUsuario && tutoria.acciones_disponibles.cancelar &&
                 <Link className="boton-global boton-global--secundario" to="/panel">Gestionar en mi panel</Link>}
+              {(tutoria.id_tutor === idUsuario || tutoria.id_tutee === idUsuario) && [
+                'CONFIRMADA',
+                'PENDIENTE_CIERRE',
+                'COMPLETADA',
+                'NO_REALIZADA',
+                'INASISTENCIA',
+                'EN_CONFLICTO',
+              ].includes(tutoria.estado_sesion) && (
+                <Link
+                  className="boton-global boton-global--secundario"
+                  to={`/reportes/nuevo?sesionId=${tutoria.id_sesion}&usuarioReportadoId=${
+                    tutoria.id_tutor === idUsuario
+                      ? tutoria.id_tutee
+                      : tutoria.id_tutor
+                  }`}
+                >
+                  Reportar problema
+                </Link>
+              )}
             </section>
             <section className="tutorias__panel" aria-labelledby="cierre-tutoria-titulo"><h2 id="cierre-tutoria-titulo">Cierre de la sesión</h2>
               {tutoria.declaraciones.length === 0 ? <p className="tutorias__texto-secundario">Todavía no hay declaraciones de cierre para esta sesión.</p>
