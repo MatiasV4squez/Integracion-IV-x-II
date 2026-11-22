@@ -110,6 +110,7 @@
 
 .encabezado-global__contenido {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 28px;
@@ -118,9 +119,11 @@
 
 .navegacion-global {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 32px;
+  row-gap: 8px;
   flex: 1;
 }
 

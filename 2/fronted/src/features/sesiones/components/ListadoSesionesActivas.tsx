@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { Materia } from '../../materias/models/materia'
 import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import type { Sesion } from '../models/sesion'
@@ -29,6 +30,8 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
               <td data-etiqueta="Materia / Tutor">
                 <strong>{materia ? materia.nombre + ' · ' + materia.codigo : 'Materia #' + sesion.id_materia}</strong>
                 <p>{nombresTutores?.get(sesion.id_tutor) ?? 'Tutor #' + sesion.id_tutor}</p>
+                <Link className="listado-sesiones-activas__detalle" to={'/panel/tutorias/' + sesion.id_sesion + '?vista=activas'}
+                  aria-label={'Ver detalle de la tutoría #' + sesion.id_sesion}>Ver detalle</Link>
               </td>
               <td data-etiqueta="Fecha y horario">
                 <time dateTime={sesion.inicio}>{formatearHorarioSesion(sesion.inicio, sesion.fin)}</time>
@@ -45,6 +48,20 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
                         onClick={() => cancelacion.cancelar(sesion.id_sesion)}>
                         {cancelacion.cancelando === sesion.id_sesion ? 'Cancelando…' : 'Cancelar'}
                       </button>
+                    )}
+                    {[
+                      'CONFIRMADA',
+                      'PENDIENTE_CIERRE',
+                      'COMPLETADA',
+                      'NO_REALIZADA',
+                      'INASISTENCIA',
+                      'EN_CONFLICTO',
+                    ].includes(sesion.estado_sesion) && (
+                      <Link
+                        to={`/reportes/nuevo?sesionId=${sesion.id_sesion}&usuarioReportadoId=${sesion.id_tutor}`}
+                      >
+                        Reportar problema
+                      </Link>
                     )}
                   </div>
                 )}

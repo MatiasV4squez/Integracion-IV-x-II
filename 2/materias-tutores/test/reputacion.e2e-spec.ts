@@ -1,3 +1,5 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -34,6 +36,8 @@ describe('Reputación HTTP', () => {
     prisma.perfilTutor.upsert.mockResolvedValue({ ...perfil, estado: 'ACTIVO' });
     prisma.perfilTutor.findUnique.mockResolvedValue(perfil);
     const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(crearSesionAuthMock())
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(ConfigService)

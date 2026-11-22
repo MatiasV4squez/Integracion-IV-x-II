@@ -26,7 +26,9 @@ export function TutoriasLayout() {
     tieneRol(rolesSesion, 'ESTUDIANTE') &&
     tieneRol(rolesSesion, 'TUTOR') &&
     !tieneRol(rolesSesion, 'ADMINISTRADOR')
-  const rutaEstudiante = ['/inicio', '/panel', '/solicitudes/nueva'].includes(ubicacion.pathname)
+  const rutaPanel = ubicacion.pathname === '/panel' || ubicacion.pathname.startsWith('/panel/tutorias/')
+  const rutaEstudiante = ['/inicio', '/solicitudes/nueva'].includes(ubicacion.pathname)
+    || (rutaPanel && new URLSearchParams(ubicacion.search).get('rol') !== 'TUTOR')
   const rolInicial: RolVista = rutaEstudiante ? 'ESTUDIANTE' : 'TUTOR'
   const rolActivo = seleccionRol && seleccionRol.idUsuario === sesion?.idUsuario
     ? seleccionRol.rol

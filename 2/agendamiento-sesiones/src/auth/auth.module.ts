@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { IntegracionSecretGuard } from './integracion-secret.guard';
+import { HttpSesionAuthClient } from './http-sesion-auth.client';
 
 @Module({
   imports: [
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -26,7 +29,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       },
     }),
   ],
-  providers: [JwtAuthGuard],
-  exports: [JwtAuthGuard, JwtModule],
+  providers: [JwtAuthGuard, IntegracionSecretGuard, HttpSesionAuthClient],
+  exports: [JwtAuthGuard, JwtModule, IntegracionSecretGuard, HttpSesionAuthClient],
 })
 export class AuthModule {}

@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { HttpSesionAuthClient } from '../../clientes/http-sesion-auth.client.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import {
   ForbiddenException,
@@ -53,9 +54,9 @@ function contextoCon(
   return { context, request };
 }
 
-function capturarError(fn: () => boolean): unknown {
+async function capturarError(fn: () => Promise<boolean>): Promise<unknown> {
   try {
-    fn();
+    await fn();
   } catch (error) {
     return error;
   }
@@ -64,21 +65,24 @@ function capturarError(fn: () => boolean): unknown {
 
 describe('AdminJwtGuard', () => {
   let guard: AdminJwtGuard;
+  const sesiones = new HttpSesionAuthClient();
 
   beforeEach(() => {
     process.env.JWT_SECRET = JWT_SECRET;
-    guard = new AdminJwtGuard();
+    vi.spyOn(sesiones, 'validar').mockResolvedValue(undefined);
+    guard = new AdminJwtGuard(sesiones);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     delete process.env.JWT_SECRET;
   });
 
-  it('acepta un token válido con rol administrador y expone al usuario', () => {
+  it('acepta un token válido con rol administrador y expone al usuario', async () => {
     const token = firmar(payloadAdministrador());
     const { context, request } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(guard.canActivate(context)).toBe(true);
+    expect(await guard.canActivate(context)).toBe(true);
     expect(request.user).toEqual({
       sub: '9',
       jti: 'jti-de-prueba',
@@ -87,10 +91,10 @@ describe('AdminJwtGuard', () => {
     });
   });
 
-  it('rechaza una solicitud sin cabecera Authorization', () => {
+  it('rechaza una solicitud sin cabecera Authorization', async () => {
     const { context } = contextoCon({});
 
-    const error = capturarError(() => guard.canActivate(context));
+    const error = await capturarError(() => guard.canActivate(context));
 
     expect(error).toBeInstanceOf(UnauthorizedException);
     expect((error as UnauthorizedException).getResponse()).toMatchObject({
@@ -98,83 +102,83 @@ describe('AdminJwtGuard', () => {
     });
   });
 
-  it('rechaza un esquema que no sea Bearer', () => {
+  it('rechaza un esquema que no sea Bearer', async () => {
     const token = firmar(payloadAdministrador());
     const { context } = contextoCon({ authorization: `Basic ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token con estructura inválida', () => {
+  it('rechaza un token con estructura inválida', async () => {
     const { context } = contextoCon({ authorization: 'Bearer no-es-un-jwt' });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token firmado con otro secreto', () => {
+  it('rechaza un token firmado con otro secreto', async () => {
     const token = firmar(payloadAdministrador(), undefined, 'otro-secreto');
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token con algoritmo none', () => {
+  it('rechaza un token con algoritmo none', async () => {
     const token = firmar(payloadAdministrador(), { alg: 'none', typ: 'JWT' });
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token expirado', () => {
+  it('rechaza un token expirado', async () => {
     const ahora = Math.floor(Date.now() / 1000);
     const token = firmar(payloadAdministrador({ exp: ahora - 1 }));
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token con emisor desconocido', () => {
+  it('rechaza un token con emisor desconocido', async () => {
     const token = firmar(payloadAdministrador({ iss: 'otro-servicio' }));
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token con audiencia distinta', () => {
+  it('rechaza un token con audiencia distinta', async () => {
     const token = firmar(payloadAdministrador({ aud: 'otra-audiencia' }));
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza un token con identificador de usuario inválido', () => {
+  it('rechaza un token con identificador de usuario inválido', async () => {
     const token = firmar(payloadAdministrador({ sub: '0' }));
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
-  it('rechaza con 403 un token válido sin rol administrador', () => {
+  it('rechaza con 403 un token válido sin rol administrador', async () => {
     const token = firmar(payloadAdministrador({ roles: ['ESTUDIANTE'] }));
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    const error = capturarError(() => guard.canActivate(context));
+    const error = await capturarError(() => guard.canActivate(context));
 
     expect(error).toBeInstanceOf(ForbiddenException);
     expect((error as ForbiddenException).getResponse()).toMatchObject({
@@ -182,13 +186,30 @@ describe('AdminJwtGuard', () => {
     });
   });
 
-  it('falla con 503 cuando no está configurado JWT_SECRET', () => {
+  it('falla con 503 cuando no está configurado JWT_SECRET', async () => {
     delete process.env.JWT_SECRET;
     const token = firmar(payloadAdministrador());
     const { context } = contextoCon({ authorization: `Bearer ${token}` });
 
-    expect(capturarError(() => guard.canActivate(context))).toBeInstanceOf(
+    expect(await capturarError(() => guard.canActivate(context))).toBeInstanceOf(
       ServiceUnavailableException,
     );
+  });
+
+  it('espera la validación de Auth antes de autorizar al administrador', async () => {
+    let confirmar!: () => void;
+    vi.spyOn(sesiones, 'validar').mockImplementationOnce(() => new Promise<void>((resolve) => { confirmar = resolve; }));
+    const { context, request } = contextoCon({ authorization: `Bearer ${firmar(payloadAdministrador())}` });
+    const resultado = guard.canActivate(context);
+    expect(request.user).toBeUndefined();
+    confirmar();
+    await expect(resultado).resolves.toBe(true);
+  });
+
+  it('rechaza un JWT de administrador cuya sesión Auth revocó', async () => {
+    vi.spyOn(sesiones, 'validar').mockRejectedValueOnce(new UnauthorizedException());
+    const { context, request } = contextoCon({ authorization: `Bearer ${firmar(payloadAdministrador())}` });
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(request.user).toBeUndefined();
   });
 });

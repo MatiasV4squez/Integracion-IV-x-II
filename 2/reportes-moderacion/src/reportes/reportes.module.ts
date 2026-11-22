@@ -5,6 +5,7 @@ import { ReportesController } from './infraestructura/http/reportes.controller.j
 import { ValidarSesionParaReporteGuard } from './infraestructura/http/guards/validar-sesion-para-reporte.guard.js';
 import { AdminJwtGuard } from './infraestructura/http/guards/admin-jwt.guard.js';
 import { UsuarioJwtGuard } from './infraestructura/http/guards/usuario-jwt.guard.js';
+import { HttpSesionAuthClient } from './infraestructura/clientes/http-sesion-auth.client.js';
 import { PrismaReporteRepository } from './infraestructura/persistencia/prisma-reporte.repository.js';
 import { PrismaReporteConsultaRepository } from './infraestructura/persistencia/prisma-reporte-consulta.repository.js';
 import { HttpSesionesReporteValidator } from './infraestructura/clientes/http-sesiones-reporte-validator.js';
@@ -50,6 +51,7 @@ import { ConsultarReportesAdminUseCase } from './aplicacion/consultar-reportes-a
     ConsultarReportesAdminUseCase,
     ValidarSesionParaReporteGuard,
     UsuarioJwtGuard,
+    HttpSesionAuthClient,
     AdminJwtGuard,
   ],
 })

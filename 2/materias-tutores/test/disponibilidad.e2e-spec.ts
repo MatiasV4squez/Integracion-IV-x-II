@@ -1,4 +1,6 @@
-import { INestApplication } from '@nestjs/common';
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client.js';
+import { crearSesionAuthMock } from './helpers/sesion-auth.js';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -48,13 +50,17 @@ const prismaMock = {
 
 describe('DisponibilidadController (e2e)', () => {
   let app: INestApplication<Server>;
+  let sesiones: ReturnType<typeof crearSesionAuthMock>;
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    sesiones = crearSesionAuthMock();
     prismaMock.$transaction.mockImplementation((operacion: (tx: typeof prismaMock) => unknown) => operacion(prismaMock));
     prismaMock.$queryRaw.mockResolvedValue([]);
     prismaMock.bloqueHorario.findFirst.mockResolvedValue(null);
     const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue(sesiones)
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .compile();
@@ -64,6 +70,14 @@ describe('DisponibilidadController (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  it('impide crear disponibilidad con una sesión rechazada por Auth aunque tenga rol TUTOR', async () => {
+    sesiones.validar.mockRejectedValue(new UnauthorizedException());
+    await request(app.getHttpServer()).post('/disponibilidad/bloques')
+      .set('Authorization', `Bearer ${token()}`)
+      .send({ dia: '2026-10-01', horaInicio: '09:00', horaFin: '10:00' }).expect(401);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('crea un bloque para el tutor identificado por el token', async () => {

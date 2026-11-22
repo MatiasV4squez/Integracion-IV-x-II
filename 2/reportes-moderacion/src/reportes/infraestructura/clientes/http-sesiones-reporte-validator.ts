@@ -40,15 +40,19 @@ function isValidacionReporteResponse(
 
 @Injectable()
 export class HttpSesionesReporteValidator implements SesionesReporteValidator {
-  async consultarParaReporte(
-    idSesion: string,
-  ): Promise<ParticipacionSesion | null> {
+  async consultarParaReporte(idSesion: string): Promise<ParticipacionSesion | null> {
     const endpoint = this.endpoint(idSesion);
+    const secreto = process.env.MODERACION_INTEGRACION_SECRET;
+
+    if (!secreto || Buffer.byteLength(secreto, 'utf8') < 32){
+      throw servicioSesionesNoDisponible();
+    }
+
     let response: Response;
 
     try {
       response = await fetch(endpoint, {
-        headers: { accept: 'application/json' },
+        headers: { accept: 'application/json', 'x-integracion-secret': secreto },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {
@@ -88,7 +92,7 @@ export class HttpSesionesReporteValidator implements SesionesReporteValidator {
         throw new Error('Invalid protocol');
       }
       return new URL(
-        `sesiones/${encodeURIComponent(idSesion)}/validacion-reporte`,
+        `sessions/${encodeURIComponent(idSesion)}/validacion-reporte`,
         baseUrl,
       );
     } catch {

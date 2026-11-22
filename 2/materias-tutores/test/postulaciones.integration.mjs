@@ -15,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
 import { PrismaService } from '../dist/database/prisma.service.js';
+import { HttpSesionAuthClient } from '../dist/auth/http-sesion-auth.client.js';
 import { PostulacionesModule } from '../dist/postulaciones/postulaciones.module.js';
 import { TutoresModule } from '../dist/tutores/tutores.module.js';
 
@@ -78,7 +79,9 @@ before(async () => {
   const modulo = await Test.createTestingModule({ imports: [
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ DATABASE_URL: databaseUrl, JWT_SECRET: secreto, INTEGRACION_SECRET: secreto, CERTIFICADOS_DIR: certificadosDir, USUARIOS_AUTH_ASIGNAR_TUTOR_URL: authUrl })] }),
     PostulacionesModule, TutoresModule,
-  ] }).overrideProvider(PrismaService).useValue(prisma).compile();
+  ] })
+    .overrideProvider(HttpSesionAuthClient).useValue({ validar: async () => {} })
+    .overrideProvider(PrismaService).useValue(prisma).compile();
   app = modulo.createNestApplication({ logger: false });
   await app.listen(0, '127.0.0.1');
   Object.assign(process.env, { MATERIAS_TUTORES_URL: await app.getUrl(), USUARIOS_AUTH_URL: '', AGENDAMIENTO_SESIONES_URL: '', REPORTES_MODERACION_URL: '', CORS_ORIGIN: 'http://localhost:5173' });

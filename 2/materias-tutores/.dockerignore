@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.git
+.env
+.env.*
+*.log
+*.tsbuildinfo
+src/generated/prisma
+/certificados
+/data

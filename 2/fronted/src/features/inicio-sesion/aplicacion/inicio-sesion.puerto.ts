@@ -7,7 +7,7 @@ export interface InicioSesionPuerto {
 }
 
 export class ErrorInicioSesion extends Error {
-  readonly estado: 'invalido' | 'credenciales' | 'suspendida' | 'inactiva' | 'error'
+  readonly estado: 'invalido' | 'credenciales' | 'pendiente' | 'suspendida' | 'inactiva' | 'error'
   constructor(estado: ErrorInicioSesion['estado']) {
     super('No se pudo iniciar sesión.')
     this.estado = estado

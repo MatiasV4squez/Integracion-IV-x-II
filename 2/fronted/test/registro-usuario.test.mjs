@@ -9,6 +9,7 @@ let vite, api, ErrorRegistro, validarRegistro, Container, Page
 const fetchOriginal = globalThis.fetch
 const signal = () => new AbortController().signal
 const datosValidos = { nombre: ' Camila González ', correo: ' Camila@Alu.Uct.Cl ', contrasena: 'clave-segura-1' }
+const cuentaCreada = { id: '7', nombre: 'Camila González', correo: 'camila@alu.uct.cl', estado: 'INACTIVO', verificacion: 'ENLACE_GENERADO' }
 
 before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
@@ -44,9 +45,11 @@ test('registra exclusivamente por el Gateway con el contrato público de Auth', 
   const llamadas = []
   globalThis.fetch = async (url, opciones) => {
     llamadas.push({ url, opciones })
-    return Response.json({ mensaje: 'Cuenta creada' }, { status: 201 })
+    return Response.json(cuentaCreada, { status: 201 })
   }
-  await api.registrar(datosValidos, signal())
+  assert.deepEqual(await api.registrar(datosValidos, signal()), {
+    correo: 'camila@alu.uct.cl', verificacion: 'ENLACE_GENERADO',
+  })
   assert.equal(llamadas.length, 1)
   const { url, opciones } = llamadas[0]
   assert.equal(url, vite.config.env.VITE_API_BASE_URL.replace(/\/+$/, '') + '/usuarios-auth/usuarios/registro')
@@ -60,6 +63,29 @@ test('registra exclusivamente por el Gateway con el contrato público de Auth', 
     correo_institucional: 'camila@alu.uct.cl',
     password_hash: 'clave-segura-1',
   })
+})
+
+test('un fallo de entrega conserva el registro y permite pasar a la pantalla de recuperación', async () => {
+  let llamadas = 0
+  globalThis.fetch = async () => {
+    llamadas++
+    return Response.json({ ...cuentaCreada, verificacion: 'PENDIENTE_ENVIO' }, { status: 201 })
+  }
+  assert.deepEqual(await api.registrar(datosValidos, signal()), {
+    correo: 'camila@alu.uct.cl', verificacion: 'PENDIENTE_ENVIO',
+  })
+  assert.equal(llamadas, 1, 'No repite el registro ni solicita otro enlace')
+})
+
+test('un 201 sin el nuevo contrato no se presenta como registro completado', async () => {
+  for (const cuerpo of [null, {}, { mensaje: 'ok' },
+    { ...cuentaCreada, estado: 'ACTIVO' }, { ...cuentaCreada, correo: 'otra@alu.uct.cl' },
+    { ...cuentaCreada, verificacion: 'DESCONOCIDA' }]) {
+    globalThis.fetch = async () => Response.json(cuerpo, { status: 201 })
+    await assert.rejects(api.registrar(datosValidos, signal()), ErrorRegistro)
+  }
+  globalThis.fetch = async () => new Response('<html>', { status: 201 })
+  await assert.rejects(api.registrar(datosValidos, signal()), ErrorRegistro)
 })
 
 test('solo admite el correo institucional que Auth acepta', async () => {
@@ -122,22 +148,17 @@ test('la ruta de registro presenta el formulario completo sin resultados previos
   assert.doesNotMatch(html, /registro-resultado|Cuenta creada/)
 })
 
-test('muestra el resultado del registro y sus errores según el estado del envío', () => {
+test('mantiene el formulario ante errores y ofrece verificar un correo ya registrado', () => {
   const pagina = (envio) => renderToStaticMarkup(createElement(MemoryRouter, null,
     createElement(Page, { envio, registrar: () => {} })))
-  const exito = pagina('exitoso')
-  assert.match(exito, /¡Cuenta creada!/)
-  assert.match(exito, /Ya puedes iniciar sesión/)
-  assert.doesNotMatch(exito, /Revisa tu correo/, 'Auth no envía el enlace al registrar')
-  assert.match(exito, /Ir a iniciar sesión/)
-  assert.match(exito, /href="\/verificar-cuenta"[^>]*>Solicitar enlace de verificación/)
-  assert.doesNotMatch(exito, /name="contrasena"/)
   for (const [envio, esperado] of [['invalido', /No pudimos crear tu cuenta/], ['duplicado', /El correo institucional ya está registrado/], ['error', /No pudimos completar el registro/]]) {
     const html = pagina(envio)
     assert.match(html, esperado)
     assert.match(html, /role="alert"/)
     assert.match(html, /name="contrasena"/)
   }
+  assert.match(pagina('duplicado'), /href="\/verificar-cuenta"[^>]*>Verificar mi correo/)
+  assert.doesNotMatch(pagina('inactivo'), /Ya puedes iniciar sesión|Solicitar enlace de verificación/)
   const enviando = pagina('enviando')
   assert.match(enviando, /Creando cuenta…/)
   assert.match(enviando, /disabled/)

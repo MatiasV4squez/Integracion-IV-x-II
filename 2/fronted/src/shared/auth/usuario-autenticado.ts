@@ -21,6 +21,18 @@ export function guardarSesionUsuario(resultado: ResultadoInicioSesion) {
   window.dispatchEvent(new Event('stp:sesion'))
 }
 
+// Mantiene la cabecera al día cuando el usuario cambia su nombre desde Mi perfil.
+export function actualizarNombreUsuario(idUsuario: string, nombre: string) {
+  const limpio = nombre.trim()
+  if (!limpio) return
+  try {
+    window.localStorage.setItem('usuario', JSON.stringify({ idUsuario, nombre: limpio }))
+  } catch {
+    // Sin almacenamiento, la cabecera mostrará el nombre nuevo en el próximo inicio de sesión.
+  }
+  window.dispatchEvent(new Event('stp:sesion'))
+}
+
 // Retira la sesión local aunque la revocación en Auth no haya podido confirmarse.
 export function cerrarSesionUsuario() {
   try {

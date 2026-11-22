@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { AccesoLayout } from '../../../shared/layout/AccesoLayout'
-import { LONGITUD_MAXIMA_CORREO } from '../../../shared/utils/validaciones-formulario'
+import { LONGITUD_MAXIMA_CORREO, normalizarCorreo } from '../../../shared/utils/validaciones-formulario'
 import type { CredencialesInicioSesion } from '../models/credenciales'
 import { MENSAJES_RESULTADO_INICIO_SESION, type EstadoEnvioInicioSesion } from '../models/estado-inicio-sesion'
 import {
@@ -67,6 +68,8 @@ export default function InicioSesionPage({ envio, iniciarSesion }: {
           <strong>{resultado.titulo}.</strong> {resultado.detalle}
         </p>
       )}
+      {envio === 'pendiente' && <Link to="/verificar-cuenta" state={{ correo: normalizarCorreo(credenciales.correo) }}
+        className="boton-global boton-global--secundario">Verificar mi correo</Link>}
       <form className="inicio-sesion-formulario" onSubmit={enviar} noValidate>
         {CAMPOS.map(({ campo, etiqueta, tipo, autoComplete, placeholder, maximo }) => (
           <div className="inicio-sesion-campo" key={campo}>

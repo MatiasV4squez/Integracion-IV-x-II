@@ -23,5 +23,15 @@ export const registroUsuarioHttp: RegistroUsuarioPuerto = {
     if (respuesta.status !== 201) {
       throw new ErrorRegistro(respuesta.status === 400 ? 'invalido' : respuesta.status === 409 ? 'duplicado' : 'error')
     }
+    let resultado: unknown
+    try { resultado = await respuesta.json() } catch { throw new ErrorRegistro('error') }
+    if (!resultado || typeof resultado !== 'object'
+      || !('estado' in resultado) || resultado.estado !== 'INACTIVO'
+      || !('correo' in resultado) || resultado.correo !== normalizarCorreo(datos.correo)
+      || !('verificacion' in resultado)
+      || (resultado.verificacion !== 'ENLACE_GENERADO' && resultado.verificacion !== 'PENDIENTE_ENVIO')) {
+      throw new ErrorRegistro('error')
+    }
+    return { correo: resultado.correo, verificacion: resultado.verificacion }
   },
 }

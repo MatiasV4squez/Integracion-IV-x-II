@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
 
-let vite, api, ErrorVerificacion, Container
+let vite, api, ErrorVerificacion, Container, Page, leerContextoVerificacion
 const fetchOriginal = globalThis.fetch
 const token = 'a'.repeat(64)
 const signal = () => new AbortController().signal
@@ -15,6 +15,8 @@ before(async () => {
   ;({ verificacionCuentaHttp: api } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/services/verificacion-cuenta-http.ts'))
   ;({ ErrorVerificacion } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/aplicacion/verificacion-cuenta.puerto.ts'))
   ;({ default: Container } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/containers/VerificacionCuentaContainer.tsx'))
+  ;({ default: Page } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/pages/VerificacionCuentaPage.tsx'))
+  ;({ leerContextoVerificacion } = await vite.ssrLoadModule('/src/features/verificacion-cuenta/models/estado-verificacion.ts'))
 })
 afterEach(() => { globalThis.fetch = fetchOriginal })
 after(async () => { await vite?.close() })
@@ -104,11 +106,59 @@ test('el token real prevalece sobre una vista de éxito y los enlaces vacíos o 
   const render = (ruta) => renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [ruta] }, createElement(Container, { api })))
   const html = render('/verificar-cuenta?token=' + token + '&vista=verificada')
   assert.match(html, /Confirmar correo/)
-  assert.doesNotMatch(html, /¡Tu cuenta está verificada!|Vista de demostración/)
+  assert.doesNotMatch(html, /¡Tu correo está verificado!|Vista de demostración/)
   assert.doesNotMatch(html, new RegExp(token))
   for (const consulta of ['token=', 'token=uno&token=dos']) {
     const invalida = render('/verificar-cuenta?' + consulta)
     assert.match(invalida, /Enlace no válido/)
     assert.doesNotMatch(invalida, /Confirmar correo/)
   }
+})
+
+test('el registro llega a espera con el correo precargado y sin solicitudes automáticas', () => {
+  globalThis.fetch = () => { assert.fail('Entrar en espera no debe solicitar ni confirmar enlaces') }
+  for (const [verificacion, titulo] of [
+    ['ENLACE_GENERADO', /Cuenta creada\. Verifica tu correo/],
+    ['PENDIENTE_ENVIO', /Tu cuenta fue creada, pero falta enviar el enlace/],
+  ]) {
+    const entrada = { pathname: '/verificar-cuenta', state: { correo: ' CAMILA@ALU.UCT.CL ', verificacion } }
+    // Volver a montar simula recuperar el contexto de navegación tras recargar.
+    for (let intento = 0; intento < 2; intento++) {
+      const html = renderToStaticMarkup(createElement(MemoryRouter, { initialEntries: [entrada] }, createElement(Container, { api })))
+      assert.match(html, titulo)
+      assert.match(html, /value="camila@alu.uct.cl"/)
+      assert.match(html, /Solicitar nuevo enlace/)
+      assert.doesNotMatch(html, /Confirmar correo|Ya puedes iniciar sesión/)
+    }
+  }
+})
+
+test('el acceso desde login precarga el correo y el token prevalece sobre los avisos del registro', () => {
+  const render = (search, state) => renderToStaticMarkup(createElement(MemoryRouter, {
+    initialEntries: [{ pathname: '/verificar-cuenta', search, state }],
+  }, createElement(Container, { api })))
+  const desdeLogin = render('', { correo: 'camila@alu.uct.cl' })
+  assert.match(desdeLogin, /value="camila@alu.uct.cl"/)
+  assert.doesNotMatch(desdeLogin, /Cuenta creada|Confirmar correo/)
+  const conToken = render('?token=' + token, { correo: 'camila@alu.uct.cl', verificacion: 'PENDIENTE_ENVIO' })
+  assert.match(conToken, /Confirmar correo/)
+  assert.doesNotMatch(conToken, /falta enviar el enlace|Cuenta creada/)
+})
+
+test('un estado de navegación no puede acreditar una cuenta verificada ni introducir un correo inválido', () => {
+  for (const estado of [null, 'texto', 42, {}, { correo: 7 }, { correo: '<script>' },
+    { verificacion: 'verificada' }, { verificacion: 'ACTIVO', correo_verificado: true }]) {
+    assert.deepEqual(leerContextoVerificacion(estado), { correo: '', estado: 'pendiente' })
+  }
+})
+
+test('la confirmación no promete acceso a cuentas suspendidas y el reenvío conserva un mensaje neutro', () => {
+  const render = (props) => renderToStaticMarkup(createElement(MemoryRouter, null, createElement(Page, props)))
+  const verificada = render({ estado: 'verificada', reenviar() {} })
+  assert.match(verificada, /¡Tu correo está verificado!/)
+  assert.match(verificada, /Si tu cuenta está suspendida/)
+  assert.match(verificada, /href="\/login"/)
+  assert.doesNotMatch(verificada, /Solicitar nuevo enlace|Confirmar correo/)
+  const reenvio = render({ estado: 'pendiente', reenviar() {}, reenvio: 'enviado' })
+  assert.match(reenvio, /Si la cuenta existe y requiere verificación/)
 })

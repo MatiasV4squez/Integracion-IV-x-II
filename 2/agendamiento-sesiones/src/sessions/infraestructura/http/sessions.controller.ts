@@ -1,5 +1,5 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards, UseFilters } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, ForbiddenException, Get, Header, Param, Patch, Post, Query, Req, UseGuards, UseFilters } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../../../auth/autenticacion-request';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import { CalificarSesionDto } from './calificar-sesion.dto';
@@ -8,15 +8,25 @@ import { SesionCreadaResponseDto } from './sesion-creada.response.dto';
 import { DeclararCierreDto } from './declarar-cierre.dto';
 import { ResolveConflictDto } from './resolve-conflict.dto';
 import { GestionarSesiones } from '../../aplicacion/casos-de-uso/gestionar-sesiones';
+import { ConsultarDetalleSesion } from '../../aplicacion/casos-de-uso/consultar-detalle-sesion';
+import { ConsultarHistorialPaginado } from '../../aplicacion/casos-de-uso/consultar-historial-paginado';
+import { ConsultaHistorialDto } from './consulta-historial.dto';
+import { HistorialPaginadoResponseDto } from './historial-paginado.response.dto';
+import { DetalleSesionResponseDto } from './detalle-sesion.response.dto';
 import { ErrorSesionFilter } from './error-sesion.filter';
-import { aRespuestaSesion, aRespuestaDeclaracion, aRespuestaCalificacion } from './respuestas-sesion';
+import { IntegracionSecretGuard } from '../../../auth/integracion-secret.guard';
+import { aRespuestaSesion, aRespuestaDeclaracion, aRespuestaCalificacion, aRespuestaDetalleSesion } from './respuestas-sesion';
 
 @ApiTags('Sessions')
 @ApiBearerAuth()
 @UseFilters(ErrorSesionFilter)
 @Controller('sessions')
 export class SessionsController {
-  constructor(private readonly sesiones: GestionarSesiones) {}
+  constructor(
+    private readonly sesiones: GestionarSesiones,
+    private readonly detalle: ConsultarDetalleSesion,
+    private readonly historialPaginado: ConsultarHistorialPaginado,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -53,8 +63,6 @@ export class SessionsController {
     description:
       'Fallo inesperado de persistencia; se intenta liberar la reserva confirmada.',
   })
-  
-  
   async crearSesion(
     @Body() entrada: CreateSessionDto,
     @Req() solicitud: AuthenticatedRequest,
@@ -79,6 +87,30 @@ export class SessionsController {
       ...aRespuestaSesion(sesion),
       calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
     }));
+  }
+
+  @Get('history/paginated')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Consultar el historial propio paginado por rol y estado',
+    description: 'La identidad proviene del JWT, incluso para administradores. Filtra por participación como ESTUDIANTE o TUTOR y por estado; sin filtros incluye todas las sesiones propias. Ordena por fecha de creación e ID descendentes. La ruta /sessions/history conserva su arreglo original.',
+  })
+  @ApiResponse({ status: 200, description: 'Página del historial propio con calificaciones y totales.', type: HistorialPaginadoResponseDto })
+  @ApiResponse({ status: 400, description: 'Paginación o filtros inválidos, repetidos o parámetros no admitidos.' })
+  @ApiResponse({ status: 401, description: 'JWT ausente, inválido o expirado.' })
+  async consultarHistorialPaginado(
+    @Req() solicitud: AuthenticatedRequest,
+    @Query() consulta: ConsultaHistorialDto,
+  ) {
+    const pagina = await this.historialPaginado.ejecutar(solicitud.user.idUsuario, consulta);
+    return {
+      ...pagina,
+      items: pagina.items.map((sesion) => ({
+        ...aRespuestaSesion(sesion),
+        calificaciones: sesion.calificaciones.map(aRespuestaCalificacion),
+      })),
+    };
   }
 
   @Get('active')
@@ -107,6 +139,28 @@ export class SessionsController {
   async obtenerReputacionTutor(@Param('id') idTutor: string) {
     const reputacion = await this.sesiones.obtenerReputacionTutor(idTutor);
     return { ...reputacion, id_tutor: reputacion.id_tutor.toString() };
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary: 'Consultar el detalle de una sesión',
+    description: 'Acceso exclusivo a participantes y administradores. La identidad y los roles provienen del JWT. Incluye datos del encuentro, declaraciones, calificaciones y acciones disponibles, sin modificar la sesión ni consultar otros microservicios.',
+  })
+  @ApiParam({ name: 'id', type: String, example: '100', description: 'Identificador BIGINT positivo de la sesión, enviado como texto.' })
+  @ApiResponse({ status: 200, description: 'Detalle de la sesión autorizado.', type: DetalleSesionResponseDto })
+  @ApiResponse({ status: 400, description: 'Identificador inválido o fuera del rango BIGINT.' })
+  @ApiResponse({ status: 401, description: 'JWT ausente, inválido o expirado.' })
+  @ApiResponse({ status: 403, description: 'El usuario no participa en la sesión ni es administrador.' })
+  @ApiResponse({ status: 404, description: 'La sesión no existe.' })
+  async consultarDetalle(
+    @Param('id') idSesion: string,
+    @Req() solicitud: AuthenticatedRequest,
+  ) {
+    return aRespuestaDetalleSesion(
+      await this.detalle.ejecutar(idSesion, solicitud.user.idUsuario, solicitud.user.roles),
+    );
   }
 
   @Patch(':id/accept')
@@ -230,5 +284,12 @@ export class SessionsController {
       request.user.idUsuario,
     );
     return aRespuestaSesion(sesion);
+  }
+
+  @Get(':id/validacion-reporte')
+  @UseGuards(IntegracionSecretGuard)
+  @Header('Cache-Control', 'no-store')
+  consultarValidacionReporte(@Param('id') idSesion: string) {
+    return this.sesiones.consultarValidacionReporte(idSesion);
   }
 }

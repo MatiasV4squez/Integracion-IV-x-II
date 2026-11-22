@@ -3,6 +3,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { HttpSesionesReporteValidator } from './http-sesiones-reporte-validator.js';
 
 const SERVICE_URL = 'http://agendamiento.local:3001';
+const SECRET = 's'.repeat(32);
 
 function respuestaJson(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -27,13 +28,14 @@ describe('HttpSesionesReporteValidator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', mockFetch);
-    process.env.SESIONES_SERVICE_URL = SERVICE_URL;
+    vi.stubEnv('SESIONES_SERVICE_URL', SERVICE_URL);
+    vi.stubEnv('MODERACION_INTEGRACION_SECRET', SECRET);
     validator = new HttpSesionesReporteValidator();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.SESIONES_SERVICE_URL;
+    vi.unstubAllEnvs();
   });
 
   it('consulta la participación y el estado de la sesión', async () => {
@@ -48,8 +50,13 @@ describe('HttpSesionesReporteValidator', () => {
     const resultado = await validator.consultarParaReporte('10');
 
     expect(mockFetch).toHaveBeenCalledWith(
-      new URL(`${SERVICE_URL}/sesiones/10/validacion-reporte`),
-      expect.objectContaining({ headers: { accept: 'application/json' } }),
+      new URL(`${SERVICE_URL}/sessions/10/validacion-reporte`),
+      expect.objectContaining({
+        headers: {
+          accept: 'application/json',
+          'x-integracion-secret': SECRET,
+        },
+      }),
     );
     expect(resultado).toEqual({
       alcanzoEstadoConfirmada: true,
@@ -94,11 +101,23 @@ describe('HttpSesionesReporteValidator', () => {
   });
 
   it('falla con 503 cuando falta SESIONES_SERVICE_URL', async () => {
-    delete process.env.SESIONES_SERVICE_URL;
+    vi.stubEnv('SESIONES_SERVICE_URL', undefined);
 
     expect(
       await capturarError(validator.consultarParaReporte('10')),
     ).toBeInstanceOf(ServiceUnavailableException);
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it.each([undefined, '', 'corto'])(
+    'falla con 503 sin enviar la petición cuando el secreto es inválido: %s',
+    async (secreto) => {
+      vi.stubEnv('MODERACION_INTEGRACION_SECRET', secreto);
+
+      await expect(validator.consultarParaReporte('10')).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    },
+  );
 });

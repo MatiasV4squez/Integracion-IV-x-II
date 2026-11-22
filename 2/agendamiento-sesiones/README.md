@@ -89,6 +89,14 @@ migraciones y `package-lock.json` para reproducir las dependencias.
 
 ## Consulta de sesiones activas
 
+`GET /sessions/history/paginated` agrega paginación y filtros por participación
+y estado para el usuario autenticado. El contrato y la compatibilidad con
+`GET /sessions/history` se describen en [docs/historial-paginado.md](docs/historial-paginado.md).
+
+La consulta autenticada `GET /sessions/:id`, sus permisos, datos del encuentro,
+declaraciones y acciones disponibles se describen en
+[docs/detalle-sesion.md](docs/detalle-sesion.md).
+
 `GET /sessions/active` requiere `Authorization: Bearer <JWT>`. A través del
 Gateway se consulta `GET /api/agendamiento-sesiones/sessions/active`.
 

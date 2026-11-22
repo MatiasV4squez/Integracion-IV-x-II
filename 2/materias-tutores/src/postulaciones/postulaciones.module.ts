@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthenticatedJwtGuard } from '../auth/authenticated-jwt.guard.js';
+import { HttpSesionAuthClient } from '../auth/http-sesion-auth.client.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { PostulacionesController } from './infraestructura/http/postulaciones.controller.js';
 import { PrismaPostulacionesRepository } from './infraestructura/prisma-postulaciones.repository.js';
@@ -32,6 +33,7 @@ import { ReintentarAsignacionRolUseCase } from './aplicacion/reintentar-asignaci
   ],
   controllers: [PostulacionesController],
   providers: [
+    HttpSesionAuthClient,
     AuthenticatedJwtGuard,
     { provide: POSTULACIONES_REPOSITORY, useClass: PrismaPostulacionesRepository },
     { provide: CERTIFICADOS, useClass: CertificadosDiscoAdapter },

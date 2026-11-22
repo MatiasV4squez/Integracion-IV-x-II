@@ -1,6 +1,7 @@
 import {
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
 } from '@nestjs/common';
 import {
@@ -8,6 +9,7 @@ import {
   usuarioActual,
   type RequestConUsuario,
 } from './usuario-jwt.guard.js';
+import { HttpSesionAuthClient } from '../../clientes/http-sesion-auth.client.js';
 
 const ROL_ADMINISTRADOR = 'ADMINISTRADOR';
 
@@ -21,8 +23,12 @@ function rolInsuficiente(): ForbiddenException {
 
 @Injectable()
 export class AdminJwtGuard extends UsuarioJwtGuard {
-  canActivate(context: ExecutionContext): boolean {
-    if (!super.canActivate(context)) return false;
+  constructor(@Inject(HttpSesionAuthClient) sesiones: HttpSesionAuthClient) {
+    super(sesiones);
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (!(await super.canActivate(context))) return false;
 
     const request = context.switchToHttp().getRequest<RequestConUsuario>();
     if (!usuarioActual(request).roles.includes(ROL_ADMINISTRADOR)) {

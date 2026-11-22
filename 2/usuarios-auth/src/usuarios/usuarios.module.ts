@@ -6,6 +6,9 @@ import { UsuariosPersistenceModule } from './infraestructura/persistencia/usuari
 import { UsuariosController } from './infraestructura/http/usuarios.controller';
 import type { PasswordHasher } from './dominio/ports/password.hasher';
 import { ConsultarDatosPublicosUseCase } from './aplicacion/consultar-datos-publicos.use-case';
+import { VerificacionCorreoModule } from '../verificacion-correo/verificacion-correo.module';
+import { EmailVerificationService } from '../verificacion-correo/aplicacion/email-verification.service';
+import type { VerificacionRegistro } from './dominio/ports/verificacion-registro';
 import {
   DATOS_PUBLICOS_REPOSITORY,
   USUARIO_REPOSITORY,
@@ -14,14 +17,17 @@ import {
 } from './dominio/ports/usuario.repository';
 
 @Module({
-  imports: [UsuariosPersistenceModule, AuthModule],
+  imports: [UsuariosPersistenceModule, AuthModule, VerificacionCorreoModule],
   controllers: [UsuariosController],
   providers: [
     {
       provide: RegistrarUsuarioUseCase,
-      inject: [USUARIO_REPOSITORY, PasswordService],
-      useFactory: (usuarios: UsuarioRepository, contrasenas: PasswordHasher) =>
-        new RegistrarUsuarioUseCase(usuarios, contrasenas),
+      inject: [USUARIO_REPOSITORY, PasswordService, EmailVerificationService],
+      useFactory: (
+        usuarios: UsuarioRepository,
+        contrasenas: PasswordHasher,
+        verificacion: VerificacionRegistro,
+      ) => new RegistrarUsuarioUseCase(usuarios, contrasenas, verificacion),
     },
     {
       provide: ConsultarDatosPublicosUseCase,

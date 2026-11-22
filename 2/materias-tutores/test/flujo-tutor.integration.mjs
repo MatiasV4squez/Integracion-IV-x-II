@@ -16,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
 import { PrismaService } from '../dist/database/prisma.service.js';
+import { HttpSesionAuthClient } from '../dist/auth/http-sesion-auth.client.js';
 import { DisponibilidadModule } from '../dist/disponibilidad/disponibilidad.module.js';
 import { DISPONIBILIDAD_REPOSITORY } from '../dist/disponibilidad/aplicacion/puertos/disponibilidad.repository.js';
 import { TutoresModule } from '../dist/tutores/tutores.module.js';
@@ -30,6 +31,8 @@ const { ValidationPipe } = requireSesiones('@nestjs/common');
 const { PrismaService: PrismaSesionesService } = requireSesiones(join(sesionesDir, 'dist/database/prisma.service.js'));
 const { PrismaClient: PrismaSesiones } = requireSesiones(join(sesionesDir, 'dist/generated/prisma/client.js'));
 const { SessionsModule } = requireSesiones(join(sesionesDir, 'dist/sessions/infraestructura/sessions.module.js'));
+const { HttpSesionAuthClient: SesionAuthSesiones } = requireSesiones(join(sesionesDir, 'dist/auth/http-sesion-auth.client.js'));
+const sesionesAuth = { validar: async () => {} };
 const sufijo = randomUUID().replaceAll('-', '');
 const schemas = [`test_flujo_materias_${sufijo}`, `test_flujo_sesiones_${sufijo}`];
 const secret = randomBytes(32).toString('hex');
@@ -127,6 +130,7 @@ before(
         IntegracionesModule,
       ],
     })
+      .overrideProvider(HttpSesionAuthClient).useValue(sesionesAuth)
       .overrideProvider(PrismaService)
       .useValue(materias)
       .compile();
@@ -155,6 +159,7 @@ before(
     await new Promise((r) => proxy.listen(0, '127.0.0.1', r));
     const configuracion = new ConfigService({ JWT_SECRET: secret, MATERIAS_TUTORES_URL: `http://127.0.0.1:${proxy.address().port}`, INTEGRACION_SECRET: secret });
     const moduloSesiones = await TestSesiones.createTestingModule({ imports: [SessionsModule] })
+      .overrideProvider(SesionAuthSesiones).useValue(sesionesAuth)
       .overrideProvider(PrismaSesionesService)
       .useValue(sesiones)
       .overrideProvider(ConfigService)

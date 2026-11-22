@@ -33,7 +33,7 @@ export class UsuariosController {
   @Post('registro')
   async crear(@Body() createUsuarioDto: CreateUsuarioDto) {
     try {
-      const usuario = await this.registrarUsuario.ejecutar({
+      const { usuario, verificacion } = await this.registrarUsuario.ejecutar({
         nombre: createUsuarioDto.nombre,
         correoInstitucional: createUsuarioDto.correo_institucional,
         password: createUsuarioDto.password_hash,
@@ -43,6 +43,11 @@ export class UsuariosController {
         nombre: usuario.nombre,
         correo: usuario.correo_institucional,
         estado: usuario.estado_cuenta,
+        verificacion,
+        mensaje:
+          verificacion === 'ENLACE_GENERADO'
+            ? 'Cuenta creada. Confirma tu correo institucional mediante el enlace de verificación para activarla.'
+            : 'Cuenta creada, pero no pudimos entregar el enlace de verificación. Solicita uno nuevo para activar tu cuenta.',
       };
     } catch (error) {
       if (error instanceof CorreoDuplicadoError)

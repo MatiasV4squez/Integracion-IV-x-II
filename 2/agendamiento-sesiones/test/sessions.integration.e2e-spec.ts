@@ -1,8 +1,9 @@
+import { HttpSesionAuthClient } from '../src/auth/http-sesion-auth.client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ServiceUnavailableException, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -23,6 +24,7 @@ import { EntregarAvisosModeracion } from '../src/sessions/aplicacion/casos-de-us
 // Pruebas de sesiones y JWT con PostgreSQL real en un esquema aislado.
 describe('Aceptar, rechazar y cancelar sesiones', () => {
   let app: INestApplication;
+  const validarSesion = jest.fn();
   let prisma: PrismaClient;
   let admin: Client;
   let service: ProcesarSesiones;
@@ -64,6 +66,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     const payload = Object.fromEntries(
       Object.entries({
         sub,
+        jti: randomUUID(),
         iss: 'stp-usuarios-auth',
         aud: 'stp-clients',
         exp: Math.floor(Date.now() / 1000) + 600,
@@ -285,12 +288,17 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     });
     await prisma.$connect();
     const module = await Test.createTestingModule({ imports: [SessionsModule] })
+      .overrideProvider(HttpSesionAuthClient)
+      .useValue({ validar: validarSesion })
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
           JWT_SECRET: secret,
+          // Evita usar receptores reales definidos en el .env del desarrollador.
+          REPORTES_MODERACION_URL: '',
+          MODERACION_INTEGRACION_SECRET: '',
         }),
       )
       .compile();
@@ -322,6 +330,7 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     urlMaterias = `http://127.0.0.1:${direccion.port}`;
   }, 30000);
   beforeEach(async () => {
+    validarSesion.mockReset().mockResolvedValue(undefined);
     estadoBloque = 'DISPONIBLE';
     errorConsulta = errorReserva = errorLiberacion = 0;
     tutorHabilitado = true;
@@ -381,6 +390,280 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
       where: { id_sesion: BigInt(id) },
     });
   }
+
+  it.each([401, 503])('no modifica una sesión si Auth rechaza el acceso o no está disponible (%s)', async (estado) => {
+    const sesion = await fixture();
+    validarSesion.mockRejectedValueOnce(estado === 401
+      ? new UnauthorizedException() : new ServiceUnavailableException());
+    await act(sesion.id_sesion, 'accept').expect(estado);
+    expect((await stateOf(sesion.id_sesion)).estado_sesion).toBe('PENDIENTE');
+  });
+
+  it('pagina sesiones propias de ambos roles con orden estable y conserva el historial anterior', async () => {
+    const primera = await fixture('COMPLETADA');
+    const segunda = await fixture('CANCELADA');
+    const tercera = await fixture('PENDIENTE');
+    const comoTutor = await fixture('CONFIRMADA', '2099-06-20', outsider, tutee);
+    await fixture('COMPLETADA', '2099-06-20', outsider, tutor);
+    await prisma.sesion.updateMany({ data: { fecha_creacion: new Date('2026-11-01T12:00:00Z') } });
+    const calificacion = await prisma.calificacion.create({ data: {
+      id_sesion: primera.id_sesion, id_evaluador: BigInt(tutee), id_evaluado: BigInt(tutor), puntuacion: 5,
+    } });
+    const consultar = (page: number) => request(app.getHttpServer())
+      .get(`/sessions/history/paginated?page=${page}&limit=2`)
+      .set('Authorization', `Bearer ${token(tutee)}`);
+    const pagina1 = await consultar(1).expect(200);
+    const pagina2 = await consultar(2).expect(200);
+    expect(pagina1.headers['cache-control']).toBe('no-store');
+    expect(pagina1.body).toMatchObject({ total: 4, page: 1, limit: 2, totalPages: 2 });
+    expect(pagina2.body).toMatchObject({ total: 4, page: 2, limit: 2, totalPages: 2 });
+    const items = [...pagina1.body.items, ...pagina2.body.items];
+    expect(items.map((fila: { id_sesion: string }) => fila.id_sesion)).toEqual(
+      [comoTutor, tercera, segunda, primera].map((fila) => fila.id_sesion.toString()),
+    );
+    expect(new Set(items.map((fila: { id_sesion: string }) => fila.id_sesion)).size).toBe(4);
+    expect(items[3]).toMatchObject({ id_tutor: tutor, id_tutee: tutee,
+      calificaciones: [{ id_calificacion: calificacion.id_calificacion.toString(), id_evaluador: tutee, puntuacion: 5 }],
+    });
+    const repetida = await consultar(1).expect(200);
+    expect(repetida.body).toEqual(pagina1.body);
+    const fuera = await consultar(3).expect(200);
+    expect(fuera.body).toEqual({ items: [], total: 4, page: 3, limit: 2, totalPages: 2 });
+
+    const legacy = await request(app.getHttpServer()).get('/sessions/history')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(Array.isArray(legacy.body)).toBe(true);
+    expect(legacy.body).toHaveLength(4);
+    for (const item of items) {
+      const anterior = legacy.body.find((fila: { id_sesion: string }) => fila.id_sesion === item.id_sesion);
+      expect(item).toEqual(anterior);
+      expect(item).not.toHaveProperty('fecha_confirmacion');
+      expect(item).not.toHaveProperty('datos_encuentro');
+    }
+  });
+
+  it('combina el rol de participación y el estado dentro de la consulta del usuario', async () => {
+    const estudiante = await fixture('COMPLETADA');
+    await fixture('CANCELADA');
+    const docente = await fixture('COMPLETADA', '2099-06-20', outsider, tutee);
+    await fixture('COMPLETADA', '2099-06-20', outsider, tutor);
+    for (const [rol, esperada] of [['ESTUDIANTE', estudiante], ['TUTOR', docente]] as const) {
+      const respuesta = await request(app.getHttpServer())
+        .get(`/sessions/history/paginated?rol=${rol}&estado=COMPLETADA`)
+        .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+      expect(respuesta.body).toMatchObject({ total: 1, page: 1, limit: 20, totalPages: 1 });
+      expect(respuesta.body.items.map((fila: { id_sesion: string }) => fila.id_sesion)).toEqual([esperada.id_sesion.toString()]);
+    }
+    const soloEstado = await request(app.getHttpServer()).get('/sessions/history/paginated?estado=COMPLETADA')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(soloEstado.body.total).toBe(2);
+  });
+
+  it.each([
+    'PENDIENTE', 'CONFIRMADA', 'RECHAZADA', 'EXPIRADA', 'CANCELADA',
+    'PENDIENTE_CIERRE', 'COMPLETADA', 'NO_REALIZADA', 'INASISTENCIA', 'EN_CONFLICTO',
+  ] as const)('filtra el estado %s', async (estado) => {
+    const propia = await fixture(estado);
+    await fixture(estado, '2099-06-20', outsider);
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/history/paginated?estado=${estado}&rol=ESTUDIANTE`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.body.total).toBe(1);
+    expect(respuesta.body.items[0]).toMatchObject({ id_sesion: propia.id_sesion.toString(), estado_sesion: estado });
+  });
+
+  it('devuelve una página vacía para un usuario sin sesiones, incluso si es administrador', async () => {
+    await fixture();
+    for (const claims of [{}, { roles: ['ADMINISTRADOR'] }]) {
+      const respuesta = await request(app.getHttpServer()).get('/sessions/history/paginated')
+        .set('Authorization', `Bearer ${token(outsider, claims)}`).expect(200);
+      expect(respuesta.body).toEqual({ items: [], total: 0, page: 1, limit: 20, totalPages: 0 });
+    }
+  });
+
+  it('la cuenta de una sesión que participa en ambos roles no se duplica', async () => {
+    await fixture('COMPLETADA', '2099-06-20', tutee, tutee);
+    const respuesta = await request(app.getHttpServer()).get('/sessions/history/paginated')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.body.total).toBe(1);
+    expect(respuesta.body.items).toHaveLength(1);
+  });
+
+  it.each([
+    'page=0', 'page=-1', 'page=1.5', 'page=01', 'page=1e2', 'page=', 'page=1000001',
+    'limit=0', 'limit=101', 'limit=2.5', 'limit=', 'limit=0x10',
+    'rol=ADMINISTRADOR', 'rol=tutor', 'estado=INVENTADO', 'estado=',
+    'page=1&page=2', 'limit=1&limit=2', 'rol=TUTOR&rol=ESTUDIANTE',
+    'estado=PENDIENTE&estado=COMPLETADA', 'id_usuario=123', 'id_tutor=123',
+  ])('rechaza filtros, parámetros o paginación inválidos: %s', async (consulta) => {
+    await request(app.getHttpServer()).get(`/sessions/history/paginated?${consulta}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(400);
+  });
+
+  it.each(['ausente', 'malformado', 'vencido', 'firma', 'emisor', 'audiencia'])('el historial paginado rechaza JWT %s', async (tipo) => {
+    const consulta = request(app.getHttpServer()).get('/sessions/history/paginated');
+    const valores: Record<string, string> = {
+      malformado: 'invalido', vencido: token(tutee, { exp: 1 }),
+      firma: token(tutee, {}, 'otro-secreto'), emisor: token(tutee, { iss: 'otro' }),
+      audiencia: token(tutee, { aud: 'otra' }),
+    };
+    if (tipo !== 'ausente') consulta.set('Authorization', `Bearer ${valores[tipo]}`);
+    await consulta.expect(401);
+  });
+
+  it('documenta el historial paginado en Swagger sin retirar la ruta antigua ni el detalle', () => {
+    const documento = SwaggerModule.createDocument(app, new DocumentBuilder().addBearerAuth().build());
+    const operacion = documento.paths['/sessions/history/paginated']?.get;
+    expect(operacion?.security).toEqual([{ bearer: [] }]);
+    expect(Object.keys(operacion!.responses)).toEqual(['200', '400', '401']);
+    expect(operacion!.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'page', in: 'query', required: false }),
+      expect.objectContaining({ name: 'limit', in: 'query', required: false }),
+      expect.objectContaining({ name: 'rol', in: 'query', required: false }),
+      expect.objectContaining({ name: 'estado', in: 'query', required: false }),
+    ]));
+    expect(documento.paths['/sessions/history']?.get).toBeDefined();
+    expect(documento.paths['/sessions/{id}']?.get).toBeDefined();
+    const esquema = documento.components!.schemas!.SesionHistorialResponseDto;
+    expect(esquema).toHaveProperty('properties.calificaciones');
+    expect(esquema).not.toHaveProperty('properties.datos_encuentro');
+  });
+
+  it('consulta un detalle real, serializa BIGINT y no modifica la sesión', async () => {
+    const sesion = await fixture('PENDIENTE_CIERRE');
+    await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {
+      modalidad: 'PRESENCIAL', lugar: 'Biblioteca, sala 2',
+    } });
+    const declaracion = await prisma.declaracion_cierre.create({ data: {
+      id_sesion: sesion.id_sesion, id_usuario: BigInt(tutee),
+      resultado_declarado: 'INASISTENCIA', id_usuario_inasistente: BigInt(tutor),
+    } });
+    const antes = await stateOf(sesion.id_sesion);
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(respuesta.headers['cache-control']).toBe('no-store');
+    expect(respuesta.body).toMatchObject({
+      id_sesion: sesion.id_sesion.toString(), id_tutor: tutor, id_tutee: tutee,
+      id_materia: materia, id_bloque: '9007199254741000',
+      inicio: sesion.inicio.toISOString(), fin: sesion.fin.toISOString(),
+      datos_encuentro: { modalidad: 'PRESENCIAL', lugar: 'Biblioteca, sala 2', enlace: null },
+      declaraciones: [{ id_declaracion: declaracion.id_declaracion.toString(),
+        id_usuario: tutee, id_usuario_inasistente: tutor, resultado_declarado: 'INASISTENCIA' }],
+      calificaciones: [],
+      acciones_disponibles: { aceptar: false, rechazar: false, cancelar: false,
+        declarar_cierre: false, calificar: false, resolver_conflicto: false },
+    });
+    const contraparte = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutor)}`).expect(200);
+    expect(contraparte.body.acciones_disponibles.declarar_cierre).toBe(true);
+    expect(await stateOf(sesion.id_sesion)).toEqual(antes);
+    expect(await prisma.declaracion_cierre.count()).toBe(1);
+    expect(await prisma.aviso_moderacion_sesion.count()).toBe(0);
+    expect(operacionesBloques).toEqual([]);
+  });
+
+  it('devuelve encuentro sin definir para sesiones existentes y no cambia el contrato de listas', async () => {
+    const sesion = await fixture();
+    const detalle = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(detalle.body.datos_encuentro).toEqual({ modalidad: null, lugar: null, enlace: null });
+    for (const ruta of ['active', 'history']) {
+      const lista = await request(app.getHttpServer()).get(`/sessions/${ruta}`)
+        .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+      expect(Array.isArray(lista.body)).toBe(true);
+      expect(lista.body[0]).not.toHaveProperty('modalidad');
+      expect(lista.body[0]).not.toHaveProperty('datos_encuentro');
+      expect(lista.body[0]).not.toHaveProperty('acciones_disponibles');
+    }
+  });
+
+  it('recupera el enlace persistido y las calificaciones para impedir repetir la propia', async () => {
+    const sesion = await fixture('COMPLETADA');
+    await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {
+      modalidad: 'EN_LINEA', enlace: 'https://meet.example.test/sesion',
+    } });
+    const calificacion = await prisma.calificacion.create({ data: {
+      id_sesion: sesion.id_sesion, id_evaluador: BigInt(tutee), id_evaluado: BigInt(tutor), puntuacion: 4,
+    } });
+    const propia = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(200);
+    expect(propia.body.datos_encuentro).toEqual({ modalidad: 'EN_LINEA', lugar: null, enlace: 'https://meet.example.test/sesion' });
+    expect(propia.body.calificaciones[0]).toMatchObject({
+      id_calificacion: calificacion.id_calificacion.toString(), id_evaluador: tutee, id_evaluado: tutor, puntuacion: 4,
+    });
+    expect(propia.body.acciones_disponibles.calificar).toBe(false);
+    const otra = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(tutor)}`).expect(200);
+    expect(otra.body.acciones_disponibles.calificar).toBe(true);
+  });
+
+  it('impide consultar encuentros ajenos aunque se envíe la identidad de un participante en query', async () => {
+    const sesion = await fixture('CONFIRMADA');
+    const respuesta = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}?id_usuario=${tutee}&roles=ADMINISTRADOR`)
+      .set('Authorization', `Bearer ${token(outsider)}`).expect(403);
+    expect(respuesta.body).not.toHaveProperty('datos_encuentro');
+    expect(respuesta.body).not.toHaveProperty('declaraciones');
+  });
+
+  it.each(['ADMIN', 'ADMINISTRADOR'])('permite consultar y resolver al rol %s sin habilitar acciones ajenas', async (rol) => {
+    const sesion = await fixture('EN_CONFLICTO');
+    const detalle = await request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`)
+      .set('Authorization', `Bearer ${token(outsider, { roles: [rol] })}`).expect(200);
+    expect(detalle.body.acciones_disponibles).toEqual({ aceptar: false, rechazar: false,
+      cancelar: false, declarar_cierre: false, calificar: false, resolver_conflicto: true });
+  });
+
+  it.each(['0', '-1', '1.5', '01', 'no-es-id', '9223372036854775808'])('el detalle rechaza el ID inválido %s', async (id) => {
+    await request(app.getHttpServer()).get(`/sessions/${id}`)
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(400);
+  });
+
+  it('el detalle responde 404 para una sesión inexistente', async () => {
+    await request(app.getHttpServer()).get('/sessions/9223372036854775807')
+      .set('Authorization', `Bearer ${token(tutee)}`).expect(404);
+  });
+
+  it.each(['ausente', 'malformado', 'vencido', 'firma', 'emisor', 'audiencia'])('el detalle rechaza JWT %s', async (tipo) => {
+    const sesion = await fixture();
+    const consulta = request(app.getHttpServer()).get(`/sessions/${sesion.id_sesion}`);
+    const valores: Record<string, string> = {
+      malformado: 'invalido', vencido: token(tutee, { exp: 1 }),
+      firma: token(tutee, {}, 'otro-secreto'), emisor: token(tutee, { iss: 'otro' }),
+      audiencia: token(tutee, { aud: 'otra' }),
+    };
+    if (tipo !== 'ausente') consulta.set('Authorization', `Bearer ${valores[tipo]}`);
+    await consulta.expect(401);
+  });
+
+  it('refleja las acciones reales después de aceptar y cancelar mediante las rutas existentes', async () => {
+    const id = await crearSesionReservada();
+    const detalle = (usuario: string) => request(app.getHttpServer()).get(`/sessions/${id}`)
+      .set('Authorization', `Bearer ${token(usuario)}`);
+    const pendienteTutor = await detalle(tutor).expect(200);
+    expect(pendienteTutor.body.acciones_disponibles).toMatchObject({ aceptar: true, rechazar: true, cancelar: false });
+    const pendienteEstudiante = await detalle(tutee).expect(200);
+    expect(pendienteEstudiante.body.acciones_disponibles).toMatchObject({ aceptar: false, rechazar: false, cancelar: true });
+    await act(id, 'accept').expect(200);
+    const confirmada = await detalle(tutee).expect(200);
+    expect(confirmada.body.estado_sesion).toBe('CONFIRMADA');
+    expect(confirmada.body.acciones_disponibles.cancelar).toBe(true);
+    await act(id, 'cancel', tutee).expect(200);
+    const cancelada = await detalle(tutor).expect(200);
+    expect(cancelada.body.estado_sesion).toBe('CANCELADA');
+    expect(Object.values(cancelada.body.acciones_disponibles)).not.toContain(true);
+    expect(estadoBloque).toBe('DISPONIBLE');
+  });
+
+  it('documenta el detalle y sus errores en Swagger', () => {
+    const documento = SwaggerModule.createDocument(app, new DocumentBuilder().addBearerAuth().build());
+    const operacion = documento.paths['/sessions/{id}']?.get;
+    expect(operacion?.security).toEqual([{ bearer: [] }]);
+    expect(Object.keys(operacion!.responses)).toEqual(['200', '400', '401', '403', '404']);
+    const esquema = documento.components!.schemas!.DetalleSesionResponseDto;
+    expect(esquema).toHaveProperty('properties.datos_encuentro');
+    expect(esquema).toHaveProperty('properties.declaraciones');
+    expect(esquema).toHaveProperty('properties.calificaciones');
+    expect(esquema).toHaveProperty('properties.acciones_disponibles');
+  });
 
   it('consulta las sesiones activas propias como estudiante, con orden estable y sin alterar el historial', async () => {
     const confirmada = await fixture('CONFIRMADA', '2099-06-21');
@@ -691,6 +974,9 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     ['audiencia', { aud: 'otro' }, secret],
     ['sub numérico', { sub: 2 }, secret],
     ['sub fuera de rango', { sub: '9223372036854775808' }, secret],
+    ['sin sesión', { jti: undefined }, secret],
+    ['sesión vacía', { jti: '' }, secret],
+    ['sesión demasiado larga', { jti: 'x'.repeat(65) }, secret],
   ])('rechaza JWT inválido: %s', async (_name, claims, signingSecret) => {
     await request(app.getHttpServer())
       .patch('/sessions/1/accept')

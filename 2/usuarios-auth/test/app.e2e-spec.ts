@@ -67,6 +67,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
         'secreto-de-integracion-de-prueba-con-al-menos-32-bytes',
       JWT_ACCESS_TTL_SECONDS: '1800',
       JWT_IDLE_TIMEOUT_SECONDS: '1800',
+      SMTP_DISABLED: 'true',
       SMTP_HOST: 'smtp.example.test',
       SMTP_PORT: '587',
       SMTP_SECURE: 'false',
@@ -196,7 +197,10 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       id_verificacion: 10n,
     });
     prisma.verificacionCorreo.updateMany.mockResolvedValue({ count: 1 });
-    prisma.usuario.update.mockResolvedValue({});
+    prisma.usuario.update.mockImplementation(
+      async ({ data }: { data: Partial<typeof usuarioExistente> }) =>
+        Object.assign(cuentaActual, data),
+    );
     prisma.$transaction.mockImplementation(
       async (callback: (client: typeof prisma) => Promise<unknown>) =>
         callback(prisma),
@@ -220,6 +224,42 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
         password: loginFixture.password,
         ...overrides,
       });
+  }
+
+  function prepararRegistro() {
+    prisma.usuario.findUnique.mockResolvedValueOnce(null);
+    prisma.usuario.create.mockImplementationOnce(
+      async ({
+        data,
+      }: {
+        data: {
+          nombre: string;
+          correo_institucional: string;
+          password_hash: string;
+          estado_cuenta: string;
+          correo_verificado: boolean;
+        };
+      }) => {
+        cuentaActual = {
+          ...usuarioExistente,
+          ...data,
+          roles: [{ rol: { nombre: 'ESTUDIANTE' } }],
+        };
+        return cuentaActual;
+      },
+    );
+  }
+
+  function verificacionGenerada() {
+    const { data } = prisma.verificacionCorreo.create.mock.calls.at(-1)![0] as {
+      data: { id_usuario: bigint; token: string; fecha_expiracion: Date };
+    };
+    return {
+      ...data,
+      id_verificacion: 10n,
+      fecha_utilizacion: null,
+      usuario: { correo_verificado: cuentaActual.correo_verificado },
+    };
   }
 
   it('emite un JWT firmado con la identidad mínima y no expone el hash', async () => {
@@ -547,7 +587,7 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     prisma.usuario.create.mockResolvedValueOnce({
       id_usuario: 9007199254740993n,
       ...dto,
-      estado_cuenta: 'ACTIVO',
+      estado_cuenta: 'INACTIVO',
       correo_verificado: false,
       roles: [{ rol: { nombre: 'ESTUDIANTE' } }],
     });
@@ -559,7 +599,10 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       id: '9007199254740993',
       nombre: dto.nombre,
       correo: dto.correo_institucional,
-      estado: 'ACTIVO',
+      estado: 'INACTIVO',
+      verificacion: 'ENLACE_GENERADO',
+      mensaje:
+        'Cuenta creada. Confirma tu correo institucional mediante el enlace de verificación para activarla.',
     });
     const datosGuardados = prisma.usuario.create.mock.calls[0][0] as {
       data: { password_hash: string };
@@ -568,6 +611,20 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       await verify(datosGuardados.data.password_hash, dto.password_hash),
     ).toBe(true);
     expect(respuesta.body).not.toHaveProperty('password_hash');
+    expect(datosGuardados.data).toMatchObject({
+      estado_cuenta: 'INACTIVO',
+      correo_verificado: false,
+    });
+    expect(correoSender.enviar).toHaveBeenCalledTimes(1);
+    expect(correoSender.enviar).toHaveBeenCalledWith(
+      dto.correo_institucional,
+      expect.stringContaining('?token='),
+    );
+    const enlace = correoSender.enviar.mock.calls[0][1] as string;
+    expect(JSON.stringify(respuesta.body)).not.toContain(
+      new URL(enlace).searchParams.get('token'),
+    );
+    expect(respuesta.body).not.toHaveProperty('access_token');
   });
 
   it.each(['existente', 'concurrente'])(
@@ -596,6 +653,156 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
       );
     },
   );
+
+  it('recorre registro inactivo, primer enlace automatico, bloqueo de login, confirmacion y login habilitado', async () => {
+    prepararRegistro();
+    const registro = await request(app.getHttpServer())
+      .post('/usuarios/registro')
+      .send({
+        nombre: ' Estudiante ',
+        correo_institucional: ` ${email.toUpperCase()} `,
+        password_hash: loginFixture.password,
+      })
+      .expect(201);
+    expect(registro.body).toMatchObject({
+      nombre: 'Estudiante',
+      correo: email,
+      estado: 'INACTIVO',
+      verificacion: 'ENLACE_GENERADO',
+    });
+    expect(cuentaActual).toMatchObject({
+      estado_cuenta: 'INACTIVO',
+      correo_verificado: false,
+    });
+    expect(correoSender.enviar).toHaveBeenCalledTimes(1);
+    expect(correoSender.enviar.mock.calls[0][0]).toBe(email);
+    expect(sesiones.size).toBe(0);
+
+    const pendiente = await login().expect(403);
+    expect(pendiente.body.code).toBe('AUTH_EMAIL_NOT_VERIFIED');
+    expect(prisma.sesion.create).not.toHaveBeenCalled();
+    const enlace = correoSender.enviar.mock.calls[0][1] as string;
+    const token = new URL(enlace).searchParams.get('token') as string;
+    const verificacion = verificacionGenerada();
+    expect(verificacion.token).toBe(
+      createHmac('sha256', process.env.EMAIL_VERIFICATION_SECRET as string)
+        .update(token)
+        .digest('hex'),
+    );
+    expect(JSON.stringify(registro.body)).not.toContain(token);
+    prisma.verificacionCorreo.findUnique.mockResolvedValueOnce(verificacion);
+    await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token })
+      .expect(200);
+    expect(cuentaActual).toMatchObject({
+      estado_cuenta: 'ACTIVO',
+      correo_verificado: true,
+    });
+
+    const autenticado = await login().expect(200);
+    await request(app.getHttpServer())
+      .get('/auth/sesion')
+      .auth(autenticado.body.access_token, { type: 'bearer' })
+      .expect(200);
+    prisma.verificacionCorreo.findUnique.mockResolvedValueOnce({
+      ...verificacion,
+      fecha_utilizacion: new Date(),
+      usuario: { correo_verificado: true },
+    });
+    await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token })
+      .expect(409);
+  });
+
+  it('conserva el registro inactivo ante un fallo de entrega y recupera el enlace mediante reenvio', async () => {
+    prepararRegistro();
+    correoSender.enviar.mockRejectedValueOnce(
+      new Error('Fallo interno de SMTP'),
+    );
+    const dto = {
+      nombre: 'Estudiante',
+      correo_institucional: email,
+      password_hash: loginFixture.password,
+    };
+    const registro = await request(app.getHttpServer())
+      .post('/usuarios/registro')
+      .send(dto)
+      .expect(201);
+    expect(registro.body).toMatchObject({
+      estado: 'INACTIVO',
+      verificacion: 'PENDIENTE_ENVIO',
+    });
+    expect(registro.body.mensaje).toContain('Solicita uno nuevo');
+    expect(JSON.stringify(registro.body)).not.toContain(
+      'Fallo interno de SMTP',
+    );
+    expect(cuentaActual).toMatchObject({
+      estado_cuenta: 'INACTIVO',
+      correo_verificado: false,
+    });
+    expect(prisma.verificacionCorreo.delete).toHaveBeenCalledWith({
+      where: { id_verificacion: 10n },
+    });
+    expect(prisma.verificacionCorreo.updateMany).not.toHaveBeenCalled();
+    await login().expect(403);
+    await request(app.getHttpServer())
+      .post('/auth/reenviar-verificacion')
+      .send({ correo_institucional: email })
+      .expect(202);
+    expect(correoSender.enviar).toHaveBeenCalledTimes(2);
+    expect(prisma.usuario.create).toHaveBeenCalledTimes(1);
+    await request(app.getHttpServer())
+      .post('/usuarios/registro')
+      .send(dto)
+      .expect(409);
+    expect(correoSender.enviar).toHaveBeenCalledTimes(2);
+  });
+
+  it('confirmar el correo de una cuenta suspendida no la reactiva ni permite login', async () => {
+    prepararRegistro();
+    await request(app.getHttpServer())
+      .post('/usuarios/registro')
+      .send({
+        nombre: 'Estudiante',
+        correo_institucional: email,
+        password_hash: loginFixture.password,
+      })
+      .expect(201);
+    const token = new URL(
+      correoSender.enviar.mock.calls[0][1] as string,
+    ).searchParams.get('token');
+    await moderar('1', 'SUSPENDIDO').expect(200);
+    prisma.verificacionCorreo.findUnique.mockResolvedValueOnce(
+      verificacionGenerada(),
+    );
+    await request(app.getHttpServer())
+      .post('/auth/verificar-correo')
+      .send({ token })
+      .expect(200);
+    expect(cuentaActual).toMatchObject({
+      estado_cuenta: 'SUSPENDIDO',
+      correo_verificado: true,
+    });
+    const acceso = await login().expect(403);
+    expect(acceso.body.code).toBe('AUTH_ACCOUNT_SUSPENDED');
+    expect(prisma.sesion.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza nombres vacios y correos no institucionales sin crear cuenta ni enlace', async () => {
+    for (const datos of [
+      { nombre: '   ', correo_institucional: email },
+      { nombre: 'Estudiante', correo_institucional: 'estudiante@example.test' },
+    ]) {
+      await request(app.getHttpServer())
+        .post('/usuarios/registro')
+        .send({ ...datos, password_hash: loginFixture.password })
+        .expect(400);
+    }
+    expect(prisma.usuario.create).not.toHaveBeenCalled();
+    expect(correoSender.enviar).not.toHaveBeenCalled();
+  });
 
   it('comparte el flujo JWT con el login de usuarios', async () => {
     const { body } = await request(app.getHttpServer())
@@ -887,14 +1094,22 @@ describe('Autenticación y sesiones (HTTP con persistencia simulada)', () => {
     expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
   });
 
-  it('mantiene el login de cuentas activas con correo sin verificar', async () => {
+  it('rechaza el login de cuentas antiguas activas sin verificar', async () => {
     cuentaActual.correo_verificado = false;
+    const { body } = await login().expect(403);
+    expect(body.code).toBe('AUTH_EMAIL_NOT_VERIFIED');
+    expect(body).not.toHaveProperty('access_token');
+    expect(prisma.sesion.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una sesion previamente emitida si la cuenta no tiene correo verificado', async () => {
     const { body } = await login().expect(200);
-    expect(body.usuario.correo_verificado).toBe(false);
+    cuentaActual.correo_verificado = false;
     await request(app.getHttpServer())
       .get('/auth/sesion')
       .auth(body.access_token, { type: 'bearer' })
-      .expect(200);
+      .expect(401);
+    expect(prisma.sesion.updateMany).not.toHaveBeenCalled();
   });
 
   it('descarta los roles enviados por el cliente y utiliza los del usuario persistido', async () => {

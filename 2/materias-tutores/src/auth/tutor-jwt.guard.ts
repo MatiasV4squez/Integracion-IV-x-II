@@ -1,6 +1,7 @@
-import { ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedJwtGuard, type AuthenticatedRequest } from './authenticated-jwt.guard.js';
+import { HttpSesionAuthClient } from './http-sesion-auth.client.js';
 
 export interface TutorRequest extends AuthenticatedRequest {
   idTutor: bigint;
@@ -8,8 +9,11 @@ export interface TutorRequest extends AuthenticatedRequest {
 
 @Injectable()
 export class TutorJwtGuard extends AuthenticatedJwtGuard {
-  constructor(jwt: JwtService) {
-    super(jwt);
+  constructor(
+    @Inject(JwtService) jwt: JwtService,
+    @Inject(HttpSesionAuthClient) sesiones: HttpSesionAuthClient,
+  ) {
+    super(jwt, sesiones);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

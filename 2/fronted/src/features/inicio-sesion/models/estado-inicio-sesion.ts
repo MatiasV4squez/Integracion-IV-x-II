@@ -11,9 +11,13 @@ export const MENSAJES_RESULTADO_INICIO_SESION = {
     titulo: 'Tu cuenta está suspendida',
     detalle: 'Comunícate con la administración de la plataforma para más información.',
   },
+  pendiente: {
+    titulo: 'Debes verificar tu correo antes de iniciar sesión',
+    detalle: 'Abre el enlace enviado a tu correo institucional. Si necesitas otro, puedes solicitarlo en la pantalla de verificación.',
+  },
   inactiva: {
     titulo: 'Tu cuenta aún no está activa',
-    detalle: 'Abre el enlace de verificación enviado a tu correo institucional para activarla.',
+    detalle: 'Comunícate con la administración de la plataforma para revisar el estado de tu cuenta.',
   },
   error: {
     titulo: 'No pudimos iniciar sesión',

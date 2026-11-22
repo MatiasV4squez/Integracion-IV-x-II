@@ -1,10 +1,14 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedRequest } from './autenticacion-request';
+import { HttpSesionAuthClient } from './http-sesion-auth.client';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-    constructor(private readonly jwtService: JwtService) { }
+    constructor(
+        @Inject(JwtService) private readonly jwtService: JwtService,
+        @Inject(HttpSesionAuthClient) private readonly sesiones: HttpSesionAuthClient,
+    ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context
@@ -61,6 +65,11 @@ export class JwtAuthGuard implements CanActivate {
                 'El token no contiene roles válidos.',
             );
         }
+
+        if (typeof payload.jti !== 'string' || payload.jti.length < 1 || payload.jti.length > 64) {
+            throw new UnauthorizedException('El token no contiene una sesión válida.');
+        }
+        await this.sesiones.validar(match[1], payload.sub, payload.jti);
 
         request.user = {
             idUsuario: payload.sub,

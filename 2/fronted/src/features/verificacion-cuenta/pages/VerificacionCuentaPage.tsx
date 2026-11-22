@@ -5,9 +5,10 @@ import { LONGITUD_MAXIMA_CORREO, normalizarCorreo, validarCorreo } from '../../.
 import { MENSAJES_VERIFICACION, type EstadoVerificacion as Estado } from '../models/estado-verificacion'
 import './VerificacionCuentaPage.css'
 
-export default function VerificacionCuentaPage({ estado, demostracion = false, confirmar, reenviar, reenvio = 'inactivo' }: {
+export default function VerificacionCuentaPage({ estado, demostracion = false, confirmar, reenviar, reenvio = 'inactivo', correoInicial = '' }: {
   estado: Estado; demostracion?: boolean; confirmar?: () => void; reenviar?: (correo: string) => void
   reenvio?: 'inactivo' | 'enviando' | 'enviado' | 'error'
+  correoInicial?: string
 }) {
   const [errorCorreo, setErrorCorreo] = useState<string>()
   const mensaje = MENSAJES_VERIFICACION[estado]
@@ -42,6 +43,7 @@ export default function VerificacionCuentaPage({ estado, demostracion = false, c
           {estado !== 'verificada' && reenviar && <form className="verificacion-reenvio" onSubmit={solicitarEnlace} noValidate>
             <label htmlFor="correo-verificacion">¿Necesitas un nuevo enlace? Correo institucional</label>
             <input id="correo-verificacion" name="correo" type="email" autoComplete="email"
+              defaultValue={correoInicial}
               maxLength={LONGITUD_MAXIMA_CORREO} required disabled={cargando || demostracion}
               aria-invalid={errorCorreo ? true : undefined}
               aria-describedby={errorCorreo ? 'error-correo-verificacion' : undefined}

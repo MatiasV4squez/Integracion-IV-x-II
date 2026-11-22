@@ -27,6 +27,7 @@ const ESTUDIANTE: readonly EnlaceNavegacion[] = [
 const TUTOR: readonly EnlaceNavegacion[] = [
   { etiqueta: 'Inicio', destino: '/tutor' },
   { etiqueta: 'Solicitudes', destino: '/solicitudes/recibidas' },
+  { etiqueta: 'Mi panel', destino: '/panel?vista=historial&rol=TUTOR' },
   { etiqueta: 'Disponibilidad', destino: '/disponibilidad' },
   { etiqueta: 'Postulaciones', destino: '/postulacion-tutor' },
   PUBLICOS[2],

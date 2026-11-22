@@ -11,5 +11,6 @@ export interface Sesion {
   fin: Date;
   fecha_creacion: Date;
   fecha_actualizacion: Date;
+  fecha_confirmacion: Date | null;
   resultado_provisional: boolean;
 }

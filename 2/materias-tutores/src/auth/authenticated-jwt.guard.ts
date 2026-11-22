@@ -1,7 +1,8 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { parsePositiveId } from './parse-positive-id.js';
+import { HttpSesionAuthClient } from './http-sesion-auth.client.js';
 
 export interface AuthenticatedRequest extends Request {
   idUsuario: bigint;
@@ -10,7 +11,10 @@ export interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class AuthenticatedJwtGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService) {}
+  constructor(
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(HttpSesionAuthClient) private readonly sesiones: HttpSesionAuthClient,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -49,6 +53,7 @@ export class AuthenticatedJwtGuard implements CanActivate {
       throw new UnauthorizedException('Token inválido');
     }
 
+    await this.sesiones.validar(match[1], String(idUsuario), claims.jti);
     request.idUsuario = idUsuario;
     request.roles = claims.roles as string[];
     return true;
