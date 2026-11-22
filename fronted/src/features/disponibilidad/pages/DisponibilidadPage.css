@@ -47,7 +47,6 @@
   background: var(--color-surface, #fff);
 }
 
-/* El aviso de confirmación no lleva clase: las pruebas verifican el marcado <p role="status">. */
 .disponibilidad > p[role='status']:not([class]) {
   margin-top: 16px;
   padding: 12px 14px;

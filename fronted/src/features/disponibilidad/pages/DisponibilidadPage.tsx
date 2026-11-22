@@ -67,7 +67,6 @@ export default function DisponibilidadPage({
         </button>
       </div>
 
-      {/* Sin clase: las pruebas verifican el marcado exacto <p role="status">. */}
       {mensaje && <p role="status">{mensaje}</p>}
 
       {errorOperacion && (

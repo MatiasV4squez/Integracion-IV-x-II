@@ -42,6 +42,7 @@ test('sin sesión las rutas privadas redirigen al login sin mostrar su contenido
     ['/solicitudes/recibidas', /Solicitudes recibidas/],
     ['/disponibilidad', /Gestión de disponibilidad/],
     ['/administracion/postulaciones', /Administrar postulaciones/],
+    ['/administracion/reportes', /Reportes y moderación/],
   ]
   for (const [ruta, contenido] of privadas) {
     const html = await renderRuta(ruta)
