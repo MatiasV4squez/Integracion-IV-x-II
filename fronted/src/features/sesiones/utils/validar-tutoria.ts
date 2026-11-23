@@ -1,6 +1,7 @@
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import { esFecha, esSesion } from './validar-sesion'
 import type { CalificacionTutoria, DeclaracionTutoria, DetalleTutoria, Tutoria } from '../models/tutoria'
+import type { Sesion } from '../models/sesion'
 
 function esCalificacion(valor: unknown, sesion: Tutoria): valor is CalificacionTutoria {
   if (!valor || typeof valor !== 'object') return false
@@ -22,7 +23,7 @@ export function esTutoria(valor: unknown): valor is Tutoria {
     && new Set(datos.calificaciones.map((nota) => nota.id_evaluador)).size === datos.calificaciones.length
 }
 
-function esDeclaracion(valor: unknown, sesion: Tutoria): valor is DeclaracionTutoria {
+export function esDeclaracion(valor: unknown, sesion: Sesion): valor is DeclaracionTutoria {
   if (!valor || typeof valor !== 'object') return false
   const dato = valor as Record<string, unknown>
   const participantes = [sesion.id_tutee, sesion.id_tutor]

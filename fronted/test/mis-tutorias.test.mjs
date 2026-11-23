@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
 import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
-let vite, api, filtros, Page, PanelPage, Detalle, AppRoutes, navegacion
+let vite, api, apiCierre, filtros, Page, PanelPage, Detalle, AppRoutes, navegacion
 const fetchOriginal = globalThis.fetch
 const usuario = '9007199254740993'
 const sesion = { token: 'jwt-prueba', idUsuario: usuario, roles: ['ESTUDIANTE'], expiraEn: Date.now() + 3600000 }
@@ -37,6 +37,7 @@ const render = (Componente, props) => renderToStaticMarkup(createElement(MemoryR
 before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
   api = await vite.ssrLoadModule('/src/features/sesiones/services/tutorias-api.ts')
+  apiCierre = await vite.ssrLoadModule('/src/features/sesiones/services/declarar-cierre-api.ts')
   filtros = await vite.ssrLoadModule('/src/features/sesiones/utils/filtros-tutorias.ts')
   ;({ default: Page } = await vite.ssrLoadModule('/src/features/sesiones/pages/HistorialTutoriasPage.tsx'))
   ;({ default: PanelPage } = await vite.ssrLoadModule('/src/features/panel-tutee/pages/PanelTuteePage.tsx'))
@@ -176,6 +177,55 @@ test('el detalle muestra encuentro, declaraciones, calificaciones y el retorno a
   assert.match(html, /Tu calificación a Camila/)
   assert.match(html, /4 de 5/)
   assert.match(html, /href="\/panel\?page=2&amp;limit=10&amp;estado=COMPLETADA&amp;vista=historial"/)
+})
+
+test('envía cada resultado por Gateway y conserva los identificadores como texto', async () => {
+  for (const resultado of ['COMPLETADA', 'NO_REALIZADA', 'INASISTENCIA']) {
+    const entrada = resultado === 'INASISTENCIA'
+      ? { resultado_declarado: resultado, id_usuario_inasistente: usuario }
+      : { resultado_declarado: resultado }
+    const declaracion = { ...detalle.declaraciones[0], ...entrada, id_usuario_inasistente: entrada.id_usuario_inasistente ?? null }
+    globalThis.fetch = async (url, opciones) => {
+      assert.equal(new URL(url).pathname, '/api/agendamiento-sesiones/sessions/' + tutoria.id_sesion + '/closure-declarations')
+      assert.equal(opciones.method, 'POST')
+      assert.equal(opciones.headers.Authorization, 'Bearer jwt-prueba')
+      assert.deepEqual(JSON.parse(opciones.body), entrada)
+      return Response.json({ sesion: tutoria, declaracion }, { status: 201 })
+    }
+    await apiCierre.declararCierre(tutoria.id_sesion, sesion, entrada, new AbortController().signal)
+  }
+})
+
+test('un conflicto o respuesta incierta de cierre exige comprobar el detalle antes de reenviar', async () => {
+  for (const estado of [409, 504, 201]) {
+    let solicitudes = 0
+    globalThis.fetch = async () => {
+      solicitudes++
+      return Response.json({}, { status: estado })
+    }
+    await assert.rejects(apiCierre.declararCierre(tutoria.id_sesion, sesion,
+      { resultado_declarado: 'NO_REALIZADA' }, new AbortController().signal), (error) => error.comprobarEstado)
+    assert.equal(solicitudes, 1)
+  }
+})
+
+test('el cierre ofrece opciones a ambos participantes y muestra la espera una vez recibida su declaración', () => {
+  const cierre = { enviar() {}, enviando: false, enviado: false, error: null }
+  const datos = { ...detalle, estado_sesion: 'PENDIENTE_CIERRE', declaraciones: [],
+    acciones_disponibles: { ...detalle.acciones_disponibles, declarar_cierre: true } }
+  for (const idUsuario of [usuario, '2']) {
+    const html = render(Detalle, { ...baseDetalle, idUsuario, cierre, consulta: { estado: 'listo', datos } })
+    assert.match(html, /aria-label="Declarar cierre"/)
+    assert.match(html, /value="NO_REALIZADA"/)
+    assert.match(html, /value="INASISTENCIA"/)
+  }
+  const vistaAjena = render(Detalle, { ...baseDetalle, idUsuario: '99', cierre, consulta: { estado: 'listo', datos } })
+  assert.doesNotMatch(vistaAjena, /aria-label="Declarar cierre"/)
+  const declarada = { ...datos, declaraciones: detalle.declaraciones,
+    acciones_disponibles: { ...datos.acciones_disponibles, declarar_cierre: false } }
+  const html = render(Detalle, { ...baseDetalle, cierre, consulta: { estado: 'listo', datos: declarada } })
+  assert.match(html, /Pendiente de la declaración del otro participante/)
+  assert.doesNotMatch(html, /aria-label="Declarar cierre"/)
 })
 
 test('los encuentros sin definir y los resultados provisionales se presentan explícitamente', () => {

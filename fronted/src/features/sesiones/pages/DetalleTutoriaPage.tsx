@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
-import type { ConsultaTutorias, DetalleTutoria } from '../models/tutoria'
+import type { ConsultaTutorias, DetalleTutoria, EntradaCierre } from '../models/tutoria'
 import { EstadoConsultaTutorias } from '../components/EstadoConsultaTutorias'
 import { EstadoTutoria } from '../components/EstadoTutoria'
+import { FormularioCierreTutoria, type BorradorCierre } from '../components/FormularioCierreTutoria'
+import type { ErrorDeclararCierre } from '../services/declarar-cierre-api'
 import { enlaceEncuentroSeguro, ETIQUETAS_SESION } from '../utils/filtros-tutorias'
 import { formatearHorarioSesion } from '../utils/solicitudes-recibidas'
 import './Tutorias.css'
@@ -13,13 +16,20 @@ interface Propiedades {
   nombres: ReadonlyMap<string, string>
   volver: string
   onRecargar: () => void
+  cierre?: {
+    enviar: (entrada: EntradaCierre) => void
+    enviando: boolean
+    enviado: boolean
+    error: ErrorDeclararCierre | null
+  }
 }
 
 const fechaDeclaracion = new Intl.DateTimeFormat('es-CL', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago',
 })
 
-export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, onRecargar }: Propiedades) {
+export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, onRecargar, cierre }: Propiedades) {
+  const [borradorCierre, setBorradorCierre] = useState<BorradorCierre>({ resultado: '', inasistente: '' })
   const tutoria = consulta.estado === 'listo' ? consulta.datos : null
   const nombre = (id: string) => nombres.get(id) ?? (id === tutoria?.id_tutor ? 'Tutor #' : 'Estudiante #') + id
   const encuentro = tutoria?.datos_encuentro
@@ -28,7 +38,7 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
     <Link className="tutorias__volver" to={volver}>← Volver a Mi panel</Link>
     <div className="tutorias__encabezado"><div><h1 id="detalle-tutoria-titulo">Detalle de tutoría</h1>
       <p className="tutorias__subtitulo">La información de tu encuentro y el resultado de la sesión.</p></div>
-      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando'}>Actualizar</button></div>
+      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando' || cierre?.enviando}>Actualizar</button></div>
     {consulta.estado === 'cargando' ? <EstadoConsultaTutorias estado="cargando" />
       : consulta.estado === 'error' ? <EstadoConsultaTutorias estado="error" tipo={consulta.tipo} mensaje={consulta.mensaje} onReintentar={onRecargar} />
         : tutoria && encuentro && <>
@@ -81,7 +91,19 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
                   {declaracion.id_usuario_inasistente && <p>Inasistencia de {nombre(declaracion.id_usuario_inasistente)}</p>}
                   <time dateTime={declaracion.fecha_declaracion}>{fechaDeclaracion.format(new Date(declaracion.fecha_declaracion))}</time>
                 </li>)}</ul>}
-              {tutoria.acciones_disponibles.declarar_cierre && <p className="tutorias__nota">Tu declaración de cierre está pendiente.</p>}
+              {cierre?.error && <p className="tutorias__error-cierre" role="alert">{cierre.error.message}</p>}
+              {cierre?.enviado && <p className="tutorias__nota" role="status">Tu declaración quedó registrada.</p>}
+              {tutoria.estado_sesion === 'PENDIENTE_CIERRE' &&
+                tutoria.declaraciones.some((declaracion) => declaracion.id_usuario === idUsuario) &&
+                <p className="tutorias__nota">Pendiente de la declaración del otro participante.</p>}
+              {cierre && !cierre.enviado && tutoria.acciones_disponibles.declarar_cierre &&
+                (tutoria.id_tutor === idUsuario || tutoria.id_tutee === idUsuario) &&
+                <FormularioCierreTutoria
+                  borrador={borradorCierre} onCambiar={setBorradorCierre}
+                  participantes={[...new Set([tutoria.id_tutor, tutoria.id_tutee])].map((id) => ({
+                    id, etiqueta: nombre(id) + (id === idUsuario ? ' (tú)' : ''),
+                  }))}
+                  enviando={cierre.enviando} bloqueado={cierre.error?.comprobarEstado ?? false} onEnviar={cierre.enviar} />}
               {tutoria.estado_sesion === 'EN_CONFLICTO' && <p className="tutorias__nota">Las declaraciones requieren revisión de administración.</p>}
             </section>
             <section className="tutorias__panel" aria-labelledby="calificaciones-titulo"><h2 id="calificaciones-titulo">Calificaciones</h2>

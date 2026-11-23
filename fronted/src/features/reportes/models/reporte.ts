@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 export interface DatosReporte {
   titulo: string
   descripcion: string
@@ -12,7 +11,7 @@ export type EstadoEnvioReporte =
   | { estado: 'enviado' }
   | { estado: 'error'; mensaje: string }
   | { estado: 'incierto'; mensaje: string }
-=======
+
 export const ESTADOS_REPORTE = ['PENDIENTE', 'DESESTIMADO', 'ADVERTIDO', 'SUSPENDIDO'] as const
 export type EstadoReporte = (typeof ESTADOS_REPORTE)[number]
 
@@ -84,4 +83,3 @@ export interface FiltrosReportes {
   fechaHasta?: string
   pagina: number
 }
->>>>>>> ff2fd05b (feat(web): panel administrativo de reportes con resolución, suspensión y reactivación.)

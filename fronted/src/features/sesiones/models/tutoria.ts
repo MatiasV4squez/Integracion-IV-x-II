@@ -28,11 +28,17 @@ export interface PaginaTutorias {
   totalPages: number
 }
 
+export const RESULTADOS_CIERRE = ['COMPLETADA', 'NO_REALIZADA', 'INASISTENCIA'] as const
+export type ResultadoCierre = (typeof RESULTADOS_CIERRE)[number]
+export type EntradaCierre =
+  | { resultado_declarado: Exclude<ResultadoCierre, 'INASISTENCIA'> }
+  | { resultado_declarado: 'INASISTENCIA'; id_usuario_inasistente: string }
+
 export interface DeclaracionTutoria {
   id_declaracion: string
   id_sesion: string
   id_usuario: string
-  resultado_declarado: 'COMPLETADA' | 'NO_REALIZADA' | 'INASISTENCIA'
+  resultado_declarado: ResultadoCierre
   id_usuario_inasistente: string | null
   fecha_declaracion: string
 }

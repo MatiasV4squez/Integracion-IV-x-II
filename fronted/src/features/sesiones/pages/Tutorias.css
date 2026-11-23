@@ -46,6 +46,11 @@
 .tutorias__registros time { display: block; margin-top: 8px; color: var(--color-text-muted); font-size: 13px; }
 .tutorias__puntuacion { color: #135ab8; font-size: 20px; font-weight: 600; }
 .tutorias__nota { margin-top: 10px; color: var(--color-text-muted); font-size: 13px; }
+.tutorias__formulario-cierre { display: grid; gap: 14px; margin-top: 18px; }
+.tutorias__formulario-cierre label { display: grid; min-width: 0; gap: 6px; font-size: 14px; font-weight: 600; }
+.tutorias__formulario-cierre select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: inherit; font: inherit; }
+.tutorias__formulario-cierre button { justify-self: start; }
+.tutorias__error-cierre { margin-top: 12px; color: #963a35; font-size: 14px; }
 .tutorias__aviso { padding: 16px 20px; margin-bottom: 24px; border: 1px solid #eddaa9; border-radius: 12px; background: #fff4da; color: #80580b; }
 .tutorias__solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 1100px) {
