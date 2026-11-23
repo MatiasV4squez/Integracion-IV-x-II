@@ -40,6 +40,7 @@ function DashboardDelTutor({ sesion }: { sesion: SesionUsuario }) {
       materias={catalogo.estado === 'listo' ? catalogo.materias : []}
       solicitudes={solicitudes.consulta}
       aceptacion={solicitudes.aceptacion}
+      rechazo={solicitudes.rechazo}
       bloqueada={solicitudes.bloqueada}
       actualizando={solicitudes.actualizando}
       errorActualizacion={solicitudes.errorActualizacion}
@@ -47,6 +48,7 @@ function DashboardDelTutor({ sesion }: { sesion: SesionUsuario }) {
       completadas={historial && historial.filter((clase) => clase.estado_sesion === 'COMPLETADA').length}
       disponibilidad={disponibilidad}
       onAceptar={solicitudes.aceptar}
+      onRechazar={solicitudes.rechazar}
       onActualizar={actualizarTodo}
       onRecargarDisponibilidad={recargarDisponibilidad}
     />

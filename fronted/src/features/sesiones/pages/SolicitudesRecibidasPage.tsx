@@ -3,9 +3,10 @@ import { Paginacion } from '../../../shared/components/Paginacion'
 import type { Materia } from '../../materias/models/materia'
 import { EstadoSolicitudes } from '../components/EstadoSolicitudes'
 import { ListadoSolicitudes } from '../components/ListadoSolicitudes'
-import { AccionAceptarSolicitud } from '../components/AccionAceptarSolicitud'
+import { AccionesSolicitud } from '../components/AccionesSolicitud'
 import { ResultadoAceptacionSolicitud } from '../components/ResultadoAceptacionSolicitud'
-import type { AceptacionSolicitud } from '../models/bandeja-solicitudes'
+import { ResultadoRechazoSolicitud } from '../components/ResultadoRechazoSolicitud'
+import type { AceptacionSolicitud, RechazoSolicitud } from '../models/bandeja-solicitudes'
 import type { ConsultaSolicitudes } from '../models/sesion'
 import './SolicitudesRecibidasPage.css'
 
@@ -16,7 +17,9 @@ interface SolicitudesRecibidasPageProps {
   ahora: number
   onRecargar: () => void
   onAceptar?: (idSesion: string) => void
+  onRechazar?: (idSesion: string) => void
   aceptacion?: AceptacionSolicitud
+  rechazo?: RechazoSolicitud
   bloqueada?: boolean
   actualizando?: boolean
   errorActualizacion?: string
@@ -25,7 +28,7 @@ interface SolicitudesRecibidasPageProps {
 const POR_PAGINA = 10
 
 export default function SolicitudesRecibidasPage({ acceso, consulta, materias = [], ahora, onRecargar,
-  onAceptar, aceptacion = { estado: 'inicial' }, bloqueada = false, actualizando = false, errorActualizacion,
+  onAceptar, onRechazar, aceptacion = { estado: 'inicial' }, rechazo = { estado: 'inicial' }, bloqueada = false, actualizando = false, errorActualizacion,
 }: SolicitudesRecibidasPageProps) {
   const [pagina, setPagina] = useState(1)
   const solicitudes = consulta.estado === 'listo' ? consulta.solicitudes : []
@@ -33,6 +36,8 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
   if (consulta.estado === 'listo' && pagina > totalPaginas) setPagina(totalPaginas)
   const paginaVisible = Math.min(pagina, totalPaginas)
   const listo = !acceso && consulta.estado === 'listo'
+  const procesando = aceptacion.estado === 'aceptando' || rechazo.estado === 'rechazando'
+  const errorDeAcceso = [aceptacion, rechazo].some((accion) => accion.estado === 'error' && ['sesion', 'permiso'].includes(accion.tipo))
 
   return (
     <main className="solicitudes-recibidas" aria-labelledby="solicitudes-titulo">
@@ -47,6 +52,7 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
       )}
 
       {!acceso && <ResultadoAceptacionSolicitud aceptacion={aceptacion} />}
+      {!acceso && <ResultadoRechazoSolicitud rechazo={rechazo} />}
       {!acceso && errorActualizacion && <div className="solicitudes-recibidas__aviso solicitudes-recibidas__aviso--error" role="alert">
         <p>{errorActualizacion} Se muestran los últimos datos confirmados. Pulsa Actualizar para consultar nuevamente.</p>
       </div>}
@@ -57,7 +63,7 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
           <h2 id="solicitudes-listado-titulo">Solicitudes recibidas</h2>
           {!acceso && consulta.estado === 'listo' && (
             <button type="button" className="solicitudes-recibidas__boton solicitudes-recibidas__boton--secundario"
-              disabled={actualizando || aceptacion.estado === 'aceptando' || (aceptacion.estado === 'error' && ['sesion', 'permiso'].includes(aceptacion.tipo))}
+              disabled={actualizando || procesando || errorDeAcceso}
               onClick={onRecargar}>Actualizar</button>
           )}
         </div>
@@ -67,9 +73,9 @@ export default function SolicitudesRecibidasPage({ acceso, consulta, materias = 
           : solicitudes.length === 0 ? <EstadoSolicitudes estado="vacio" />
           : <>
             <ListadoSolicitudes solicitudes={solicitudes.slice((paginaVisible - 1) * POR_PAGINA, paginaVisible * POR_PAGINA)} materias={materias} ahora={ahora}
-              renderizarAcciones={onAceptar ? (solicitud) => <AccionAceptarSolicitud solicitud={solicitud} aceptacion={aceptacion} bloqueada={bloqueada} onAceptar={onAceptar} /> : undefined} />
+              renderizarAcciones={onAceptar || onRechazar ? (solicitud) => <AccionesSolicitud solicitud={solicitud} aceptacion={aceptacion} rechazo={rechazo} bloqueada={bloqueada || errorDeAcceso} onAceptar={onAceptar} onRechazar={onRechazar} /> : undefined} />
             <Paginacion page={paginaVisible} totalPages={totalPaginas} onCambiarPagina={setPagina} etiqueta="Páginas de solicitudes"
-              deshabilitada={actualizando || aceptacion.estado === 'aceptando'} />
+              deshabilitada={actualizando || procesando} />
           </>}
       </section>
     </main>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { crearBandejaSolicitudes } from '../aplicacion/bandeja-solicitudes'
 import { aceptarSolicitud } from '../services/aceptar-solicitud-api'
+import { rechazarSolicitud } from '../services/rechazar-solicitud-api'
 import type { Sesion } from '../models/sesion'
 import { consultarHistorialTutor } from '../services/sesiones-api'
 import { seleccionarSolicitudesRecibidas } from '../utils/solicitudes-recibidas'
@@ -17,6 +18,7 @@ export function useSolicitudesRecibidas(sesion: SesionUsuario, alRecibirHistoria
       return seleccionarSolicitudesRecibidas(historial, sesion.idUsuario)
     },
     aceptar: (idSesion, signal) => aceptarSolicitud(idSesion, sesion, signal),
+    rechazar: (idSesion, signal) => rechazarSolicitud(idSesion, sesion, signal),
   }), [sesion, alRecibirHistorial])
   const estado = useSyncExternalStore(bandeja.suscribir, bandeja.obtenerEstado, bandeja.obtenerEstado)
 
@@ -25,8 +27,9 @@ export function useSolicitudesRecibidas(sesion: SesionUsuario, alRecibirHistoria
     return () => bandeja.detener()
   }, [bandeja])
 
-  const errorDeAcceso = estado.aceptacion.estado === 'error'
-    && ['sesion', 'permiso'].includes(estado.aceptacion.tipo)
-  const bloqueada = estado.actualizando || estado.necesitaActualizar || errorDeAcceso || estado.aceptacion.estado === 'aceptando'
-  return { ...estado, bloqueada, recargar: bandeja.recargar, aceptar: bandeja.aceptar }
+  const errorDeAcceso = [estado.aceptacion, estado.rechazo].some((accion) => accion.estado === 'error'
+    && ['sesion', 'permiso'].includes(accion.tipo))
+  const procesando = estado.aceptacion.estado === 'aceptando' || estado.rechazo.estado === 'rechazando'
+  const bloqueada = estado.actualizando || estado.necesitaActualizar || errorDeAcceso || procesando
+  return { ...estado, bloqueada, recargar: bandeja.recargar, aceptar: bandeja.aceptar, rechazar: bandeja.rechazar }
 }

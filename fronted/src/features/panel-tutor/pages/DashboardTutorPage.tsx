@@ -1,11 +1,12 @@
 import { Link } from 'react-router'
 import type { ConsultaDisponibilidad } from '../../disponibilidad/models/bloque-disponibilidad'
 import type { Materia } from '../../materias/models/materia'
-import { AccionAceptarSolicitud } from '../../sesiones/components/AccionAceptarSolicitud'
+import { AccionesSolicitud } from '../../sesiones/components/AccionesSolicitud'
 import { EstadoSolicitudes } from '../../sesiones/components/EstadoSolicitudes'
 import { ListadoSolicitudes } from '../../sesiones/components/ListadoSolicitudes'
 import { ResultadoAceptacionSolicitud } from '../../sesiones/components/ResultadoAceptacionSolicitud'
-import type { AceptacionSolicitud } from '../../sesiones/models/bandeja-solicitudes'
+import { ResultadoRechazoSolicitud } from '../../sesiones/components/ResultadoRechazoSolicitud'
+import type { AceptacionSolicitud, RechazoSolicitud } from '../../sesiones/models/bandeja-solicitudes'
 import type { ConsultaSolicitudes, Sesion } from '../../sesiones/models/sesion'
 import { formatearHorarioSesion } from '../../sesiones/utils/solicitudes-recibidas'
 import { formatearDiaBloque, seleccionarProximosBloques } from '../utils/resumen-tutor'
@@ -24,6 +25,7 @@ interface Propiedades {
   materias: Materia[]
   solicitudes: ConsultaSolicitudes
   aceptacion: AceptacionSolicitud
+  rechazo?: RechazoSolicitud
   bloqueada: boolean
   actualizando: boolean
   errorActualizacion?: string
@@ -31,13 +33,14 @@ interface Propiedades {
   completadas: number | null
   disponibilidad: ConsultaDisponibilidad
   onAceptar: (idSesion: string) => void
+  onRechazar?: (idSesion: string) => void
   onActualizar: () => void
   onRecargarDisponibilidad: () => void
 }
 
 export default function DashboardTutorPage({
-  nombre, ahora, materias, solicitudes, aceptacion, bloqueada, actualizando, errorActualizacion,
-  proximas, completadas, disponibilidad, onAceptar, onActualizar, onRecargarDisponibilidad,
+  nombre, ahora, materias, solicitudes, aceptacion, rechazo = { estado: 'inicial' }, bloqueada, actualizando, errorActualizacion,
+  proximas, completadas, disponibilidad, onAceptar, onRechazar, onActualizar, onRecargarDisponibilidad,
 }: Propiedades) {
   const nombreMateria = (id: string) => materias.find((materia) => materia.idMateria === id)?.nombre ?? 'Materia #' + id
   const pendientes = solicitudes.estado === 'listo' ? solicitudes.solicitudes : []
@@ -47,6 +50,7 @@ export default function DashboardTutorPage({
   const reservados = proximosBloques.length - disponibles
   const siguiente = proximas?.[0]
   const accesoDenegado = solicitudes.estado === 'error' && solicitudes.tipo !== 'consulta'
+  const errorDeAccion = [aceptacion, rechazo].some((accion) => accion.estado === 'error' && ['sesion', 'permiso'].includes(accion.tipo))
 
   const indicadores = [
     {
@@ -82,7 +86,7 @@ export default function DashboardTutorPage({
           <button
             type="button"
             className="boton-global boton-global--secundario"
-            disabled={actualizando || aceptacion.estado === 'aceptando' || disponibilidad.estado === 'cargando'}
+            disabled={actualizando || aceptacion.estado === 'aceptando' || rechazo.estado === 'rechazando' || errorDeAccion || disponibilidad.estado === 'cargando'}
             onClick={onActualizar}
           >
             {actualizando ? 'Actualizando…' : 'Actualizar'}
@@ -110,6 +114,7 @@ export default function DashboardTutorPage({
             </Link>
           </div>
           <ResultadoAceptacionSolicitud aceptacion={aceptacion} />
+          <ResultadoRechazoSolicitud rechazo={rechazo} />
           {errorActualizacion && (
             <div className="solicitudes-recibidas__aviso solicitudes-recibidas__aviso--error" role="alert">
               <p>{errorActualizacion} Se muestran los últimos datos confirmados.</p>
@@ -127,7 +132,7 @@ export default function DashboardTutorPage({
                   materias={materias}
                   ahora={ahora}
                   renderizarAcciones={(solicitud) => (
-                    <AccionAceptarSolicitud solicitud={solicitud} aceptacion={aceptacion} bloqueada={bloqueada} onAceptar={onAceptar} />
+                    <AccionesSolicitud solicitud={solicitud} aceptacion={aceptacion} rechazo={rechazo} bloqueada={bloqueada || errorDeAccion} onAceptar={onAceptar} onRechazar={onRechazar} />
                   )}
                 />
                 {pendientes.length > SOLICITUDES_VISIBLES && (

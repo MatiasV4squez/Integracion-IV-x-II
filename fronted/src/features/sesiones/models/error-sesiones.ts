@@ -24,3 +24,12 @@ export class ErrorCancelarSesion extends Error {
     this.tipo = tipo
   }
 }
+
+export class ErrorRechazarSolicitud extends Error {
+  readonly tipo: ErrorAceptarSolicitud['tipo']
+  constructor(mensaje: string, tipo: ErrorRechazarSolicitud['tipo'], options?: ErrorOptions) {
+    super(mensaje, options)
+    this.name = 'ErrorRechazarSolicitud'
+    this.tipo = tipo
+  }
+}

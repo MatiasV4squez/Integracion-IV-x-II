@@ -21,6 +21,9 @@
 .solicitudes-recibidas__estado h3 { margin: 0; font-size: 20px; }
 .solicitudes-recibidas__estado p { max-width: 420px; margin: 0 0 8px; color: var(--color-text-muted); font-size: 14px; }
 .listado-solicitudes { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; text-align: left; }
+.listado-solicitudes__acciones { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.listado-solicitudes__rechazar { border-color: #a52a37; background: #fff; color: #a52a37; }
+.listado-solicitudes__rechazar:hover:not(:disabled) { background: #a52a37; color: #fff; }
 .listado-solicitudes th { padding: 16px; background: var(--color-primary-soft); font-size: 12px; font-weight: 600; }
 .listado-solicitudes td { padding: 16px; border: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
 .listado-solicitudes td p { margin: 4px 0 0; }

@@ -1,17 +1,18 @@
 import type { EstadoBandejaSolicitudes } from '../models/bandeja-solicitudes'
-import { ErrorAceptarSolicitud, ErrorConsultaSesiones } from '../models/error-sesiones'
+import { ErrorAceptarSolicitud, ErrorConsultaSesiones, ErrorRechazarSolicitud } from '../models/error-sesiones'
 import type { Sesion } from '../models/sesion'
 
 // Las operaciones se proporcionan desde el hook; la coordinación no depende de fetch ni de React.
 interface OperacionesSolicitudes {
   consultar: (signal: AbortSignal) => Promise<Sesion[]>
   aceptar: (idSesion: string, signal: AbortSignal) => Promise<Sesion>
+  rechazar: (idSesion: string, signal: AbortSignal) => Promise<Sesion>
 }
 
 export function crearBandejaSolicitudes(operaciones: OperacionesSolicitudes) {
   const inicial = (): EstadoBandejaSolicitudes => ({
     consulta: { estado: 'cargando' }, actualizando: false,
-    aceptacion: { estado: 'inicial' }, necesitaActualizar: false,
+    aceptacion: { estado: 'inicial' }, rechazo: { estado: 'inicial' }, necesitaActualizar: false,
   })
   let estado = inicial()
   let activa = false
@@ -26,8 +27,8 @@ export function crearBandejaSolicitudes(operaciones: OperacionesSolicitudes) {
   }
 
   function accesoDenegado() {
-    return estado.aceptacion.estado === 'error'
-      && ['sesion', 'permiso'].includes(estado.aceptacion.tipo)
+    return [estado.aceptacion, estado.rechazo].some((accion) => accion.estado === 'error'
+      && ['sesion', 'permiso'].includes(accion.tipo))
   }
 
   async function recargar() {
@@ -58,26 +59,31 @@ export function crearBandejaSolicitudes(operaciones: OperacionesSolicitudes) {
     }
   }
 
-  async function aceptar(idSesion: string) {
+  async function decidir(idSesion: string, accion: 'aceptar' | 'rechazar') {
     if (!activa || escritura || estado.actualizando || estado.necesitaActualizar || accesoDenegado()
       || estado.consulta.estado !== 'listo' || !estado.consulta.solicitudes.some((solicitud) => solicitud.id_sesion === idSesion)) return
     // El bloqueo se establece antes del primer await: dos clics no producen dos PATCH.
     const controlador = new AbortController()
     escritura = controlador
-    publicar({ aceptacion: { estado: 'aceptando', idSesion }, errorActualizacion: undefined })
+    publicar({ errorActualizacion: undefined, ...(accion === 'aceptar'
+      ? { aceptacion: { estado: 'aceptando', idSesion } as const, rechazo: { estado: 'inicial' } as const }
+      : { rechazo: { estado: 'rechazando', idSesion } as const, aceptacion: { estado: 'inicial' } as const }) })
     try {
-      await operaciones.aceptar(idSesion, controlador.signal)
+      await operaciones[accion](idSesion, controlador.signal)
       if (!activa || escritura !== controlador || controlador.signal.aborted) return
       // La fila se elimina únicamente después de una confirmación válida de la API.
-      publicar({ aceptacion: { estado: 'aceptada', idSesion }, consulta: {
+      publicar({ ...(accion === 'aceptar'
+        ? { aceptacion: { estado: 'aceptada', idSesion } as const }
+        : { rechazo: { estado: 'rechazada', idSesion } as const }), consulta: {
         estado: 'listo', solicitudes: estado.consulta.estado === 'listo'
           ? estado.consulta.solicitudes.filter((solicitud) => solicitud.id_sesion !== idSesion) : [],
       } })
     } catch (error) {
       if (!activa || escritura !== controlador || controlador.signal.aborted) return
-      const fallo = error instanceof ErrorAceptarSolicitud ? error
-        : new ErrorAceptarSolicitud('No pudimos confirmar el resultado. Actualiza el listado antes de volver a aceptar.', 'incierto')
-      publicar({ aceptacion: { estado: 'error', idSesion, mensaje: fallo.message, tipo: fallo.tipo },
+      const fallo = error instanceof ErrorAceptarSolicitud || error instanceof ErrorRechazarSolicitud ? error
+        : new ErrorAceptarSolicitud(`No pudimos confirmar el resultado. Actualiza el listado antes de volver a ${accion}.`, 'incierto')
+      const resultado = { estado: 'error', idSesion, mensaje: fallo.message, tipo: fallo.tipo } as const
+      publicar({ ...(accion === 'aceptar' ? { aceptacion: resultado } : { rechazo: resultado }),
         necesitaActualizar: !['sesion', 'permiso'].includes(fallo.tipo) })
     } finally {
       if (activa && escritura === controlador) {
@@ -100,6 +106,7 @@ export function crearBandejaSolicitudes(operaciones: OperacionesSolicitudes) {
       escritura = undefined
     },
     recargar,
-    aceptar,
+    aceptar: (idSesion: string) => decidir(idSesion, 'aceptar'),
+    rechazar: (idSesion: string) => decidir(idSesion, 'rechazar'),
   }
 }
