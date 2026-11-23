@@ -518,6 +518,12 @@ export default function ReportesAdminPage({
                         </li>
                       ))}
                     </ul>
+                    <Link
+                      className="conflicto-sesion__revisar"
+                      to={`/panel/tutorias/${conflicto.idSesion}?desde=${encodeURIComponent('/administracion/reportes')}`}
+                    >
+                      Revisar y resolver
+                    </Link>
                   </li>
                 ))}
               </ul>

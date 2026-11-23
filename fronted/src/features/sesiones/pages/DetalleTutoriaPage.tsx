@@ -4,7 +4,9 @@ import type { ConsultaTutorias, DetalleTutoria, EntradaCierre } from '../models/
 import { EstadoConsultaTutorias } from '../components/EstadoConsultaTutorias'
 import { EstadoTutoria } from '../components/EstadoTutoria'
 import { FormularioCierreTutoria, type BorradorCierre } from '../components/FormularioCierreTutoria'
+import { FormularioResolucionConflicto, type BorradorResolucion } from '../components/FormularioResolucionConflicto'
 import type { ErrorDeclararCierre } from '../services/declarar-cierre-api'
+import type { EntradaResolucionConflicto, ErrorResolverConflicto } from '../services/resolver-conflicto-api'
 import { enlaceEncuentroSeguro, ETIQUETAS_SESION } from '../utils/filtros-tutorias'
 import { formatearHorarioSesion } from '../utils/solicitudes-recibidas'
 import './Tutorias.css'
@@ -22,23 +24,31 @@ interface Propiedades {
     enviado: boolean
     error: ErrorDeclararCierre | null
   }
+  resolucion?: {
+    resolver: (entrada: EntradaResolucionConflicto) => void
+    resolviendo: boolean
+    resuelto: boolean
+    error: ErrorResolverConflicto | null
+  }
+  etiquetaVolver?: string
 }
 
 const fechaDeclaracion = new Intl.DateTimeFormat('es-CL', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago',
 })
 
-export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, onRecargar, cierre }: Propiedades) {
+export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, etiquetaVolver = '← Volver a Mi panel', onRecargar, cierre, resolucion }: Propiedades) {
   const [borradorCierre, setBorradorCierre] = useState<BorradorCierre>({ resultado: '', inasistente: '' })
+  const [borradorResolucion, setBorradorResolucion] = useState<BorradorResolucion>({ estado: '', motivo: '', observaciones: '' })
   const tutoria = consulta.estado === 'listo' ? consulta.datos : null
   const nombre = (id: string) => nombres.get(id) ?? (id === tutoria?.id_tutor ? 'Tutor #' : 'Estudiante #') + id
   const encuentro = tutoria?.datos_encuentro
   const enlace = encuentro ? enlaceEncuentroSeguro(encuentro.enlace) : undefined
   return <main className="tutorias" aria-labelledby="detalle-tutoria-titulo">
-    <Link className="tutorias__volver" to={volver}>← Volver a Mi panel</Link>
+    <Link className="tutorias__volver" to={volver}>{etiquetaVolver}</Link>
     <div className="tutorias__encabezado"><div><h1 id="detalle-tutoria-titulo">Detalle de tutoría</h1>
       <p className="tutorias__subtitulo">La información de tu encuentro y el resultado de la sesión.</p></div>
-      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando' || cierre?.enviando}>Actualizar</button></div>
+      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando' || cierre?.enviando || resolucion?.resolviendo}>Actualizar</button></div>
     {consulta.estado === 'cargando' ? <EstadoConsultaTutorias estado="cargando" />
       : consulta.estado === 'error' ? <EstadoConsultaTutorias estado="error" tipo={consulta.tipo} mensaje={consulta.mensaje} onReintentar={onRecargar} />
         : tutoria && encuentro && <>
@@ -105,6 +115,13 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
                   }))}
                   enviando={cierre.enviando} bloqueado={cierre.error?.comprobarEstado ?? false} onEnviar={cierre.enviar} />}
               {tutoria.estado_sesion === 'EN_CONFLICTO' && <p className="tutorias__nota">Las declaraciones requieren revisión de administración.</p>}
+              {resolucion?.error && <p className="tutorias__error-cierre" role="alert">{resolucion.error.message}</p>}
+              {resolucion?.resuelto && <p className="tutorias__nota" role="status">El conflicto se resolvió correctamente.</p>}
+              {resolucion && !resolucion.resuelto && tutoria.acciones_disponibles.resolver_conflicto &&
+                <FormularioResolucionConflicto
+                  borrador={borradorResolucion} onCambiar={setBorradorResolucion}
+                  resolviendo={resolucion.resolviendo} bloqueado={resolucion.error?.comprobarEstado ?? false}
+                  onEnviar={resolucion.resolver} />}
             </section>
             <section className="tutorias__panel" aria-labelledby="calificaciones-titulo"><h2 id="calificaciones-titulo">Calificaciones</h2>
               {tutoria.calificaciones.length === 0 ? <p className="tutorias__texto-secundario">Esta sesión todavía no tiene calificaciones.</p>

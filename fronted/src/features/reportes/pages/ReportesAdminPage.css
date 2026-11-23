@@ -562,6 +562,22 @@
   overflow-wrap: anywhere;
 }
 
+.conflicto-sesion__revisar {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 10px;
+  color: var(--color-primary-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.conflicto-sesion__revisar:hover {
+  color: var(--color-primary-hover);
+}
+
 @media (max-width: 720px) {
   .reportes-admin {
     padding: 28px 20px 56px;

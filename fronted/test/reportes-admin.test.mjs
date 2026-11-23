@@ -510,6 +510,8 @@ test('presenta los conflictos de cierre solo cuando existen', () => {
   assert.match(conConflictos, /Inasistencia/)
   assert.match(conConflictos, /Usuario #31/)
   assert.match(conConflictos, /marca inasistente a Usuario #31/)
+  assert.match(conConflictos, /Revisar y resolver/)
+  assert.match(conConflictos, /href="\/panel\/tutorias\/77\?desde=%2Fadministracion%2Freportes"/)
   assert.doesNotMatch(pagina(listo([pendiente])), /Conflictos de cierre/)
 })
 

@@ -53,6 +53,9 @@ export function vistaPanel(parametros: URLSearchParams, roles: readonly string[]
 }
 
 export function regresoPanel(parametros: URLSearchParams, roles: readonly string[]): string {
+  const desde = parametros.get('desde')
+  if (desde && desde.startsWith('/') && !desde.startsWith('//')) return desde
+  if (!roles.includes('ESTUDIANTE') && !roles.includes('TUTOR')) return '/administracion/reportes'
   return parametros.get('vista') === 'activas' && roles.includes('ESTUDIANTE') ? '/panel'
     : '/panel?' + parametrosHistorialPanel(filtrosTutoriasDelUsuario(parametros, roles))
 }
