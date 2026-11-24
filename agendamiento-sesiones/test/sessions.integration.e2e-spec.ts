@@ -20,6 +20,7 @@ import { ProcesarSesiones } from '../src/sessions/aplicacion/casos-de-uso/proces
 import { EntregarReputacion } from '../src/sessions/aplicacion/casos-de-uso/entregar-reputacion';
 import { LiberarBloques } from '../src/sessions/aplicacion/casos-de-uso/liberar-bloques';
 import { EntregarAvisosModeracion } from '../src/sessions/aplicacion/casos-de-uso/entregar-avisos-moderacion';
+import { RepositorioSesionesPrisma } from '../src/sessions/infraestructura/persistencia/repositorio-sesiones-prisma';
 
 // Pruebas de sesiones y JWT con PostgreSQL real en un esquema aislado.
 describe('Aceptar, rechazar y cancelar sesiones', () => {
@@ -1069,6 +1070,30 @@ describe('Aceptar, rechazar y cancelar sesiones', () => {
     const session = await fixture('CONFIRMADA', '2020-01-01');
     await act(session.id_sesion, 'cancel', outsider).expect(403);
     await act(session.id_sesion, 'cancel').expect(409);
+  });
+  it.each(['UTC', 'America/Santiago'])(
+    'compara el instante de inicio sin desplazarlo por la zona horaria %s',
+    async (zona) => {
+      await prisma.$transaction(async (cliente) => {
+        await cliente.$queryRaw`SELECT set_config('TimeZone', ${zona}, true)`;
+        const [reloj] = await cliente.$queryRaw<Array<{ ahora: string }>>`
+          SELECT clock_timestamp()::text AS ahora
+        `;
+        const inicio = new Date(reloj.ahora);
+        const repositorio = new RepositorioSesionesPrisma(cliente);
+        expect(await repositorio.haComenzado(new Date(inicio.getTime() - 1000))).toBe(true);
+        expect(await repositorio.haComenzado(inicio)).toBe(true);
+        expect(await repositorio.haComenzado(new Date(inicio.getTime() + 60000))).toBe(false);
+      });
+    },
+  );
+  it.each([tutor, tutee])('impide cancelar una sesión recién iniciada al participante %s', async (usuario) => {
+    const sesion = await fixture('CONFIRMADA');
+    await prisma.sesion.update({ where: { id_sesion: sesion.id_sesion }, data: {
+      inicio: new Date(Date.now() - 1000), fin: new Date(Date.now() + 3600000),
+    } });
+    await act(sesion.id_sesion, 'cancel', usuario).expect(409);
+    expect((await stateOf(sesion.id_sesion)).estado_sesion).toBe('CONFIRMADA');
   });
   it('actualiza fecha_actualizacion y excluye la propia solicitud al aceptar', async () => {
     const session = await fixture();

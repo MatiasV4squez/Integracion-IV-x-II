@@ -91,7 +91,7 @@ export class RepositorioSesionesPrisma implements RepositorioSesiones {
     const [resultado] = await this.cliente.$queryRaw<
       Array<{ iniciado: boolean }>
     >`
-      SELECT clock_timestamp() >= ${inicio}::timestamptz AS iniciado
+      SELECT clock_timestamp() >= ${inicio.toISOString()}::timestamptz AS iniciado
     `;
     return resultado.iniciado;
   }
