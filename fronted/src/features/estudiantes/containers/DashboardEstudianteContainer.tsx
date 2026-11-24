@@ -14,7 +14,7 @@ import { useState } from 'react'
 
 function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
   const { consulta, recargar } = useSesionesActivas(sesion)
-  const cancelacion = useCancelarSesion(sesion)
+  const cancelacion = useCancelarSesion(sesion, consulta, recargar)
   const nombresTutores = useNombresTutores(
     consulta.estado === 'listo' ? consulta.sesiones.map((clase) => clase.id_tutor) : [],
     sesion.token,
@@ -83,8 +83,9 @@ function DashboardConSesiones({ sesion }: { sesion: SesionUsuario}){
     )
   }
   function actualizarSesiones() {
+    if (!cancelacion.puedeActualizar) return
     establecerAhora(Date.now())
-    recargar()
+    cancelacion.actualizar()
     recargarHistorial()
   }
   return (
@@ -165,7 +166,7 @@ export default function DashboardEstudianteContainer() {
   }
 
   return <DashboardConSesiones
-    key={sesion.idUsuario}
+    key={sesion.token}
     sesion={sesion}
   />
 }

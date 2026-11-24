@@ -184,12 +184,17 @@ test('presenta carga, envío, éxito y errores sin perder la salida', () => {
   assert.doesNotMatch(completas, /name="idMateria"/)
 })
 
-test('la ruta exige sesión y aparece en la navegación de estudiantes y tutores', async () => {
+test('la ruta exige sesión y aparece en el desplegable de estudiantes y tutores', async () => {
   const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: ['/postulacion-tutor'] }, createElement(AppRoutes)))
   assert.match(html, /Redirigiendo al inicio de sesión…/)
   assert.doesNotMatch(html, /Postular como tutor/)
-  for (const roles of [['ESTUDIANTE'], ['TUTOR']]) {
-    assert.ok(obtenerNavegacion(roles).some((enlace) => enlace.destino === '/postulacion-tutor'), roles[0])
+  const { MenuUsuario } = await vite.ssrLoadModule('/src/shared/layout/MenuUsuario.tsx')
+  for (const [rol, etiqueta] of [['ESTUDIANTE', 'Estudiante'], ['TUTOR', 'Tutor']]) {
+    const menu = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MenuUsuario, {
+      usuario: { etiqueta: 'Camila', rol: etiqueta },
+    })))
+    assert.match(menu, /href="\/postulacion-tutor"/)
+    assert.ok(!obtenerNavegacion([rol]).some((enlace) => enlace.destino === '/postulacion-tutor'), rol)
   }
   assert.ok(!obtenerNavegacion([]).some((enlace) => enlace.destino === '/postulacion-tutor'))
   assert.ok(!obtenerNavegacion(['ADMIN']).some((enlace) => enlace.destino === '/postulacion-tutor'))

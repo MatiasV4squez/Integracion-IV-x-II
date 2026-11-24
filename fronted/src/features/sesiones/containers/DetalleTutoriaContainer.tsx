@@ -5,6 +5,7 @@ import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useConsultaTutorias } from '../hooks/useConsultaTutorias'
 import { useDeclararCierre } from '../hooks/useDeclararCierre'
+import { useCancelarSesion } from '../hooks/useCancelarSesion'
 import { useNombresParticipantes } from '../hooks/useNombresParticipantes'
 import { useResolverConflicto } from '../hooks/useResolverConflicto'
 import { consultarDetalleTutoria, idsParticipantes } from '../services/tutorias-api'
@@ -15,6 +16,7 @@ function DetalleDelUsuario({ sesion, idSesion }: { sesion: SesionUsuario; idSesi
   const [parametros] = useSearchParams()
   const consultar = useCallback((signal: AbortSignal) => consultarDetalleTutoria(sesion, idSesion, signal), [sesion, idSesion])
   const { consulta, recargar } = useConsultaTutorias(sesion.token + ':' + idSesion, consultar)
+  const cancelacion = useCancelarSesion(sesion, consulta, recargar)
   const cierre = useDeclararCierre(sesion, idSesion, recargar)
   const resolucion = useResolverConflicto(sesion, idSesion, recargar)
   const { consulta: catalogo } = useMaterias()
@@ -24,13 +26,14 @@ function DetalleDelUsuario({ sesion, idSesion }: { sesion: SesionUsuario; idSesi
   const volver = regresoPanel(parametros, sesion.roles)
 
   function actualizar() {
+    if (!cancelacion.puedeActualizar || cierre.enviando || resolucion.resolviendo) return
     cierre.actualizar()
     resolucion.actualizar()
   }
 
   return <DetalleTutoriaPage consulta={consulta} idUsuario={sesion.idUsuario} materia={materia} nombres={nombres}
     volver={volver} etiquetaVolver={volver.startsWith('/administracion') ? '← Volver a Reportes y moderación' : undefined}
-    onRecargar={actualizar} cierre={cierre} resolucion={resolucion} />
+    onRecargar={actualizar} cierre={cierre} resolucion={resolucion} cancelacion={cancelacion} />
 }
 
 export default function DetalleTutoriaContainer() {

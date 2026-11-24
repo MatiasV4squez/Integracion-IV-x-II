@@ -77,6 +77,16 @@ test('configura menús por rol sin inventar identidad ni alterar los permisos de
   assert.match(html, /href="\/disponibilidad"/)
   assert.doesNotMatch(html, /Registrarse|Martina|Diego/)
   assert.ok(!configuracion.obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/solicitudes/nueva'))
+  for (const [roles, selectorRol] of [[['ESTUDIANTE'], undefined], [['ESTUDIANTE'], 'Selector de contexto'], [['TUTOR'], 'Selector de contexto']]) {
+    const cabecera = renderizar(createElement(Encabezado, {
+      enlaces: configuracion.obtenerNavegacion(roles),
+      usuario: configuracion.obtenerUsuarioEncabezado({ ...sesion, roles }), selectorRol,
+    }))
+    const principal = cabecera.match(/<nav[^>]*aria-label="Navegación principal"[^>]*>([\s\S]*?)<\/nav>/)[1]
+    assert.doesNotMatch(principal, /Mi perfil|Mi panel|Solicitudes|Postulaciones|Ser tutor/)
+    assert.equal((cabecera.match(/>Mi panel<\/a>/g) ?? []).length, 1)
+    assert.equal((cabecera.match(/href="\/postulacion-tutor"/g) ?? []).length, 1)
+  }
 })
 
 test('una URL de demostración no puede presentar éxito en producción', () => {
@@ -109,7 +119,7 @@ test('el desplegable distingue estudiante sin tutoría y los dos contextos de un
     assert.doesNotMatch(html, />Ser tutor</)
     if (rolActivo === 'TUTOR') {
       assert.match(html, /href="\/solicitudes\/recibidas"/)
-      assert.doesNotMatch(html, /href="\/panel"/)
+      assert.match(html, /href="\/panel\?vista=historial&amp;rol=TUTOR"[^>]*>Mi panel/)
     } else {
       assert.match(html, /href="\/panel"/)
       assert.doesNotMatch(html, /href="\/solicitudes\/recibidas"/)

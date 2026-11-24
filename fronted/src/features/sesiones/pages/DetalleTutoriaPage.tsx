@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import type { ConsultaTutorias, DetalleTutoria, EntradaCierre } from '../models/tutoria'
 import { EstadoConsultaTutorias } from '../components/EstadoConsultaTutorias'
 import { EstadoTutoria } from '../components/EstadoTutoria'
+import { AccionCancelarSesion, ResultadoCancelacionSesion } from '../components/CancelacionSesion'
+import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import { FormularioCierreTutoria, type BorradorCierre } from '../components/FormularioCierreTutoria'
 import { FormularioResolucionConflicto, type BorradorResolucion } from '../components/FormularioResolucionConflicto'
 import type { ErrorDeclararCierre } from '../services/declarar-cierre-api'
@@ -18,6 +20,7 @@ interface Propiedades {
   nombres: ReadonlyMap<string, string>
   volver: string
   onRecargar: () => void
+  cancelacion?: CancelacionSesiones
   cierre?: {
     enviar: (entrada: EntradaCierre) => void
     enviando: boolean
@@ -37,7 +40,7 @@ const fechaDeclaracion = new Intl.DateTimeFormat('es-CL', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago',
 })
 
-export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, etiquetaVolver = '← Volver a Mi panel', onRecargar, cierre, resolucion }: Propiedades) {
+export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, etiquetaVolver = '← Volver a Mi panel', onRecargar, cierre, resolucion, cancelacion }: Propiedades) {
   const [borradorCierre, setBorradorCierre] = useState<BorradorCierre>({ resultado: '', inasistente: '' })
   const [borradorResolucion, setBorradorResolucion] = useState<BorradorResolucion>({ estado: '', motivo: '', observaciones: '' })
   const tutoria = consulta.estado === 'listo' ? consulta.datos : null
@@ -48,7 +51,9 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
     <Link className="tutorias__volver" to={volver}>{etiquetaVolver}</Link>
     <div className="tutorias__encabezado"><div><h1 id="detalle-tutoria-titulo">Detalle de tutoría</h1>
       <p className="tutorias__subtitulo">La información de tu encuentro y el resultado de la sesión.</p></div>
-      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar} disabled={consulta.estado === 'cargando' || cierre?.enviando || resolucion?.resolviendo}>Actualizar</button></div>
+      <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar}
+        disabled={consulta.estado === 'cargando' || cierre?.enviando || resolucion?.resolviendo || cancelacion?.puedeActualizar === false}>Actualizar</button></div>
+    <ResultadoCancelacionSesion cancelacion={cancelacion} />
     {consulta.estado === 'cargando' ? <EstadoConsultaTutorias estado="cargando" />
       : consulta.estado === 'error' ? <EstadoConsultaTutorias estado="error" tipo={consulta.tipo} mensaje={consulta.mensaje} onReintentar={onRecargar} />
         : tutoria && encuentro && <>
@@ -69,29 +74,31 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
             <section className="tutorias__panel" aria-labelledby="participantes-titulo"><h2 id="participantes-titulo">Participantes</h2>
               <dl className="tutorias__datos">{([['Tutor', tutoria.id_tutor], ['Estudiante', tutoria.id_tutee]] as const).map(([rol, id]) =>
                 <div key={rol}><dt>{rol}</dt><dd>{nombre(id)}{id === idUsuario && <span className="tutorias__tu">Tú</span>}</dd></div>)}</dl>
-              {tutoria.id_tutor === idUsuario && tutoria.acciones_disponibles.aceptar &&
-                <Link className="boton-global boton-global--secundario" to="/solicitudes/recibidas">Gestionar solicitud</Link>}
-              {tutoria.id_tutee === idUsuario && tutoria.acciones_disponibles.cancelar &&
-                <Link className="boton-global boton-global--secundario" to="/panel">Gestionar en mi panel</Link>}
-              {(tutoria.id_tutor === idUsuario || tutoria.id_tutee === idUsuario) && [
-                'CONFIRMADA',
-                'PENDIENTE_CIERRE',
-                'COMPLETADA',
-                'NO_REALIZADA',
-                'INASISTENCIA',
-                'EN_CONFLICTO',
-              ].includes(tutoria.estado_sesion) && (
-                <Link
-                  className="boton-global boton-global--secundario"
-                  to={`/reportes/nuevo?sesionId=${tutoria.id_sesion}&usuarioReportadoId=${
-                    tutoria.id_tutor === idUsuario
-                      ? tutoria.id_tutee
-                      : tutoria.id_tutor
-                  }`}
-                >
-                  Reportar problema
-                </Link>
-              )}
+              <div className="tutorias__acciones">
+                {tutoria.id_tutor === idUsuario && tutoria.acciones_disponibles.aceptar &&
+                  <Link className="boton-global boton-global--secundario" to="/solicitudes/recibidas">Gestionar solicitud</Link>}
+                <AccionCancelarSesion sesion={tutoria} cancelacion={cancelacion} permitida={tutoria.acciones_disponibles.cancelar}
+                  bloqueada={cierre?.enviando || resolucion?.resolviendo} />
+                {(tutoria.id_tutor === idUsuario || tutoria.id_tutee === idUsuario) && [
+                  'CONFIRMADA',
+                  'PENDIENTE_CIERRE',
+                  'COMPLETADA',
+                  'NO_REALIZADA',
+                  'INASISTENCIA',
+                  'EN_CONFLICTO',
+                ].includes(tutoria.estado_sesion) && (
+                  <Link
+                    className="boton-global boton-global--secundario"
+                    to={`/reportes/nuevo?sesionId=${tutoria.id_sesion}&usuarioReportadoId=${
+                      tutoria.id_tutor === idUsuario
+                        ? tutoria.id_tutee
+                        : tutoria.id_tutor
+                    }`}
+                  >
+                    Reportar problema
+                  </Link>
+                )}
+              </div>
             </section>
             <section className="tutorias__panel" aria-labelledby="cierre-tutoria-titulo"><h2 id="cierre-tutoria-titulo">Cierre de la sesión</h2>
               {tutoria.declaraciones.length === 0 ? <p className="tutorias__texto-secundario">Todavía no hay declaraciones de cierre para esta sesión.</p>

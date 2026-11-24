@@ -2,7 +2,8 @@ import { Link } from 'react-router'
 import type { Materia } from '../../materias/models/materia'
 import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import type { Sesion } from '../models/sesion'
-import { etiquetarEstadoActivo, puedeCancelar } from '../utils/sesiones-activas'
+import { etiquetarEstadoActivo } from '../utils/sesiones-activas'
+import { AccionCancelarSesion } from './CancelacionSesion'
 import { formatearHorarioSesion } from '../utils/solicitudes-recibidas'
 
 interface ListadoSesionesActivasProps {
@@ -21,6 +22,7 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
         <th scope="col">Materia / Tutor</th>
         <th scope="col">Fecha y horario</th>
         <th scope="col">Estado</th>
+        <th scope="col">Acciones</th>
       </tr></thead>
       <tbody>
         {sesiones.map((sesion) => {
@@ -37,34 +39,27 @@ export function ListadoSesionesActivas({ sesiones, materias, cancelacion, nombre
                 <time dateTime={sesion.inicio}>{formatearHorarioSesion(sesion.inicio, sesion.fin)}</time>
               </td>
               <td data-etiqueta="Estado">
-                {cancelacion?.canceladas.includes(sesion.id_sesion) ? (
-                  <span className="listado-sesiones-activas__etiqueta listado-sesiones-activas__etiqueta--cancelada">Cancelada</span>
-                ) : (
-                  <div className="listado-sesiones-activas__estado">
-                    <span className="listado-sesiones-activas__etiqueta">{etiquetarEstadoActivo(sesion.estado_sesion)}</span>
-                    {cancelacion && puedeCancelar(sesion) && (
-                      <button type="button" className="listado-sesiones-activas__cancelar"
-                        disabled={cancelacion.cancelando !== null} aria-busy={cancelacion.cancelando === sesion.id_sesion}
-                        onClick={() => cancelacion.cancelar(sesion.id_sesion)}>
-                        {cancelacion.cancelando === sesion.id_sesion ? 'Cancelando…' : 'Cancelar'}
-                      </button>
-                    )}
-                    {[
-                      'CONFIRMADA',
-                      'PENDIENTE_CIERRE',
-                      'COMPLETADA',
-                      'NO_REALIZADA',
-                      'INASISTENCIA',
-                      'EN_CONFLICTO',
-                    ].includes(sesion.estado_sesion) && (
-                      <Link
-                        to={`/reportes/nuevo?sesionId=${sesion.id_sesion}&usuarioReportadoId=${sesion.id_tutor}`}
-                      >
-                        Reportar problema
-                      </Link>
-                    )}
-                  </div>
-                )}
+                <span className="listado-sesiones-activas__etiqueta">{etiquetarEstadoActivo(sesion.estado_sesion)}</span>
+              </td>
+              <td data-etiqueta="Acciones">
+                <div className="listado-sesiones-activas__acciones">
+                  <AccionCancelarSesion sesion={sesion} cancelacion={cancelacion} />
+                  {[
+                    'CONFIRMADA',
+                    'PENDIENTE_CIERRE',
+                    'COMPLETADA',
+                    'NO_REALIZADA',
+                    'INASISTENCIA',
+                    'EN_CONFLICTO',
+                  ].includes(sesion.estado_sesion) && (
+                    <Link
+                      className="sesiones-activas__boton sesiones-activas__boton--secundario"
+                      to={`/reportes/nuevo?sesionId=${sesion.id_sesion}&usuarioReportadoId=${sesion.id_tutor}`}
+                    >
+                      Reportar problema
+                    </Link>
+                  )}
+                </div>
               </td>
             </tr>
           )

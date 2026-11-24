@@ -153,7 +153,11 @@ test('registra la ruta del panel del estudiante dentro del layout compartido', a
 })
 
 test('el estudiante entra a las activas y el tutor a su historial desde Mi panel', async () => {
-  const { obtenerNavegacion } = await vite.ssrLoadModule('/src/shared/layout/configuracion-navegacion.ts')
-  assert.ok(obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/panel'))
-  assert.ok(obtenerNavegacion(['TUTOR']).some((enlace) => enlace.destino === '/panel?vista=historial&rol=TUTOR'))
+  const { MenuUsuario } = await vite.ssrLoadModule('/src/shared/layout/MenuUsuario.tsx')
+  for (const [rol, destino] of [['Estudiante', '/panel'], ['Tutor', '/panel?vista=historial&amp;rol=TUTOR']]) {
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(MenuUsuario, {
+      usuario: { etiqueta: 'Camila', rol },
+    })))
+    assert.equal(html.match(/<a\b[^>]*href="([^"]+)"[^>]*>Mi panel<\/a>/)?.[1], destino, rol)
+  }
 })

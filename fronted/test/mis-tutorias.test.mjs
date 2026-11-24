@@ -245,14 +245,15 @@ test('no crea enlaces ejecutables ni interpreta el texto de participantes como H
   }
 })
 
-test('unifica el acceso en Mi panel para ambos roles sin el enlace duplicado', () => {
-  for (const rol of ['ESTUDIANTE', 'TUTOR']) {
+test('unifica el acceso en Mi panel para ambos roles dentro del desplegable', async () => {
+  const { MenuUsuario } = await vite.ssrLoadModule('/src/shared/layout/MenuUsuario.tsx')
+  for (const [rol, etiqueta] of [['ESTUDIANTE', 'Estudiante'], ['TUTOR', 'Tutor']]) {
     const enlaces = navegacion.obtenerNavegacion([rol])
-    assert.equal(enlaces.filter((enlace) => enlace.etiqueta === 'Mi panel').length, 1)
+    const html = render(MenuUsuario, { usuario: { etiqueta: 'Camila', rol: etiqueta } })
+    assert.equal((html.match(/>Mi panel<\/a>/g) ?? []).length, 1)
+    assert.ok(!enlaces.some((enlace) => enlace.etiqueta === 'Mi panel'))
     assert.ok(!enlaces.some((enlace) => enlace.destino === '/mis-tutorias'))
   }
-  assert.ok(navegacion.obtenerNavegacion(['ESTUDIANTE']).some((enlace) => enlace.destino === '/panel'))
-  assert.ok(navegacion.obtenerNavegacion(['TUTOR']).some((enlace) => enlace.destino === '/solicitudes/recibidas'))
 })
 
 test('una cuenta solo estudiante no muestra el selector de participación ni opciones de tutor', () => {

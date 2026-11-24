@@ -9,8 +9,8 @@ export async function cancelarSesion(idSesion: string, sesion: SesionUsuario, ex
   if (!sesion.token || !esIdentificador(sesion.idUsuario) || sesion.expiraEn <= Date.now()) {
     throw new ErrorCancelarSesion('Tu sesión venció o no es válida. Inicia sesión nuevamente.', 'sesion')
   }
-  if (!sesion.roles.includes('ESTUDIANTE')) {
-    throw new ErrorCancelarSesion('Necesitas una cuenta de estudiante para cancelar sesiones.', 'permiso')
+  if (!sesion.roles.some((rol) => ['ESTUDIANTE', 'TUTOR'].includes(rol))) {
+    throw new ErrorCancelarSesion('Necesitas una cuenta de estudiante o tutor para cancelar sesiones.', 'permiso')
   }
   if (!esIdentificador(idSesion)) throw new ErrorCancelarSesion('El identificador de la sesión no es válido.', 'solicitud')
 
@@ -24,10 +24,13 @@ export async function cancelarSesion(idSesion: string, sesion: SesionUsuario, ex
     if (respuesta.status === 404) throw new ErrorCancelarSesion('La sesión ya no existe. Actualiza el listado.', 'ausente')
     if (respuesta.status === 409) throw new ErrorCancelarSesion('No se pudo cancelar: la sesión cambió de estado o ya comenzó. Actualiza el listado.', 'conflicto')
     if (respuesta.status === 400) throw new ErrorCancelarSesion('No se pudo cancelar esta sesión. Actualiza el listado antes de intentarlo nuevamente.', 'solicitud')
-    if (!respuesta.ok) throw new ErrorCancelarSesion('No pudimos confirmar la cancelación. Actualiza el listado antes de volver a intentarlo.', 'incierto')
+    if (respuesta.status !== 200) throw new ErrorCancelarSesion('No pudimos confirmar la cancelación. Actualiza la vista antes de volver a intentarlo.', 'incierto')
 
     const datos: unknown = await respuesta.json()
-    if (!esSesion(datos) || datos.id_sesion !== idSesion || datos.id_tutee !== sesion.idUsuario || datos.estado_sesion !== 'CANCELADA') {
+    if (!esSesion(datos) || datos.id_sesion !== idSesion
+      || !(datos.id_tutee === sesion.idUsuario && sesion.roles.includes('ESTUDIANTE')
+        || datos.id_tutor === sesion.idUsuario && sesion.roles.includes('TUTOR'))
+      || datos.estado_sesion !== 'CANCELADA') {
       throw new ErrorCancelarSesion('La respuesta no permite confirmar la cancelación. Actualiza el listado antes de volver a intentarlo.', 'incierto')
     }
   } catch (error) {

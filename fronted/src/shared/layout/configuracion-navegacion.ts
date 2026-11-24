@@ -19,17 +19,12 @@ const PUBLICOS: readonly EnlaceNavegacion[] = [
 const ESTUDIANTE: readonly EnlaceNavegacion[] = [
   { etiqueta: 'Inicio', destino: '/inicio' },
   PUBLICOS[1],
-  { etiqueta: 'Mi panel', destino: '/panel' },
   PUBLICOS[2],
-  { etiqueta: 'Ser tutor', destino: '/postulacion-tutor' },
 ]
 
 const TUTOR: readonly EnlaceNavegacion[] = [
   { etiqueta: 'Inicio', destino: '/tutor' },
-  { etiqueta: 'Solicitudes', destino: '/solicitudes/recibidas' },
-  { etiqueta: 'Mi panel', destino: '/panel?vista=historial&rol=TUTOR' },
   { etiqueta: 'Disponibilidad', destino: '/disponibilidad' },
-  { etiqueta: 'Postulaciones', destino: '/postulacion-tutor' },
   PUBLICOS[2],
 ]
 

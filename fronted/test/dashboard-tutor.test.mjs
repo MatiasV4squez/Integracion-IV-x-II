@@ -126,9 +126,8 @@ test('el dashboard es el inicio del tutor y la ruta exige sesión', async () => 
   assert.equal(navegacion.obtenerInicioPorRol(['TUTOR']), '/tutor')
   const enlaces = navegacion.obtenerNavegacion(['TUTOR'])
   assert.deepEqual(enlaces[0], { etiqueta: 'Inicio', destino: '/tutor' })
-  for (const destino of ['/solicitudes/recibidas', '/disponibilidad']) {
-    assert.ok(enlaces.some((enlace) => enlace.destino === destino), destino)
-  }
+  assert.ok(enlaces.some((enlace) => enlace.destino === '/disponibilidad'))
+  assert.ok(!enlaces.some((enlace) => enlace.destino === '/solicitudes/recibidas'))
   const html = await renderizarRuta(createElement(MemoryRouter, { initialEntries: ['/tutor'] }, createElement(AppRoutes)))
   assert.match(html, /Redirigiendo al inicio de sesión…/)
   assert.doesNotMatch(html, /resumen de tu actividad/)

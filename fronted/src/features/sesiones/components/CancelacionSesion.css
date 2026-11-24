@@ -1,0 +1,4 @@
+.cancelar-sesion__boton { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border: 1px solid #a52a37; border-radius: 10px; background: #fff; color: #a52a37; font: inherit; font-size: 14px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+.cancelar-sesion__boton:hover:not(:disabled) { background: #a52a37; color: #fff; }
+.cancelar-sesion__boton:disabled { color: var(--color-text-muted); background: var(--color-primary-soft); cursor: not-allowed; }
+.cancelar-sesion__error { margin-bottom: 16px; color: #963a35; }
