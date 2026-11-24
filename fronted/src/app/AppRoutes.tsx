@@ -14,6 +14,7 @@ const VerificacionCuentaContainer = lazy(() => import('../features/verificacion-
 const PanelTuteeContainer = lazy(() => import('../features/panel-tutee/containers/PanelTuteeContainer'))
 const PostulacionesAdminContainer = lazy(() => import('../features/postulaciones/containers/PostulacionesAdminContainer'))
 const ReportesAdminContainer = lazy(() => import('../features/reportes/containers/ReportesAdminContainer'))
+const TutoresRevisionAdminContainer = lazy(() => import('../features/tutores-revision/containers/TutoresRevisionAdminContainer'))
 const DashboardEstudianteContainer = lazy(() => import('../features/estudiantes/containers/DashboardEstudianteContainer'))
 const SolicitarTutoriaContainer = lazy(() => import('../features/sesiones/containers/SolicitarTutoriaContainer'))
 const PantallasEquipo = lazy(() => import('../components/PantallasEquipo'))
@@ -64,6 +65,7 @@ export function AppRoutes({ children }: { children?: ReactNode }) {
         <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
           <Route path="/administracion/postulaciones" element={<PostulacionesAdminContainer />} />
           <Route path="/administracion/reportes" element={<ReportesAdminContainer />} />
+          <Route path="/administracion/tutores-revision" element={<TutoresRevisionAdminContainer />} />
         </Route>
         {children}
         <Route path="/*" element={<PantallasEquipo />} />

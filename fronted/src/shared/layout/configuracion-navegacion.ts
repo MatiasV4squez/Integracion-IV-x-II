@@ -36,6 +36,7 @@ const TUTOR: readonly EnlaceNavegacion[] = [
 const ADMINISTRADOR: readonly EnlaceNavegacion[] = [
   { etiqueta: 'Postulaciones', destino: '/administracion/postulaciones' },
   { etiqueta: 'Reportes', destino: '/administracion/reportes' },
+  { etiqueta: 'Tutores en revisión', destino: '/administracion/tutores-revision' },
   PUBLICOS[1],
   PUBLICOS[2],
 ]
