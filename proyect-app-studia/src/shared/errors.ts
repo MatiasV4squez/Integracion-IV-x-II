@@ -3,13 +3,14 @@
  * leen los casos de uso y la presentación sin depender de cómo se obtuvo el dato.
  */
 export class AppError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-  ) {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'AppError';
+    this.status = status;
+    this.code = code;
   }
 }
 

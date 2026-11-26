@@ -8,7 +8,8 @@ import { SessionCard } from '@/presentation/components/session-card';
 import { StatTile } from '@/presentation/components/stat-tile';
 import { Txt } from '@/presentation/components/txt';
 import { useTheme } from '@/presentation/hooks/use-theme';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
+import { ROUTES } from '@/presentation/navigation/access';
 import { formatDate, formatTimeRange } from '@/shared/format';
 import { clasesActivas, historialReciente, proximaClase, resumenEstudiante, resumenTutor, sesionesAgendadasTutor } from '@/domain/sesiones/resumen-agenda';
 
@@ -19,7 +20,7 @@ function useOpenSession() {
   const { setLastViewed } = useSessions();
   return (id: string) => {
     setLastViewed(id);
-    router.push({ pathname: '/detalle-sesion', params: { id } });
+    router.push({ pathname: ROUTES.detalleSesion, params: { id } });
   };
 }
 
@@ -37,7 +38,7 @@ export function StudentAgendaPanel() {
       {/* Tarjeta azul con degradado, como "Tu próxima clase" del panel web. */}
       <Pressable
         accessibilityRole="button"
-        onPress={() => (proxima ? open(proxima.id) : router.push('/buscar'))}
+        onPress={() => (proxima ? open(proxima.id) : router.push(ROUTES.buscar))}
         style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
         <LinearGradient colors={[colors.headerStart, colors.headerEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.4 }} style={styles.nextCard}>
           <Text style={[styles.nextLabel, { color: colors.headerAccent }]}>{proxima ? 'CLASE CONFIRMADA' : 'SIN CLASES CONFIRMADAS'}</Text>
@@ -78,7 +79,7 @@ export function StudentAgendaList() {
 
       <View style={styles.between}>
         <Txt variant="h2">Tus clases agendadas</Txt>
-        <AppButton label="Solicitar" size="sm" variant="ghost" onPress={() => router.push('/buscar')} />
+        <AppButton label="Solicitar" size="sm" variant="ghost" onPress={() => router.push(ROUTES.buscar)} />
       </View>
       {activas.length === 0 ? (
         <Card>
@@ -86,7 +87,7 @@ export function StudentAgendaList() {
           <Txt variant="small" color="muted">
             Aquí verás tus tutorías y el estado de cada solicitud.
           </Txt>
-          <AppButton label="Buscar tutores" size="sm" variant="secondary" onPress={() => router.push('/buscar')} />
+          <AppButton label="Buscar tutores" size="sm" variant="secondary" onPress={() => router.push(ROUTES.buscar)} />
         </Card>
       ) : (
         activas.map((s) => <SessionCard key={s.id} session={s} onPress={() => open(s.id)} />)
@@ -96,7 +97,7 @@ export function StudentAgendaList() {
         <>
           <View style={styles.between}>
             <Txt variant="h2">Historial reciente</Txt>
-            <AppButton label="Ver todo" size="sm" variant="ghost" onPress={() => router.push('/historial')} />
+            <AppButton label="Ver todo" size="sm" variant="ghost" onPress={() => router.push(ROUTES.historial)} />
           </View>
           {recientes.map((s) => (
             <SessionCard key={s.id} session={s} onPress={() => open(s.id)} />
@@ -126,7 +127,7 @@ export function TutorAgendaPanel() {
 
       <View style={styles.between}>
         <Txt variant="h2">Solicitudes recibidas</Txt>
-        <AppButton label="Ver todas" size="sm" variant="ghost" onPress={() => router.push('/tutor/mis-tutorias')} />
+        <AppButton label="Ver todas" size="sm" variant="ghost" onPress={() => router.push(ROUTES.tutorMisTutorias)} />
       </View>
       {resumen.solicitudes.length === 0 ? (
         <Txt variant="small" color="muted">
@@ -154,7 +155,7 @@ export function TutorAgendaPanel() {
         <>
           <View style={styles.between}>
             <Txt variant="h2">Historial reciente</Txt>
-            <AppButton label="Ver todo" size="sm" variant="ghost" onPress={() => router.push('/historial')} />
+            <AppButton label="Ver todo" size="sm" variant="ghost" onPress={() => router.push(ROUTES.historial)} />
           </View>
           {recientes.map((s) => (
             <SessionCard key={s.id} session={s} onPress={() => open(s.id)} />

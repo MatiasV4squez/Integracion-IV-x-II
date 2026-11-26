@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { isApiEnabled } from '@/di/container';
+import { isApiEnabled, useCases } from '@/di/container';
 import { AppButton } from '@/presentation/components/app-button';
 import { Card } from '@/presentation/components/card';
 import { EmptyState } from '@/presentation/components/empty-state';
@@ -13,22 +13,23 @@ import { ToneBadge } from '@/presentation/components/status-badge';
 import { TutoriaCard } from '@/presentation/components/tutoria-card';
 import { Txt } from '@/presentation/components/txt';
 import { Spacing, type ThemeColors } from '@/presentation/constants/theme';
-import { TUTORIAS } from '@/presentation/constants/tutorias';
+import { useAsync } from '@/presentation/hooks/use-async';
 import { useSesiones } from '@/presentation/hooks/use-sesiones';
 import { useTheme } from '@/presentation/hooks/use-theme';
 import { ROUTES } from '@/presentation/navigation/access';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 import { formatDate, formatTimeRange } from '@/shared/format';
 
 export default function MisTutoriasScreen() {
   return isApiEnabled() ? <MisTutoriasApi /> : <MisTutoriasDemo />;
 }
 
-/** Sin backend: tutorías de ejemplo (src/constants/tutorias). */
+/** Sin backend: tutorías de ejemplo ("Mis tutorías" del modo demo). */
 function MisTutoriasDemo() {
   const colors = useTheme();
   const styles = createStyles(colors);
   const router = useRouter();
+  const { data, isLoading } = useAsync('tutorias-demo', useCases.misTutorias.listar);
 
   return (
     <ScrollView
@@ -37,11 +38,12 @@ function MisTutoriasDemo() {
       showsVerticalScrollIndicator={false}>
       <MisHorarios />
       <Txt variant="h3">Solicitudes y sesiones</Txt>
-      {TUTORIAS.map((tutoria) => (
+      {isLoading ? <LoadingState /> : null}
+      {(data ?? []).map((tutoria) => (
         <TutoriaCard
           key={tutoria.id}
           tutoria={tutoria}
-          onPress={() => router.push(`/tutor/tutoria/${tutoria.id}`)}
+          onPress={() => router.push({ pathname: ROUTES.tutorTutoria, params: { id: tutoria.id } })}
         />
       ))}
     </ScrollView>
@@ -63,7 +65,7 @@ function MisTutoriasApi() {
 
   const open = (id: string) => {
     setLastViewed(id);
-    router.push({ pathname: '/detalle-sesion', params: { id } });
+    router.push({ pathname: ROUTES.detalleSesion, params: { id } });
   };
 
   return (

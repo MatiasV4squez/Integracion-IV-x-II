@@ -3,16 +3,26 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useCases } from '@/di/container';
 import { Radius, Spacing, type ThemeColors } from '@/presentation/constants/theme';
-import { findTutoria, initials, statusBadge, statusLabel, type TutoriaStatus } from '@/presentation/constants/tutorias';
+import { initials, statusBadge, statusLabel, type TutoriaStatus } from '@/presentation/constants/tutorias';
+import { useAsync } from '@/presentation/hooks/use-async';
 import { useTheme } from '@/presentation/hooks/use-theme';
 
 export default function TutoriaDetailScreen() {
   const colors = useTheme();
   const styles = createStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const tutoria = findTutoria(id);
-  const [status, setStatus] = useState<TutoriaStatus | undefined>(tutoria?.status);
+  const { data: tutoria } = useAsync(id ? `tutoria-demo:${id}` : null, (signal) => useCases.misTutorias.obtener(id, signal));
+  const [status, setStatus] = useState<TutoriaStatus | undefined>(undefined);
+
+  // Sincronizado durante el render, no en un efecto, siguiendo el patrón de
+  // React para "adjusting state when a prop changes".
+  const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
+  if (tutoria && tutoria.id !== loadedId) {
+    setLoadedId(tutoria.id);
+    setStatus(tutoria.status);
+  }
 
   if (!tutoria || !status) {
     return (

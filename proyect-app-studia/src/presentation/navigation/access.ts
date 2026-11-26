@@ -9,11 +9,16 @@ export const ROUTES = {
   login: '/login',
   registro: '/registro',
   home: '/',
+  buscar: '/buscar',
   historial: '/historial',
+  detalleSesion: '/detalle-sesion',
   publicarDisponibilidad: '/publicar-disponibilidad',
   postulacionTutor: '/postulacion-tutor',
   adminPostulaciones: '/admin/postulaciones',
   verificarCuenta: '/verificar-cuenta',
+  tutorMisTutorias: '/tutor/mis-tutorias',
+  tutorPerfil: '/tutor/[id]',
+  tutorTutoria: '/tutor/tutoria/[id]',
 } as const;
 
 export function hasRole(roles: readonly AccountRole[], role: AccountRole): boolean {

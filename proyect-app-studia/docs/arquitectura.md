@@ -39,13 +39,13 @@ pide todo a `src/di` y nunca importa `infrastructure`. ESLint lo hace cumplir
 | Carpeta | Qué va ahí |
 |---|---|
 | `src/domain/` | Entidades y reglas de negocio puras: `sesiones/` (tipos, máquina de estados BR02, resúmenes de agenda), `auth/` (usuario, roles, correo institucional, token), `disponibilidad/` (calendario, validación del bloque, 12/24 h), `postulaciones/` (estados, certificado, nota), `catalogo/` (materia). |
-| `src/application/ports/` | **Puertos**: interfaces que la aplicación necesita del exterior (`AuthGateway`, `StorageService`, `TokenStorage`, `CatalogoRepository`, `TutoresRepository`, `SesionesRepository`, `DisponibilidadRepository`, `PerfilRepository`, `PostulacionesRepository`, `UsuariosRepository`). |
-| `src/application/<caso>/` | **Casos de uso** por funcionalidad (`auth`, `catalogo`, `tutorias`, `sesiones`, `disponibilidad`, `postulaciones`, `perfil`). Reciben puertos por parámetro (factorías `create...`), validan con el dominio y nunca lanzan errores esperados. |
+| `src/application/ports/` | **Puertos**: interfaces que la aplicación necesita del exterior (`AuthGateway`, `StorageService`, `TokenStorage`, `CatalogoRepository`, `TutoresRepository`, `SesionesRepository`, `DisponibilidadRepository`, `PerfilRepository`, `PostulacionesRepository`, `UsuariosRepository`, `MisTutoriasRepository`). |
+| `src/application/<caso>/` | **Casos de uso** por funcionalidad (`auth`, `catalogo`, `tutorias` (búsqueda y "mis tutorías"), `sesiones`, `disponibilidad`, `postulaciones`, `perfil`). Reciben puertos por parámetro (factorías `create...`), validan con el dominio y nunca lanzan errores esperados. |
 | `src/infrastructure/http/` | Adaptadores HTTP de cada puerto hacia el API Gateway, más el cliente (`http-client.ts`: JSON, multipart, JWT, 401). |
-| `src/infrastructure/demo/` | Adaptadores demo (sin backend) y sus datos de ejemplo (`data/`). |
+| `src/infrastructure/demo/` | Adaptadores demo (sin backend) y sus datos de ejemplo (`data/`). La presentación nunca los importa directamente: siempre a través de un puerto conectado en `di/container.ts`. |
 | `src/infrastructure/storage/`, `platform/` | Almacenamiento local/seguro y descarga de archivos por plataforma. |
-| `src/di/` | `container.ts`: raíz de composición (adaptadores HTTP o demo según `EXPO_PUBLIC_API_URL`, casos de uso, estados globales). `demo.ts`: datos de ejemplo que la UI usa solo en modo demo. |
-| `src/presentation/` | `screens/`, `components/`, `hooks/`, `state/` (Zustand y contexto de sesiones), `navigation/`, `schemas/` (zod), `constants/` (tema). |
+| `src/di/` | `container.ts`: única raíz de composición (adaptadores HTTP o demo según `EXPO_PUBLIC_API_URL`, casos de uso, estados globales de Zustand). |
+| `src/presentation/` | `screens/`, `components/`, `hooks/`, `state/` (stores de Zustand), `navigation/`, `schemas/` (zod), `constants/` (tema). |
 | `src/shared/` | Utilidades sin dependencias de capa: fechas, formato, hora de Santiago, configuración, errores (`AppError`), paginación. |
 | `src/app/` | Rutas de Expo Router (archivos delgados que renderizan una pantalla). Expo exige esta ubicación. |
 
@@ -61,6 +61,7 @@ pide todo a `src/di` y nunca importa `infrastructure`. ESLint lo hace cumplir
 | `PerfilRepository` | `perfil-api` | `demo-repositories` | `perfil` |
 | `PostulacionesRepository` | `postulaciones-api` | `demo-repositories` (en memoria) | `postulaciones` |
 | `UsuariosRepository` | `usuarios-auth-api` (datos públicos) | `demo-repositories` | `postulaciones`, adaptadores |
+| `MisTutoriasRepository` | — (pantalla de demostración, sin backend todavía) | `demo-repositories` | `tutorias/mis-tutorias` |
 | `StorageService`, `TokenStorage` | `storage/` (AsyncStorage, SecureStore) | — | `auth`, `catalogo` |
 
 ### Convención de resultados
@@ -90,9 +91,11 @@ Con `EXPO_PUBLIC_API_URL` (raíz del API Gateway, p. ej. `http://192.168.1.10:80
 |---|---|---|
 | `authStore` | `status` (`hydrating`/`authenticated`/`unauthenticated`), `user`, `error`, `notice` | Token en SecureStore, usuario y última actividad en AsyncStorage |
 | `preferencesStore` | `theme`, `notificationsEnabled`, `tutorMode` | AsyncStorage |
+| `sessionsStore` | Sesiones, cupos reservados, horarios propios y acciones (`run`, `reload`, `remote`). Con backend recarga al iniciar/cerrar sesión (suscrito a `authStore`); sin backend los datos son fijos (`MOCK_SESSIONS`) | — (con backend vive en agendamiento-sesiones) |
 
-Al abrir la app, el layout raíz mantiene la pantalla de carga hasta que ambos terminan de leer lo guardado
-(así no se ve un parpadeo del login).
+Los tres son fábricas (`create...Store`) que reciben sus dependencias por parámetro, así se prueban con
+memoria y casos de uso falsos. Al abrir la app, el layout raíz mantiene la pantalla de carga hasta que
+`authStore` y `preferencesStore` terminan de leer lo guardado (así no se ve un parpadeo del login).
 
 ## 5. Navegación y roles
 
@@ -168,6 +171,5 @@ El cargador de `scripts/` permite importar los módulos `.ts` con el alias `@/`.
 ## 11. Pendiente
 
 - Pantallas del rol Administrador (la navegación ya admite el rol `admin`).
-- Migrar `SessionsProvider` a Zustand.
 - Conectar `auth-gateway` y el catálogo al API Gateway real.
 - Pantalla de recuperación de contraseña (no está en el SRS).

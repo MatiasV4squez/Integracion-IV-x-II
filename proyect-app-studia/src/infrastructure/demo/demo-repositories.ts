@@ -5,6 +5,7 @@
 import type {
   CatalogoRepository,
   DatosPublicos,
+  MisTutoriasRepository,
   PerfilRepository,
   PostulacionesRepository,
   TutoresRepository,
@@ -17,6 +18,7 @@ import { paginate } from '@/shared/pagination';
 import { ME, ME_AS_TUTOR, ME_PROFILE } from './data/sessions';
 import { SUBJECTS } from './data/subjects';
 import { getTutorById, tutorsForSubject } from './data/tutors';
+import { TUTORIAS } from './data/tutorias';
 import { mockResponse } from './latency';
 
 export function createDemoCatalogoRepository(): CatalogoRepository {
@@ -45,6 +47,10 @@ export function createDemoPerfilRepository(): PerfilRepository {
 
 export function createDemoUsuariosRepository(): UsuariosRepository {
   return { datosPublicos: async () => new Map<string, DatosPublicos>() };
+}
+
+export function createDemoMisTutoriasRepository(): MisTutoriasRepository {
+  return { listar: (signal) => mockResponse(() => TUTORIAS, signal) };
 }
 
 /** Postulaciones en memoria; `getUserId` entrega el usuario de la sesión (lo conecta la raíz de composición). */

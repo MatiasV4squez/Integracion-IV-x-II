@@ -15,12 +15,13 @@ import { ScreenContainer } from '@/presentation/components/screen-container';
 import { SegmentedTabs } from '@/presentation/components/segmented-tabs';
 import { StatTile } from '@/presentation/components/stat-tile';
 import { Txt } from '@/presentation/components/txt';
-import { getSubject } from '@/di/demo';
 import { AppError } from '@/shared/errors';
+import { useSubjects } from '@/presentation/hooks/use-subjects';
 import { useTone } from '@/presentation/hooks/use-tone';
 import { useTutoria } from '@/presentation/hooks/use-tutorias';
 import { useUI } from '@/presentation/hooks/use-ui';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
+import { ROUTES } from '@/presentation/navigation/access';
 import type { AvailabilityBlock } from '@/domain/sesiones/session';
 import { formatDate, formatTimeRange, joinDetails, plural, semesterLabel } from '@/shared/format';
 import { blockOccupancy } from '@/domain/sesiones/session-machine';
@@ -36,6 +37,8 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
   const success = useTone('success');
   const { reserved } = useSessions();
   const { data: tutor, error, isLoading, isRefreshing, refresh } = useTutoria(tutorId);
+  const { subjects } = useSubjects();
+  const subjectName = (code: string) => subjects.find((s) => s.code === code)?.name;
   const [tab, setTab] = useState<Tab>('resumen');
 
   const distribution = useMemo(
@@ -52,7 +55,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
     return [...map.entries()];
   }, [tutor]);
 
-  const back = () => (router.canGoBack() ? router.back() : router.navigate('/buscar'));
+  const back = () => (router.canGoBack() ? router.back() : router.navigate(ROUTES.buscar));
 
   if (isLoading) {
     return (
@@ -82,7 +85,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
 
   const requestWithTutor = () =>
     router.navigate({
-      pathname: '/buscar',
+      pathname: ROUTES.buscar,
       params: { tutor: tutor.id, subject: subjectCode ?? tutor.subjectCodes[0] },
     });
 
@@ -162,7 +165,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
           <Card>
             <Txt variant="h3">Materias que enseña</Txt>
             {tutor.subjectCodes.map((code) => {
-              const subject = getSubject(code);
+              const subject = subjects.find((s) => s.code === code);
               return (
                 <View key={code} style={styles.subjectRow}>
                   <View style={styles.flex}>
@@ -175,7 +178,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
                     label="Ver horarios"
                     size="sm"
                     variant="secondary"
-                    onPress={() => router.navigate({ pathname: '/buscar', params: { tutor: tutor.id, subject: code } })}
+                    onPress={() => router.navigate({ pathname: ROUTES.buscar, params: { tutor: tutor.id, subject: code } })}
                   />
                 </View>
               );
@@ -204,7 +207,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
 
       {tab === 'resenas' ? (
         tutor.reviews.length > 0 ? (
-          tutor.reviews.map((review) => <ReviewCard key={review.id} review={review} />)
+          tutor.reviews.map((review) => <ReviewCard key={review.id} review={review} subjectName={subjectName(review.subjectCode)} />)
         ) : (
           <EmptyState icon="💬" title="Aún no hay reseñas" message="Este tutor todavía no recibe calificaciones. ¡Puedes ser de los primeros!" />
         )
@@ -243,7 +246,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
               {tutor.bySubject.map(({ code, sessions }) => (
                 <View key={code} style={styles.gap6}>
                   <View style={styles.between}>
-                    <Txt variant="label">{getSubject(code)?.name ?? code}</Txt>
+                    <Txt variant="label">{subjectName(code) ?? code}</Txt>
                     <Txt variant="caption" color="muted">
                       {plural(sessions, 'tutoría', 'tutorías')}
                     </Txt>
@@ -259,7 +262,7 @@ export default function TutorPerfilScreen({ tutorId, subjectCode }: Props) {
               {tutor.recent.map((item) => (
                 <View key={`${item.subjectCode}-${item.date}`} style={[styles.blockRow, { borderColor: ui.border }]}>
                   <View style={styles.flex}>
-                    <Txt variant="label">{getSubject(item.subjectCode)?.name ?? item.subjectCode}</Txt>
+                    <Txt variant="label">{subjectName(item.subjectCode) ?? item.subjectCode}</Txt>
                     <Txt variant="caption" color="muted">
                       {formatDate(item.date)}
                     </Txt>

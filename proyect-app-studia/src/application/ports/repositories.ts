@@ -63,3 +63,22 @@ export interface UsuariosRepository {
   /** Nunca falla: si el servicio no responde, devuelve un mapa vacío y se muestran IDs. */
   datosPublicos(ids: string[], signal?: AbortSignal): Promise<Map<string, DatosPublicos>>;
 }
+
+export type TutoriaStatus = 'confirmada' | 'pendiente' | 'completada' | 'cancelada';
+
+/** Tarjeta de "Mis tutorías" (pantalla de demostración de la vista de Tutor, sin backend todavía). */
+export type Tutoria = {
+  id: string;
+  studentName: string;
+  subject: string;
+  date: string;
+  time: string;
+  modality: 'Presencial' | 'Virtual';
+  location: string;
+  status: TutoriaStatus;
+  notes: string;
+};
+
+export interface MisTutoriasRepository {
+  listar(signal?: AbortSignal): Promise<Tutoria[]>;
+}

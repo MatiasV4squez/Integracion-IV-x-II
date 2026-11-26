@@ -3,12 +3,12 @@ import { useMemo, useState } from 'react';
 import { filtrarSesiones } from '@/application/sesiones/sesiones';
 import { isApiEnabled } from '@/di/container';
 import type { AsyncState } from '@/presentation/hooks/use-async';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 import type { SesionesFilter, Session } from '@/domain/sesiones/session';
 
 /**
  * Sesiones del usuario ("mis sesiones"), opcionalmente filtradas por rol y estado.
- * Siempre se leen de SessionsProvider (que con backend las carga desde agendamiento-sesiones),
+ * Siempre se leen de `sessionsStore` (que con backend las carga desde agendamiento-sesiones),
  * así los cambios hechos en otras pantallas se ven al tiro.
  */
 export function useSesiones(filter: SesionesFilter = {}): AsyncState<Session[]> {

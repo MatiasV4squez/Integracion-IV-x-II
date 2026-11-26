@@ -4,13 +4,10 @@ import { Avatar } from '@/presentation/components/avatar';
 import { Card } from '@/presentation/components/card';
 import { RatingStars } from '@/presentation/components/rating-stars';
 import { Txt } from '@/presentation/components/txt';
-import { getSubject } from '@/di/demo';
 import type { Review } from '@/domain/sesiones/session';
 import { formatDate } from '@/shared/format';
 
-export function ReviewCard({ review }: { review: Review }) {
-  const subject = getSubject(review.subjectCode);
-
+export function ReviewCard({ review, subjectName }: { review: Review; subjectName?: string }) {
   return (
     <Card>
       <View style={styles.header}>
@@ -18,7 +15,7 @@ export function ReviewCard({ review }: { review: Review }) {
         <View style={styles.flex}>
           <Txt variant="label">{review.author}</Txt>
           <Txt variant="caption" color="muted">
-            {subject?.name ?? review.subjectCode} · {formatDate(review.date)}
+            {subjectName ?? review.subjectCode} · {formatDate(review.date)}
           </Txt>
         </View>
         <RatingStars value={review.rating} size={14} />

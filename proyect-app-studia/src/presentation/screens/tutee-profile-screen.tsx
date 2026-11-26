@@ -15,7 +15,7 @@ import { useAuth } from '@/presentation/hooks/use-auth';
 import { usePerfil } from '@/presentation/hooks/use-perfil';
 import { useUI } from '@/presentation/hooks/use-ui';
 import { canBeTutor, isAdmin, ROUTES } from '@/presentation/navigation/access';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 import { joinDetails } from '@/shared/format';
 
 const ACTIVE_STATUSES = ['pendiente', 'confirmada', 'pendiente_cierre'];
@@ -31,7 +31,7 @@ export default function TuteeProfileScreen() {
 
   const signOut = async () => {
     await logout();
-    router.replace('/login');
+    router.replace(ROUTES.login);
   };
 
   const tuteeSessions = useMemo(() => sessions.filter((s) => s.myRole === 'tutee'), [sessions]);

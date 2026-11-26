@@ -7,40 +7,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PreferencesCard } from '@/presentation/components/preferences-card';
 import { Radius, Spacing, type ThemeColors } from '@/presentation/constants/theme';
 import { initials } from '@/presentation/constants/tutorias';
-import { isApiEnabled } from '@/di/container';
 import { useAuth } from '@/presentation/hooks/use-auth';
 import { usePerfil } from '@/presentation/hooks/use-perfil';
 import { useTheme } from '@/presentation/hooks/use-theme';
 import { isAdmin, ROUTES } from '@/presentation/navigation/access';
-import { ME_AS_TUTOR } from '@/di/demo';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 import { formatDuration, minutesBetween } from '@/shared/date-time';
 import { formatDate, formatTimeRange } from '@/shared/format';
 
-// Datos de ejemplo del modo demo (sin backend).
-const DEMO_STATS = [
-  { icon: 'school-outline' as const, value: '32', label: 'Tutorías dadas' },
-  { icon: 'time-outline' as const, value: '48h', label: 'Horas totales' },
-  { icon: 'star-outline' as const, value: String(ME_AS_TUTOR.reputation), label: 'Calificación' },
-];
-
-const DEMO_SUBJECTS = ['Cálculo I', 'Cálculo II', 'Álgebra Lineal', 'Programación I'];
-
-const DEMO_AVAILABILITY = [
-  { day: 'Lunes', time: '10:00 - 12:00' },
-  { day: 'Miércoles', time: '14:00 - 16:00' },
-  { day: 'Viernes', time: '09:00 - 11:00' },
-];
-
-/**
- * Con backend, estadísticas, materias y horarios salen de las sesiones dictadas (agendamiento-sesiones)
- * y de los bloques publicados (materias-tutores).
- */
+/** Estadísticas, materias y horarios salen de las sesiones dictadas (agendamiento-sesiones) y de los bloques publicados (materias-tutores). */
 function useTutorData() {
   const { sessions, myAvailability } = useSessions();
   const { data: perfil } = usePerfil();
   return useMemo(() => {
-    if (!isApiEnabled()) return { stats: DEMO_STATS, subjects: DEMO_SUBJECTS, availability: DEMO_AVAILABILITY };
     const dictated = sessions.filter((s) => s.myRole === 'tutor' && s.status === 'completada');
     const minutes = dictated.reduce((sum, s) => sum + minutesBetween(s.startsAt, s.endsAt), 0);
     const rating = perfil?.reputation;
@@ -75,7 +54,7 @@ export default function TutorProfileScreen() {
 
   const signOut = async () => {
     await logout();
-    router.replace('/login');
+    router.replace(ROUTES.login);
   };
 
   return (

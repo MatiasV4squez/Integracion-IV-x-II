@@ -10,14 +10,18 @@ import { createPerfilUseCases } from '@/application/perfil/perfil';
 import type { TokenStorage } from '@/application/ports/storage';
 import { createPostulacionesUseCases } from '@/application/postulaciones/postulaciones';
 import { createSesionesUseCases } from '@/application/sesiones/sesiones';
+import { createMisTutoriasUseCases } from '@/application/tutorias/mis-tutorias';
 import { createTutoriasUseCases } from '@/application/tutorias/tutorias';
+import { isTutor } from '@/domain/auth/auth';
 import {
   createDemoCatalogoRepository,
+  createDemoMisTutoriasRepository,
   createDemoPerfilRepository,
   createDemoPostulacionesRepository,
   createDemoTutoresRepository,
   createDemoUsuariosRepository,
 } from '@/infrastructure/demo/demo-repositories';
+import { MOCK_NOW, MOCK_SESSIONS } from '@/infrastructure/demo/data/sessions';
 import { createMockAuthGateway } from '@/infrastructure/demo/mock-auth-gateway';
 import { createHttpCatalogoRepository } from '@/infrastructure/http/catalogo-api';
 import { createHttpDisponibilidadRepository } from '@/infrastructure/http/disponibilidad-api';
@@ -34,6 +38,7 @@ import { createStorageService } from '@/infrastructure/storage/storage-service';
 import { createTokenStorage } from '@/infrastructure/storage/token-storage';
 import { createAuthStore } from '@/presentation/state/auth-store';
 import { createPreferencesStore } from '@/presentation/state/preferences-store';
+import { createSessionsStore } from '@/presentation/state/sessions-store';
 import { STORAGE } from '@/shared/app-config';
 
 const MOCK_LATENCY_MS = 400;
@@ -92,11 +97,29 @@ export const useCases = {
   disponibilidad: createDisponibilidadUseCases({ disponibilidad: createHttpDisponibilidadRepository() }),
   postulaciones: createPostulacionesUseCases({ postulaciones, usuarios }),
   perfil: createPerfilUseCases({ perfil }),
+  // Pantalla de demostración de "Mis tutorías" (sin backend todavía).
+  misTutorias: createMisTutoriasUseCases({ misTutorias: createDemoMisTutoriasRepository() }),
 };
 
 // --- Estado global (presentación) ---
 export const authStore = createAuthStore(authService);
 export const preferencesStore = createPreferencesStore(storage);
+export const sessionsStore = createSessionsStore({
+  api: backend,
+  seed: backend ? { sessions: [], clock: new Date().toISOString(), reserved: {} } : { sessions: MOCK_SESSIONS, clock: MOCK_NOW, reserved: {} },
+  sesiones: useCases.sesiones,
+  disponibilidad: useCases.disponibilidad,
+  isTutor: () => isTutor(authStore.getState().user),
+});
+
+// Con backend, el login/logout recarga o limpia las sesiones (en la demo no reacciona: son fijas).
+let sessionsWasAuthenticated = authStore.getState().status === 'authenticated';
+authStore.subscribe((state) => {
+  const isAuthenticated = state.status === 'authenticated';
+  if (isAuthenticated === sessionsWasAuthenticated) return;
+  sessionsWasAuthenticated = isAuthenticated;
+  sessionsStore.getState().handleAuthChange(isAuthenticated);
+});
 
 // Un 401 en cualquier microservicio significa que el token venció o fue revocado: se vuelve al login.
 setUnauthorizedHandler(() => {

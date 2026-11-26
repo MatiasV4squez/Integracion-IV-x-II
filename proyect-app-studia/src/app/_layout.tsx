@@ -7,7 +7,6 @@ import { useAuth } from '@/presentation/hooks/use-auth';
 import { usePreferences } from '@/presentation/hooks/use-preferences';
 import { useUI } from '@/presentation/hooks/use-ui';
 import { canAccess } from '@/presentation/navigation/access';
-import { SessionsProvider } from '@/presentation/state/sessions-context';
 import { authStore, preferencesStore } from '@/di/container';
 
 // La pantalla de carga se mantiene hasta recuperar la sesión y las preferencias guardadas.
@@ -28,11 +27,7 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  return (
-    <SessionsProvider>
-      <RootNavigator />
-    </SessionsProvider>
-  );
+  return <RootNavigator />;
 }
 
 /** Registra actividad al navegar y revisa la inactividad al volver a la app (NFR04). */

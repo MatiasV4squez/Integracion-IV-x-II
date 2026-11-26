@@ -22,7 +22,8 @@ import { MaxContentWidth, Spacing } from '@/presentation/constants/theme';
 import { useClientPagination } from '@/presentation/hooks/use-client-pagination';
 import { useSesiones } from '@/presentation/hooks/use-sesiones';
 import { useUI } from '@/presentation/hooks/use-ui';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
+import { ROUTES } from '@/presentation/navigation/access';
 import type { Session, UserRole } from '@/domain/sesiones/session';
 import { formatDate, formatTimeRange } from '@/shared/format';
 import { conteoHistorial, historialPorRol, type FiltroHistorial } from '@/domain/sesiones/resumen-agenda';
@@ -104,7 +105,7 @@ export default function MiHistorialScreen({ role }: { role: UserRole }) {
 
   const openDetail = (id: string) => {
     setLastViewed(id);
-    router.push({ pathname: '/detalle-sesion', params: { id } });
+    router.push({ pathname: ROUTES.detalleSesion, params: { id } });
   };
 
   const elegir = (value: FiltroHistorial) => {
@@ -180,8 +181,8 @@ export default function MiHistorialScreen({ role }: { role: UserRole }) {
                 message={vacio.message}
                 action={
                   role === 'tutee'
-                    ? { label: 'Buscar tutorías', onPress: () => router.navigate('/buscar') }
-                    : { label: 'Publicar disponibilidad', onPress: () => router.navigate('/publicar-disponibilidad') }
+                    ? { label: 'Buscar tutorías', onPress: () => router.navigate(ROUTES.buscar) }
+                    : { label: 'Publicar disponibilidad', onPress: () => router.navigate(ROUTES.publicarDisponibilidad) }
                 }
               />
             )

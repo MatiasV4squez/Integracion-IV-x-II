@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
 import { isApiEnabled, useCases } from '@/di/container';
-import { ME } from '@/di/demo';
 import type { SolicitudInput } from '@/domain/sesiones/session';
 import { createRequest } from '@/domain/sesiones/session-machine';
 import { useAsync } from '@/presentation/hooks/use-async';
+import { useAuth } from '@/presentation/hooks/use-auth';
 import { usePaginated } from '@/presentation/hooks/use-paginated';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 
 export const TUTORES_PAGE_SIZE = 5;
 
@@ -31,15 +31,17 @@ export type SolicitudResult = { ok: true; sessionId: string } | { ok: false; err
 
 /**
  * Solicitar (reservar) un horario de tutoría. Sin backend aplica las reglas de session-machine
- * sobre SessionsProvider; con backend usa el caso de uso de sesiones y recarga.
+ * sobre `sessionsStore`; con backend usa el caso de uso de sesiones y recarga.
  */
 export function useSolicitarTutoria() {
   const { run, reload } = useSessions();
+  const { user } = useAuth();
   const [pendingBlockId, setPendingBlockId] = useState<string | null>(null);
 
   const solicitar = async (input: SolicitudInput): Promise<SolicitudResult> => {
     if (!isApiEnabled()) {
-      const res = run((state) => createRequest(state, { ...input, me: ME }));
+      const me = { id: user?.id ?? '', name: user?.name ?? '' };
+      const res = run((state) => createRequest(state, { ...input, me }));
       return res.ok ? { ok: true, sessionId: res.session.id } : { ok: false, error: res.error };
     }
     setPendingBlockId(input.block.id);

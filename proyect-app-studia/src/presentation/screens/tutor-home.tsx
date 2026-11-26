@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { TutorAgendaPanel } from '@/presentation/components/agenda-panels';
 import { Radius, Spacing, type ThemeColors } from '@/presentation/constants/theme';
 import { useTheme } from '@/presentation/hooks/use-theme';
+import { ROUTES } from '@/presentation/navigation/access';
 
 export default function TutorHome() {
   const colors = useTheme();
@@ -22,7 +23,7 @@ export default function TutorHome() {
 
       <View style={styles.cards}>
         <Pressable
-          onPress={() => router.push('/publicar-disponibilidad')}
+          onPress={() => router.push(ROUTES.publicarDisponibilidad)}
           style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
           <LinearGradient
             colors={[colors.headerStart, colors.headerEnd]}
@@ -41,7 +42,7 @@ export default function TutorHome() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/tutor/mis-tutorias')}
+          onPress={() => router.push(ROUTES.tutorMisTutorias)}
           style={({ pressed }) => [styles.cardWrapper, pressed && styles.pressed]}>
           <View style={[styles.card, styles.cardSurface]}>
             <View style={styles.iconBox}>

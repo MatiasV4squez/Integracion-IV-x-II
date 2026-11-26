@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { isApiEnabled } from '@/di/container';
 import { AppButton } from '@/presentation/components/app-button';
 import { Avatar } from '@/presentation/components/avatar';
 import { CapacityMeter } from '@/presentation/components/capacity-meter';
@@ -21,8 +20,8 @@ import { useAuth } from '@/presentation/hooks/use-auth';
 import { useTone } from '@/presentation/hooks/use-tone';
 import { useMaterias, useSolicitarTutoria, useTutorias } from '@/presentation/hooks/use-tutorias';
 import { useUI } from '@/presentation/hooks/use-ui';
-import { ME, ME_AS_TUTOR, SUBJECTS, tutorsForSubject } from '@/di/demo';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
+import { ROUTES } from '@/presentation/navigation/access';
 import type { Tutor } from '@/domain/sesiones/session';
 import { formatDate, formatTimeRange, joinDetails, plural, semesterLabel } from '@/shared/format';
 import { blockOccupancy, isBlockFull, MAX_PENDING_REQUESTS } from '@/domain/sesiones/session-machine';
@@ -33,14 +32,13 @@ type Props = { initialSubject?: string; initialTutor?: string };
 export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor }: Props) {
   const router = useRouter();
   const ui = useUI();
-  const { pendingCount, reserved, sessions, setLastViewed, myAvailability } = useSessions();
+  const { pendingCount, reserved, sessions, setLastViewed } = useSessions();
   const { solicitar, pendingBlockId } = useSolicitarTutoria();
   const { user } = useAuth();
   const materias = useMaterias();
-  const api = isApiEnabled();
-  const catalog = api ? (materias.data ?? []) : SUBJECTS;
+  const catalog = materias.data ?? [];
   const findSubject = (code: string) => catalog.find((m) => m.code === code);
-  const myId = api ? user?.id : ME.id;
+  const myId = user?.id;
 
   const [query, setQuery] = useState('');
   const [subjectCode, setSubjectCode] = useState<string | null>(initialSubject ?? null);
@@ -51,7 +49,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
   const [prevInitialSubject, setPrevInitialSubject] = useState(initialSubject);
   if (initialSubject !== prevInitialSubject) {
     setPrevInitialSubject(initialSubject);
-    if (initialSubject && (api || findSubject(initialSubject))) setSubjectCode(initialSubject);
+    if (initialSubject) setSubjectCode(initialSubject);
   }
 
   const subject = subjectCode ? findSubject(subjectCode) : undefined;
@@ -63,51 +61,23 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
     return !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || s.area.toLowerCase().includes(q);
   });
 
-  // El mismo usuario puede ser Tutor y Tutee a la vez: si publicó horarios para esta materia,
-  // aparecen aquí igual que los de cualquier otro tutor (con su propio historial de solicitudes).
-  const myBlocks = useMemo(
-    () => myAvailability.filter((b) => b.subjectCode === subjectCode),
-    [myAvailability, subjectCode],
-  );
-  const meAsTutor: Tutor | null = useMemo(() => {
-    // Con backend el propio tutor ya aparece en la búsqueda real de materias-tutores.
-    if (api || !subjectCode || myBlocks.length === 0) return null;
-    return {
-      id: ME_AS_TUTOR.id,
-      name: ME_AS_TUTOR.name,
-      career: 'Tú, en modo tutor',
-      semester: 0,
-      bio: '',
-      verified: true,
-      reputation: ME_AS_TUTOR.reputation,
-      ratingsCount: ME_AS_TUTOR.ratingsCount,
-      subjectCodes: [subjectCode],
-      stats: { sessions: 0, hours: 0, responseTime: '—', repeatRate: 0 },
-      bySubject: [],
-      recent: [],
-      reviews: [],
-      availability: myBlocks,
-    };
-  }, [api, subjectCode, myBlocks]);
-
   const tutors = useMemo(() => {
     if (!subjectCode) return [];
-    // Un tutor no puede reservarse a sí mismo: con backend se quita de la lista (en la demo se agrega aparte, sin "Reservar").
-    const list = (tutorias.items ?? []).filter((t) => !api || t.id !== myId);
-    const withMe = meAsTutor ? [meAsTutor, ...list] : list;
-    if (!initialTutor) return withMe;
+    // Un tutor no puede reservarse a sí mismo: se quita de la lista de resultados.
+    const list = (tutorias.items ?? []).filter((t) => t.id !== myId);
+    if (!initialTutor) return list;
     // El tutor pedido explícitamente (desde su perfil o "¿Qué sigue?") aparece primero.
-    return [...withMe].sort((a, b) => (a.id === initialTutor ? -1 : b.id === initialTutor ? 1 : 0));
-  }, [subjectCode, initialTutor, meAsTutor, tutorias.items, api, myId]);
+    return [...list].sort((a, b) => (a.id === initialTutor ? -1 : b.id === initialTutor ? 1 : 0));
+  }, [subjectCode, initialTutor, tutorias.items, myId]);
 
-  const selfListed = api && (tutorias.items ?? []).some((t) => t.id === myId);
+  const selfListed = (tutorias.items ?? []).some((t) => t.id === myId);
 
   const alreadyRequested = (blockId: string) =>
     sessions.some((s) => s.blockId === blockId && s.myRole === 'tutee' && (s.status === 'pendiente' || s.status === 'confirmada'));
 
   const openDetail = (id: string) => {
     setLastViewed(id);
-    router.push({ pathname: '/detalle-sesion', params: { id } });
+    router.push({ pathname: ROUTES.detalleSesion, params: { id } });
   };
 
   const reserve = async (tutor: Tutor, blockId: string) => {
@@ -161,18 +131,18 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
               {s.name}
             </Txt>
             <Txt variant="caption" color="muted">
-              {api ? s.code : `${s.code} · ${plural(tutorsForSubject(s.code).length, 'tutor', 'tutores')}`}
+              {s.code}
             </Txt>
           </Pressable>
         ))}
-        {api && materias.isLoading ? <LoadingState /> : null}
-        {api && materias.error ? <ErrorState message={materias.error.message} onRetry={materias.refresh} /> : null}
-        {filteredSubjects.length === 0 && !(api && (materias.isLoading || materias.error)) ? <EmptyState icon="🔎" title="Sin resultados" message="Prueba con otro nombre o código." /> : null}
+        {materias.isLoading ? <LoadingState /> : null}
+        {materias.error ? <ErrorState message={materias.error.message} onRetry={materias.refresh} /> : null}
+        {filteredSubjects.length === 0 && !(materias.isLoading || materias.error) ? <EmptyState icon="🔎" title="Sin resultados" message="Prueba con otro nombre o código." /> : null}
       </View>
 
       {subject ? (
         <>
-          <SectionHeader title="Tutores y horarios" subtitle={`${plural(Math.max(tutors.length, tutorias.total + (meAsTutor ? 1 : 0) - (selfListed ? 1 : 0)), 'tutor disponible', 'tutores disponibles')} en ${subject.name}`} />
+          <SectionHeader title="Tutores y horarios" subtitle={`${plural(Math.max(tutors.length, tutorias.total - (selfListed ? 1 : 0)), 'tutor disponible', 'tutores disponibles')} en ${subject.name}`} />
 
           {tutorias.isLoading ? (
             <LoadingState message="Buscando tutores…" />
@@ -181,9 +151,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
           ) : tutors.length === 0 ? (
             <EmptyState icon="🌱" title="Sin tutores por ahora" message="Nadie ofrece esta materia todavía. Vuelve a revisar más tarde." />
           ) : (
-            tutors.map((tutor) => {
-              const isMe = tutor.id === myId;
-              return (
+            tutors.map((tutor) => (
               <Card key={tutor.id}>
                 <View style={styles.header}>
                   <Avatar name={tutor.name} size={52} />
@@ -195,9 +163,9 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
                       {tutor.verified ? <VerifiedPill /> : null}
                     </View>
                     {/* Con backend la carrera y el semestre pueden no estar cargados en usuarios-auth. */}
-                    {joinDetails(tutor.career, !isMe && semesterLabel(tutor.semester)) ? (
+                    {joinDetails(tutor.career, semesterLabel(tutor.semester)) ? (
                       <Txt variant="small" color="muted" numberOfLines={1}>
-                        {joinDetails(tutor.career, !isMe && semesterLabel(tutor.semester))}
+                        {joinDetails(tutor.career, semesterLabel(tutor.semester))}
                       </Txt>
                     ) : null}
                     {tutor.reputation !== null ? (
@@ -213,14 +181,12 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
                       </Txt>
                     )}
                   </View>
-                  {isMe ? null : (
-                    <AppButton
-                      label="Ver perfil"
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => router.push({ pathname: '/tutor/[id]', params: { id: tutor.id, subject: subject.code } })}
-                    />
-                  )}
+                  <AppButton
+                    label="Ver perfil"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => router.push({ pathname: ROUTES.tutorPerfil, params: { id: tutor.id, subject: subject.code } })}
+                  />
                 </View>
 
                 {tutor.availability.length === 0 ? (
@@ -241,11 +207,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
                             {formatTimeRange(block.startsAt, block.endsAt)}
                           </Txt>
                           <CapacityMeter enrolled={blockOccupancy(block, reserved)} capacity={block.capacity} />
-                          {isMe ? (
-                            <Txt variant="caption" color="muted">
-                              Tu horario
-                            </Txt>
-                          ) : mine ? (
+                          {mine ? (
                             <Txt variant="caption" color="primary">
                               Ya reservado
                             </Txt>
@@ -276,8 +238,7 @@ export default function TutoriasDisponiblesScreen({ initialSubject, initialTutor
                   </View>
                 )}
               </Card>
-              );
-            })
+            ))
           )}
           {tutorias.items !== undefined ? (
             <LoadMore

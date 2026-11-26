@@ -15,9 +15,8 @@ import { ScreenContainer } from '@/presentation/components/screen-container';
 import { SectionHeader } from '@/presentation/components/section-header';
 import { Txt } from '@/presentation/components/txt';
 import { useSubjects } from '@/presentation/hooks/use-subjects';
-import { getSubject } from '@/di/demo';
 import { createAvailabilitySchema, type AvailabilityForm } from '@/presentation/schemas/availability-schema';
-import { useSessions } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
 import { formatDate, formatTimeRange } from '@/shared/format';
 import { duracion, validarBloque } from '@/domain/disponibilidad/calendar';
 import { santiagoDay, santiagoTime, santiagoToIso } from '@/shared/santiago-time';
@@ -57,7 +56,7 @@ export default function PublicarDisponibilidadScreen() {
     reValidateMode: 'onChange',
   });
   const { subjectCode, day, startTime, endTime } = useWatch({ control });
-  const subject = !api && subjectCode ? getSubject(subjectCode) : undefined;
+  const subject = !api && subjectCode ? subjects.find((s) => s.code === subjectCode) : undefined;
 
   // Días con horarios propios (punto en el calendario) y los tramos ya ocupados el día elegido.
   const markedDays = useMemo(() => new Set(myAvailability.map((b) => b.startsAt.slice(0, 10))), [myAvailability]);
@@ -210,7 +209,7 @@ export default function PublicarDisponibilidadScreen() {
         <EmptyState icon="🗓️" title="Aún no publicas horarios" message="Los horarios que publiques aparecerán aquí y en la búsqueda de los tutees." />
       ) : (
         myAvailability.map((block) => {
-          const blockSubject = getSubject(block.subjectCode);
+          const blockSubject = subjects.find((s) => s.code === block.subjectCode);
           return (
             <Card key={block.id}>
               <View style={styles.between}>

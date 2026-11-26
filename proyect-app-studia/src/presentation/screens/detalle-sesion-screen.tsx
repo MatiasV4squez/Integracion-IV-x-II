@@ -21,8 +21,9 @@ import { Txt } from '@/presentation/components/txt';
 import { STATUS_META } from '@/presentation/constants/session-status';
 import { useAuth } from '@/presentation/hooks/use-auth';
 import { useUI } from '@/presentation/hooks/use-ui';
-import { getTutorById, ME } from '@/di/demo';
-import { useSessions, type RemoteResult } from '@/presentation/state/sessions-context';
+import { useSessions } from '@/presentation/hooks/use-sessions';
+import { ROUTES } from '@/presentation/navigation/access';
+import type { RemoteResult } from '@/presentation/state/sessions-store';
 import type { ClosureResult, MaterialKind, Session } from '@/domain/sesiones/session';
 import { formatDateTime, formatDayLong, formatTime, plural } from '@/shared/format';
 import {
@@ -103,15 +104,13 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
     return (
       <ScreenContainer>
         <EmptyState icon="📄" title="No hay sesiones para mostrar" message="Reserva una tutoría y aparecerá aquí." />
-        <AppButton label="Buscar tutorías disponibles" onPress={() => router.navigate('/buscar')} />
+        <AppButton label="Buscar tutorías disponibles" onPress={() => router.navigate(ROUTES.buscar)} />
       </ScreenContainer>
     );
   }
 
   const id = session.id;
   const iAmTutee = session.myRole === 'tutee';
-  // Con backend el perfil del tutor se pide a materias-tutores al abrirlo.
-  const tutorProfile = api ? session.tutor : getTutorById(session.tutor.id);
   const actions = getAvailableActions({
     status: session.status,
     role: session.myRole,
@@ -179,7 +178,7 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
           title: materialTitle || `${kindLabel} ${session.materials.length + 1}`,
           kind: materialKind,
           meta: 'PDF · demo',
-          uploadedBy: user?.name ?? ME.name,
+          uploadedBy: user?.name ?? '',
         }),
       'Material subido a la sesión.',
     );
@@ -190,14 +189,14 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
   };
 
   const canUpload = ['confirmada', 'pendiente_cierre', 'completada'].includes(session.status);
-  const openTutorProfile = () => router.push({ pathname: '/tutor/[id]', params: { id: session.tutor.id, subject: session.subject.code } });
+  const openTutorProfile = () => router.push({ pathname: ROUTES.tutorPerfil, params: { id: session.tutor.id, subject: session.subject.code } });
 
   const { mine, theirs } = session.declaration ?? {};
   const notice = getNotice(session, mine, theirs);
   const phase = getCheckInPhase(session.startsAt, session.endsAt, now);
   const showQr = ['confirmada', 'pendiente_cierre', 'completada'].includes(session.status);
   const showTimer = session.status === 'pendiente' || session.status === 'confirmada';
-  const goBack = () => (router.canGoBack() ? router.back() : router.navigate('/historial'));
+  const goBack = () => (router.canGoBack() ? router.back() : router.navigate(ROUTES.historial));
 
   return (
     <View style={[styles.flex, { backgroundColor: ui.bg }]}>
@@ -306,7 +305,7 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
                 ? `★ ${session.tutor.reputation.toFixed(1)} · ${plural(session.tutor.ratingsCount, 'reseña', 'reseñas')}`
                 : 'Sin reseñas aún'
             }
-            action={tutorProfile && iAmTutee ? <AppButton label="Ver perfil" size="sm" variant="secondary" onPress={openTutorProfile} /> : undefined}
+            action={iAmTutee ? <AppButton label="Ver perfil" size="sm" variant="secondary" onPress={openTutorProfile} /> : undefined}
           />
           <Person name={session.tutee.name} role="Tutee" />
           <Info label="Solicitada" value={formatDateTime(session.createdAt)} />
@@ -428,21 +427,19 @@ export default function DetalleSesionScreen({ sessionId }: Props) {
         {iAmTutee ? (
           <Card>
             <Txt variant="h3">¿Qué sigue?</Txt>
-            {tutorProfile ? (
-              <AppButton
-                label={`Reservar otra hora con ${session.tutor.name.split(' ')[0]}`}
-                onPress={() => router.navigate({ pathname: '/buscar', params: { tutor: session.tutor.id, subject: session.subject.code } })}
-              />
-            ) : null}
+            <AppButton
+              label={`Reservar otra hora con ${session.tutor.name.split(' ')[0]}`}
+              onPress={() => router.navigate({ pathname: ROUTES.buscar, params: { tutor: session.tutor.id, subject: session.subject.code } })}
+            />
             <AppButton
               label={`Buscar otro tutor de ${session.subject.name}`}
               variant="secondary"
-              onPress={() => router.navigate({ pathname: '/buscar', params: { subject: session.subject.code } })}
+              onPress={() => router.navigate({ pathname: ROUTES.buscar, params: { subject: session.subject.code } })}
             />
-            <AppButton label="Volver al historial" variant="ghost" onPress={() => router.navigate('/historial')} />
+            <AppButton label="Volver al historial" variant="ghost" onPress={() => router.navigate(ROUTES.historial)} />
           </Card>
         ) : (
-          <AppButton label="Volver al historial" variant="secondary" onPress={() => router.navigate('/historial')} />
+          <AppButton label="Volver al historial" variant="secondary" onPress={() => router.navigate(ROUTES.historial)} />
         )}
 
         {/* Panel de demostración: simula lo que haría el backend / la contraparte (solo sin API) */}

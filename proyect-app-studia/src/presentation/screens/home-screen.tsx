@@ -8,11 +8,9 @@ import { Radius, Spacing, type ThemeColors } from '@/presentation/constants/them
 import { useAuth } from '@/presentation/hooks/use-auth';
 import { useTheme } from '@/presentation/hooks/use-theme';
 import { useTutorMode } from '@/presentation/hooks/use-tutor-mode';
-import { ME } from '@/di/demo';
+import { ROUTES } from '@/presentation/navigation/access';
 import { StudentAgendaList, StudentAgendaPanel } from '@/presentation/components/agenda-panels';
 import TutorHome from '@/presentation/screens/tutor-home';
-
-// Sin backend se usa el mismo usuario demo que el resto de la app: @/mocks/sessions ME.
 
 function initials(name: string) {
   return name
@@ -28,7 +26,7 @@ export default function HomeScreen() {
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const me = user ?? ME;
+  const me = { name: user?.name ?? '' };
   const router = useRouter();
   const { isTutor, setIsTutor, canBeTutor } = useTutorMode();
 
@@ -70,7 +68,7 @@ export default function HomeScreen() {
             <Pressable
               accessibilityRole="search"
               accessibilityLabel="Buscar tutores por materia"
-              onPress={() => router.push('/buscar')}
+              onPress={() => router.push(ROUTES.buscar)}
               style={({ pressed }) => [styles.searchBar, pressed && styles.pressed]}>
               <Text style={styles.searchPlaceholder} numberOfLines={1}>
                 Busca una materia o un tutor
