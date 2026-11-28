@@ -23,11 +23,9 @@ export function useCrearReporte(token: string) {
         ? error.message
         : 'Ocurrió un error al enviar el reporte.'
 
-      bloqueado.current = incierto
-
-      setEnvio(incierto
-        ? { estado: 'incierto', mensaje }
-        : { estado: 'error', mensaje })
+      const requiereSesion = error instanceof ErrorCrearReporte && error.requiereSesion
+      bloqueado.current = incierto || requiereSesion
+      setEnvio({ estado: incierto ? 'incierto' : requiereSesion ? 'sesion' : 'error', mensaje })
     }
   }
 

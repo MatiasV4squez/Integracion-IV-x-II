@@ -11,6 +11,7 @@ export type EstadoEnvioReporte =
   | { estado: 'enviado' }
   | { estado: 'error'; mensaje: string }
   | { estado: 'incierto'; mensaje: string }
+  | { estado: 'sesion'; mensaje: string }
 
 export const ESTADOS_REPORTE = ['PENDIENTE', 'DESESTIMADO', 'ADVERTIDO', 'SUSPENDIDO'] as const
 export type EstadoReporte = (typeof ESTADOS_REPORTE)[number]

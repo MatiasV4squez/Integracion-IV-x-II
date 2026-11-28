@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { Link, useLocation } from 'react-router'
+import { cerrarSesionUsuario } from '../../../shared/auth/usuario-autenticado'
 import { useCrearReporte } from '../hooks/useCrearReporte'
 
 interface Propiedades {
@@ -7,24 +9,25 @@ interface Propiedades {
   idUsuarioReportado: string
 }
 
-export function FormularioReporte({token, idSesion,idUsuarioReportado}: Propiedades) {
+export function FormularioReporte({ token, idSesion, idUsuarioReportado }: Propiedades) {
   const [titulo, setTitulo] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [errorValidacion, setErrorValidacion] = useState('')
+  const [intentoEnviar, setIntentoEnviar] = useState(false)
   const { envio, enviar } = useCrearReporte(token)
+  const ubicacion = useLocation()
 
-  const bloqueado = envio.estado === 'enviando' || envio.estado === 'enviado' || envio.estado === 'incierto'
+  const enviando = envio.estado === 'enviando'
+  const bloqueado = enviando || envio.estado === 'incierto' || envio.estado === 'sesion'
+  const faltaTitulo = intentoEnviar && !titulo.trim()
+  const faltaDescripcion = intentoEnviar && !descripcion.trim()
+  const volverATutoria = `/panel/tutorias/${idSesion}`
 
   function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     if (bloqueado) return
+    setIntentoEnviar(true)
+    if (!titulo.trim() || !descripcion.trim()) return
 
-    if (!titulo.trim() || !descripcion.trim()) {
-      setErrorValidacion('Completa el título y la descripción.')
-      return
-    }
-
-    setErrorValidacion('')
     void enviar({
       titulo: titulo.trim(),
       descripcion: descripcion.trim(),
@@ -33,11 +36,18 @@ export function FormularioReporte({token, idSesion,idUsuarioReportado}: Propieda
     })
   }
 
-  return (
-    <section>
-      <h2>Reportar un problema</h2>
+  if (envio.estado === 'enviado') {
+    return (
+      <section className="crear-reporte__tarjeta">
+        <p role="status">Tu reporte se registró correctamente.</p>
+        <Link className="boton-global boton-global--primario" to={volverATutoria}>Volver a la tutoría</Link>
+      </section>
+    )
+  }
 
-      <form onSubmit={manejarEnvio} aria-busy={envio.estado === 'enviando'}>
+  return (
+    <section className="crear-reporte__tarjeta">
+      <form onSubmit={manejarEnvio} noValidate aria-busy={enviando}>
         <fieldset disabled={bloqueado}>
           <legend>Datos del reporte</legend>
 
@@ -46,6 +56,8 @@ export function FormularioReporte({token, idSesion,idUsuarioReportado}: Propieda
             <input
               value={titulo}
               onChange={(evento) => setTitulo(evento.target.value)}
+              aria-invalid={faltaTitulo || undefined}
+              aria-describedby={faltaTitulo ? 'reporte-campos-obligatorios' : undefined}
               required
             />
           </label>
@@ -56,33 +68,39 @@ export function FormularioReporte({token, idSesion,idUsuarioReportado}: Propieda
               value={descripcion}
               onChange={(evento) => setDescripcion(evento.target.value)}
               rows={5}
+              aria-invalid={faltaDescripcion || undefined}
+              aria-describedby={faltaDescripcion ? 'reporte-campos-obligatorios' : undefined}
               required
             />
           </label>
 
-          <button type="submit">
-            {envio.estado === 'enviando'
-              ? 'Enviando…'
-              : envio.estado === 'error'
-                ? 'Reintentar envío'
-                : 'Enviar reporte'}
-          </button>
+          {(faltaTitulo || faltaDescripcion) && (
+            <p id="reporte-campos-obligatorios" role="alert">Completa el título y la descripción.</p>
+          )}
+          {envio.estado !== 'incierto' && envio.estado !== 'sesion' && (
+            <button className="boton-global boton-global--primario" type="submit">
+              {enviando ? 'Enviando…' : envio.estado === 'error' ? 'Reintentar envío' : 'Enviar reporte'}
+            </button>
+          )}
         </fieldset>
-
-        {errorValidacion && <p role="alert">{errorValidacion}</p>}
-
-        {envio.estado === 'enviando' && (
-          <p role="status">Estamos enviando tu reporte.</p>
-        )}
-
-        {envio.estado === 'enviado' && (
-          <p role="status">Tu reporte se registró correctamente.</p>
-        )}
-
-        {(envio.estado === 'error' || envio.estado === 'incierto') && (
-          <p role="alert">{envio.mensaje}</p>
-        )}
       </form>
+      {enviando && <p role="status">Estamos enviando tu reporte.</p>}
+      {(envio.estado === 'error' || envio.estado === 'incierto' || envio.estado === 'sesion') && (
+        <p role="alert">{envio.mensaje}</p>
+      )}
+      {envio.estado === 'incierto' && (
+        <Link className="boton-global boton-global--secundario" to={volverATutoria}>Volver a la tutoría</Link>
+      )}
+      {envio.estado === 'sesion' && (
+        <Link
+          className="boton-global boton-global--primario"
+          to="/login"
+          state={{ desde: ubicacion.pathname + ubicacion.search }}
+          onClick={cerrarSesionUsuario}
+        >
+          Iniciar sesión
+        </Link>
+      )}
     </section>
   )
 }

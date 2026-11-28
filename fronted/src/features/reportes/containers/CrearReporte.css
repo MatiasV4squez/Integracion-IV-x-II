@@ -1,0 +1,65 @@
+.crear-reporte {
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) 20px;
+}
+
+.crear-reporte h1 {
+  margin-bottom: 20px;
+}
+
+.crear-reporte__tarjeta {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: clamp(16px, 4vw, 28px);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.crear-reporte__tarjeta form {
+  width: 100%;
+}
+
+.crear-reporte__tarjeta fieldset {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crear-reporte__tarjeta legend {
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.crear-reporte__tarjeta label {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.crear-reporte__tarjeta :is(input, textarea) {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.crear-reporte__tarjeta textarea {
+  resize: vertical;
+}
+
+.crear-reporte__tarjeta [aria-invalid="true"] {
+  border-color: #a61925;
+}
+
+.crear-reporte__tarjeta [role="alert"] {
+  color: #a61925;
+}

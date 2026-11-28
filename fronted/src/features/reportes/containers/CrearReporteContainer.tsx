@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router'
 import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
 import { esIdentificador } from '../../../shared/utils/identificadores'
 import { FormularioReporte } from '../components/FormularioReporte'
+import './CrearReporte.css'
 
 export default function CrearReporteContainer() {
   const sesion = useSesionUsuario()
@@ -15,18 +16,18 @@ export default function CrearReporteContainer() {
   if (!esIdentificador(idSesion) || !esIdentificador(idUsuarioReportado) || idUsuarioReportado === sesion.idUsuario
   ) {
     return (
-      <main>
+      <main className="crear-reporte">
         <h1>Crear reporte</h1>
-        <p role="alert">
-          El enlace no contiene una sesión y una contraparte válidas.
-        </p>
-        <Link to="/materias">Volver a materias</Link>
+        <section className="crear-reporte__tarjeta">
+          <p role="alert">El enlace no contiene una sesión y una contraparte válidas.</p>
+          <Link to="/materias" className="boton-global boton-global--secundario">Volver a materias</Link>
+        </section>
       </main>
     )
   }
 
   return (
-    <main>
+    <main className="crear-reporte">
       <h1>Crear reporte</h1>
       <FormularioReporte
         key={`${sesion.idUsuario}:${idSesion}:${idUsuarioReportado}`}

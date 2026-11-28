@@ -69,6 +69,7 @@ export function MenuUsuario({ usuario, alCerrarSesion, selectorRol, contadorSoli
           <div className="menu-usuario__cuerpo">
             <nav className="menu-usuario__enlaces" aria-label="Mi cuenta">
               <Link className="menu-usuario__opcion" to="/perfil" onClick={cerrar}>Mi perfil</Link>
+              <Link className="menu-usuario__opcion" to="/notificaciones" onClick={cerrar}>Notificaciones</Link>
             </nav>
           </div>
         )}
@@ -76,6 +77,7 @@ export function MenuUsuario({ usuario, alCerrarSesion, selectorRol, contadorSoli
           <div className="menu-usuario__cuerpo">
             <nav className="menu-usuario__enlaces" aria-label="Mi cuenta">
               <Link className="menu-usuario__opcion" to="/perfil" onClick={cerrar}>Mi perfil</Link>
+              <Link className="menu-usuario__opcion" to="/notificaciones" onClick={cerrar}>Notificaciones</Link>
               <Link className="menu-usuario__opcion" to={esTutor ? '/panel?vista=historial&rol=TUTOR' : '/panel'} onClick={cerrar}>Mi panel</Link>
               {esTutor && (
                 <Link className="menu-usuario__opcion" to="/solicitudes/recibidas" onClick={cerrar}>

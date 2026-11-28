@@ -3,17 +3,19 @@ import type { DatosReporte } from '../models/reporte'
 
 export class ErrorCrearReporte extends Error {
   readonly incierto: boolean
+  readonly requiereSesion: boolean
 
-  constructor(mensaje: string, incierto = false) {
+  constructor(mensaje: string, incierto = false, requiereSesion = false) {
     super(mensaje)
     this.name = 'ErrorCrearReporte'
     this.incierto = incierto
+    this.requiereSesion = requiereSesion
   }
 }
 
 export async function crearReporte(datos: DatosReporte, token: string,): Promise<void> {
   if (!token.trim()) {
-    throw new ErrorCrearReporte('Inicia sesión para enviar un reporte.')
+    throw new ErrorCrearReporte('Inicia sesión para enviar un reporte.', false, true)
   }
 
   const url = obtenerUrlApi('reportes-moderacion/reportes')
@@ -55,5 +57,7 @@ export async function crearReporte(datos: DatosReporte, token: string,): Promise
 
   throw new ErrorCrearReporte(
     mensajes[respuesta.status] ?? 'No se pudo enviar el reporte.',
+    false,
+    respuesta.status === 401,
   )
 }
