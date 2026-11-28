@@ -32,7 +32,7 @@ export function FormularioCierreTutoria({ participantes, borrador, onCambiar, en
   }
 
   return (
-    <form className="tutorias__formulario-cierre" onSubmit={enviar} aria-label="Declarar cierre" aria-busy={enviando}>
+    <form className="tutorias__formulario" onSubmit={enviar} aria-label="Declarar cierre" aria-busy={enviando}>
       <p className="tutorias__texto-secundario">Cada participante envía su propia declaración. Si ambas coinciden, la sesión se cierra con ese resultado.</p>
       <label>
         Resultado de la sesión

@@ -6,6 +6,8 @@ import { EstadoTutoria } from '../components/EstadoTutoria'
 import { AccionCancelarSesion, ResultadoCancelacionSesion } from '../components/CancelacionSesion'
 import type { CancelacionSesiones } from '../hooks/useCancelarSesion'
 import { FormularioCierreTutoria, type BorradorCierre } from '../components/FormularioCierreTutoria'
+import { FormularioCalificacionTutoria } from '../components/FormularioCalificacionTutoria'
+import type { ErrorCalificarTutoria } from '../services/calificar-tutoria-api'
 import { FormularioResolucionConflicto, type BorradorResolucion } from '../components/FormularioResolucionConflicto'
 import type { ErrorDeclararCierre } from '../services/declarar-cierre-api'
 import type { EntradaResolucionConflicto, ErrorResolverConflicto } from '../services/resolver-conflicto-api'
@@ -21,6 +23,12 @@ interface Propiedades {
   volver: string
   onRecargar: () => void
   cancelacion?: CancelacionSesiones
+  calificacion?: {
+    enviar: (puntuacion: number) => void
+    enviando: boolean
+    enviada: boolean
+    error: ErrorCalificarTutoria | null
+  }
   cierre?: {
     enviar: (entrada: EntradaCierre) => void
     enviando: boolean
@@ -40,20 +48,25 @@ const fechaDeclaracion = new Intl.DateTimeFormat('es-CL', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago',
 })
 
-export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, etiquetaVolver = '← Volver a Mi panel', onRecargar, cierre, resolucion, cancelacion }: Propiedades) {
+export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombres, volver, etiquetaVolver = '← Volver a Mi panel', onRecargar, cierre, resolucion, cancelacion, calificacion }: Propiedades) {
   const [borradorCierre, setBorradorCierre] = useState<BorradorCierre>({ resultado: '', inasistente: '' })
+  const [puntuacion, setPuntuacion] = useState(0)
   const [borradorResolucion, setBorradorResolucion] = useState<BorradorResolucion>({ estado: '', motivo: '', observaciones: '' })
   const tutoria = consulta.estado === 'listo' ? consulta.datos : null
   const nombre = (id: string) => nombres.get(id) ?? (id === tutoria?.id_tutor ? 'Tutor #' : 'Estudiante #') + id
   const encuentro = tutoria?.datos_encuentro
   const enlace = encuentro ? enlaceEncuentroSeguro(encuentro.enlace) : undefined
+  const esParticipante = tutoria && (tutoria.id_tutor === idUsuario || tutoria.id_tutee === idUsuario)
+  const puedeCalificar = esParticipante && tutoria.estado_sesion === 'COMPLETADA' && tutoria.acciones_disponibles.calificar
+    && !tutoria.calificaciones.some((nota) => nota.id_evaluador === idUsuario)
   return <main className="tutorias" aria-labelledby="detalle-tutoria-titulo">
     <Link className="tutorias__volver" to={volver}>{etiquetaVolver}</Link>
     <div className="tutorias__encabezado"><div><h1 id="detalle-tutoria-titulo">Detalle de tutoría</h1>
       <p className="tutorias__subtitulo">La información de tu encuentro y el resultado de la sesión.</p></div>
       <button className="boton-global boton-global--secundario" type="button" onClick={onRecargar}
-        disabled={consulta.estado === 'cargando' || cierre?.enviando || resolucion?.resolviendo || cancelacion?.puedeActualizar === false}>Actualizar</button></div>
+        disabled={consulta.estado === 'cargando' || cierre?.enviando || resolucion?.resolviendo || calificacion?.enviando || cancelacion?.puedeActualizar === false}>Actualizar</button></div>
     <ResultadoCancelacionSesion cancelacion={cancelacion} />
+    {calificacion?.enviada && <p className="tutorias__aviso" role="status">Tu calificación quedó registrada.</p>}
     {consulta.estado === 'cargando' ? <EstadoConsultaTutorias estado="cargando" />
       : consulta.estado === 'error' ? <EstadoConsultaTutorias estado="error" tipo={consulta.tipo} mensaje={consulta.mensaje} onReintentar={onRecargar} />
         : tutoria && encuentro && <>
@@ -139,7 +152,12 @@ export default function DetalleTutoriaPage({ consulta, idUsuario, materia, nombr
                   <p className="tutorias__puntuacion"><span aria-hidden="true">★ </span>{nota.puntuacion} de 5</p>
                   <time dateTime={nota.fecha_calificacion}>{fechaDeclaracion.format(new Date(nota.fecha_calificacion))}</time>
                 </li>)}</ul>}
-              {tutoria.acciones_disponibles.calificar && <p className="tutorias__nota">Aún no has calificado esta sesión completada.</p>}
+              {calificacion?.error && <p className="tutorias__error-cierre" role="alert">{calificacion.error.message}</p>}
+              {calificacion && !calificacion.enviada && puedeCalificar &&
+                <FormularioCalificacionTutoria
+                  contraparte={nombre(tutoria.id_tutor === idUsuario ? tutoria.id_tutee : tutoria.id_tutor)}
+                  puntuacion={puntuacion} onCambiar={setPuntuacion} onEnviar={calificacion.enviar}
+                  enviando={calificacion.enviando} bloqueado={calificacion.error?.comprobarEstado ?? false} />}
             </section>
           </div>
         </>}

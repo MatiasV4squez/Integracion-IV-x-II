@@ -3,15 +3,18 @@ import { esFecha, esSesion } from './validar-sesion'
 import type { CalificacionTutoria, DeclaracionTutoria, DetalleTutoria, Tutoria } from '../models/tutoria'
 import type { Sesion } from '../models/sesion'
 
-function esCalificacion(valor: unknown, sesion: Tutoria): valor is CalificacionTutoria {
+export function esPuntuacionTutoria(valor: unknown): valor is number {
+  return typeof valor === 'number' && Number.isInteger(valor) && valor >= 1 && valor <= 5
+}
+
+export function esCalificacion(valor: unknown, sesion: Sesion): valor is CalificacionTutoria {
   if (!valor || typeof valor !== 'object') return false
   const dato = valor as Record<string, unknown>
   const participantes = [sesion.id_tutee, sesion.id_tutor]
   return esIdentificador(dato.id_calificacion) && dato.id_sesion === sesion.id_sesion
     && participantes.includes(String(dato.id_evaluador)) && typeof dato.id_evaluador === 'string'
     && participantes.includes(String(dato.id_evaluado)) && typeof dato.id_evaluado === 'string'
-    && dato.id_evaluador !== dato.id_evaluado && typeof dato.puntuacion === 'number'
-    && Number.isInteger(dato.puntuacion) && dato.puntuacion >= 1 && dato.puntuacion <= 5
+    && dato.id_evaluador !== dato.id_evaluado && esPuntuacionTutoria(dato.puntuacion)
     && esFecha(dato.fecha_calificacion)
 }
 

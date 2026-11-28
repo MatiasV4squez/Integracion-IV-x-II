@@ -4,6 +4,7 @@ import { useSesionUsuario } from '../../../shared/auth/useSesionUsuario'
 import type { SesionUsuario } from '../../../shared/auth/sesion-usuario'
 import { useMaterias } from '../../materias/hooks/useMaterias'
 import { useConsultaTutorias } from '../hooks/useConsultaTutorias'
+import { useCalificarTutoria } from '../hooks/useCalificarTutoria'
 import { useDeclararCierre } from '../hooks/useDeclararCierre'
 import { useCancelarSesion } from '../hooks/useCancelarSesion'
 import { useNombresParticipantes } from '../hooks/useNombresParticipantes'
@@ -19,6 +20,7 @@ function DetalleDelUsuario({ sesion, idSesion }: { sesion: SesionUsuario; idSesi
   const cancelacion = useCancelarSesion(sesion, consulta, recargar)
   const cierre = useDeclararCierre(sesion, idSesion, recargar)
   const resolucion = useResolverConflicto(sesion, idSesion, recargar)
+  const calificacion = useCalificarTutoria(sesion, consulta.estado === 'listo' ? consulta.datos : null, recargar)
   const { consulta: catalogo } = useMaterias()
   const nombres = useNombresParticipantes(consulta.estado === 'listo' ? idsParticipantes([consulta.datos]) : [], sesion.token)
   const materia = consulta.estado === 'listo' && catalogo.estado === 'listo'
@@ -26,14 +28,15 @@ function DetalleDelUsuario({ sesion, idSesion }: { sesion: SesionUsuario; idSesi
   const volver = regresoPanel(parametros, sesion.roles)
 
   function actualizar() {
-    if (!cancelacion.puedeActualizar || cierre.enviando || resolucion.resolviendo) return
+    if (!cancelacion.puedeActualizar || cierre.enviando || resolucion.resolviendo || calificacion.enviando) return
+    calificacion.limpiarError()
     cierre.actualizar()
     resolucion.actualizar()
   }
 
   return <DetalleTutoriaPage consulta={consulta} idUsuario={sesion.idUsuario} materia={materia} nombres={nombres}
     volver={volver} etiquetaVolver={volver.startsWith('/administracion') ? '← Volver a Reportes y moderación' : undefined}
-    onRecargar={actualizar} cierre={cierre} resolucion={resolucion} cancelacion={cancelacion} />
+    onRecargar={actualizar} cierre={cierre} resolucion={resolucion} cancelacion={cancelacion} calificacion={calificacion} />
 }
 
 export default function DetalleTutoriaContainer() {

@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { createServer } from 'vite'
 import { renderizarRuta } from './helpers/renderizar-ruta.mjs'
 
-let vite, api, apiCierre, filtros, Page, PanelPage, Detalle, AppRoutes, navegacion
+let vite, api, apiCierre, apiCalificacion, filtros, Page, PanelPage, Detalle, AppRoutes, navegacion
 const fetchOriginal = globalThis.fetch
 const usuario = '9007199254740993'
 const sesion = { token: 'jwt-prueba', idUsuario: usuario, roles: ['ESTUDIANTE'], expiraEn: Date.now() + 3600000 }
@@ -38,6 +38,7 @@ before(async () => {
   vite = await createServer({ server: { middlewareMode: true, hmr: false }, logLevel: 'error' })
   api = await vite.ssrLoadModule('/src/features/sesiones/services/tutorias-api.ts')
   apiCierre = await vite.ssrLoadModule('/src/features/sesiones/services/declarar-cierre-api.ts')
+  apiCalificacion = await vite.ssrLoadModule('/src/features/sesiones/services/calificar-tutoria-api.ts')
   filtros = await vite.ssrLoadModule('/src/features/sesiones/utils/filtros-tutorias.ts')
   ;({ default: Page } = await vite.ssrLoadModule('/src/features/sesiones/pages/HistorialTutoriasPage.tsx'))
   ;({ default: PanelPage } = await vite.ssrLoadModule('/src/features/panel-tutee/pages/PanelTuteePage.tsx'))
@@ -167,6 +168,49 @@ test('muestra carga, vacío y recuperación sin confundir errores con una lista 
   assert.doesNotMatch(fallo, /No hay tutorías para esta selección/)
   const sinAcceso = render(Detalle, { ...baseDetalle, consulta: { estado: 'error', tipo: 'permiso', mensaje: 'Sin acceso' } })
   assert.doesNotMatch(sinAcceso, /Programación III|Abrir reunión|Reintentar/)
+})
+
+const calificable = { ...detalle, calificaciones: [],
+  acciones_disponibles: { ...detalle.acciones_disponibles, calificar: true } }
+
+test('califica a la contraparte en ambos sentidos y envía solo la puntuación por Gateway', async () => {
+  for (const [evaluador, evaluado] of [[usuario, '2'], ['2', usuario]]) {
+    const nota = { ...tutoria.calificaciones[0], id_evaluador: evaluador, id_evaluado: evaluado, puntuacion: 5 }
+    globalThis.fetch = async (url, opciones) => {
+      assert.equal(new URL(url).pathname, '/api/agendamiento-sesiones/sessions/' + tutoria.id_sesion + '/ratings')
+      assert.equal(opciones.method, 'POST')
+      assert.equal(opciones.headers.Authorization, 'Bearer jwt-prueba')
+      assert.deepEqual(JSON.parse(opciones.body), { puntuacion: 5 })
+      return Response.json({ calificacion: nota }, { status: 201 })
+    }
+    assert.deepEqual(await apiCalificacion.calificarTutoria({ ...sesion, idUsuario: evaluador }, calificable, 5, new AbortController().signal), nota)
+  }
+})
+
+test('bloquea calificaciones no elegibles y exige comprobar el detalle ante un conflicto o una respuesta inválida', async () => {
+  const signal = new AbortController().signal
+  let solicitudes = 0
+  globalThis.fetch = async () => { solicitudes++; return Response.json({}, { status: 409 }) }
+  await assert.rejects(apiCalificacion.calificarTutoria(sesion, { ...calificable, estado_sesion: 'PENDIENTE_CIERRE' }, 4, signal))
+  await assert.rejects(apiCalificacion.calificarTutoria({ ...sesion, idUsuario: '99' }, calificable, 4, signal))
+  await assert.rejects(apiCalificacion.calificarTutoria(sesion, calificable, 3.5, signal))
+  await assert.rejects(apiCalificacion.calificarTutoria(sesion, { ...calificable, calificaciones: tutoria.calificaciones }, 4, signal))
+  assert.equal(solicitudes, 0)
+  await assert.rejects(apiCalificacion.calificarTutoria(sesion, calificable, 4, signal), (error) => error.comprobarEstado)
+  assert.equal(solicitudes, 1)
+  globalThis.fetch = async () => Response.json({ calificacion: { ...tutoria.calificaciones[0], id_evaluado: '99' } }, { status: 201 })
+  await assert.rejects(apiCalificacion.calificarTutoria(sesion, calificable, 4, signal), (error) => error.comprobarEstado)
+})
+
+test('ambos participantes pueden calificar; una nota propia, un estado no completado o una cuenta ajena ocultan la acción', () => {
+  const calificacion = { enviar() {}, enviando: false, enviada: false, error: null }
+  const renderizar = (datos, idUsuario) => render(Detalle, { ...baseDetalle, idUsuario, calificacion, consulta: { estado: 'listo', datos } })
+  for (const [idUsuario, contraparte] of [[usuario, 'Camila'], ['2', 'Martina']]) {
+    assert.match(renderizar(calificable, idUsuario), new RegExp('Calificación para ' + contraparte))
+  }
+  assert.doesNotMatch(renderizar(calificable, '99'), /aria-label="Calificar tutoría"/)
+  assert.doesNotMatch(renderizar({ ...calificable, estado_sesion: 'EN_CONFLICTO' }, usuario), /aria-label="Calificar tutoría"/)
+  assert.doesNotMatch(renderizar({ ...calificable, calificaciones: tutoria.calificaciones }, usuario), /aria-label="Calificar tutoría"/)
 })
 
 test('el detalle muestra encuentro, declaraciones, calificaciones y el retorno al historial', () => {
