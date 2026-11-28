@@ -12,7 +12,15 @@ const filaAviso = {
   fechaAviso: new Date('2026-10-13T12:00:00.000Z'),
   tipo: 'CONFLICTO_DETECTADO',
   idSesion: 24n,
-  datos: { tipo: 'CONFLICTO_DETECTADO', id_sesion: '24' },
+  datos: {
+    tipo: 'CONFLICTO_DETECTADO' as const,
+    id_sesion: '24',
+    id_tutor: '42',
+    id_tutee: '99',
+    id_materia: '7',
+    fecha_conflicto: '2026-10-13T12:00:00.000Z',
+    declaraciones: [],
+  },
   creadoEn: new Date('2026-10-13T12:00:01.000Z'),
 };
 
@@ -23,14 +31,20 @@ const datosNuevos: DatosNuevoAvisoSesion = {
   fechaAviso: new Date('2026-10-13T12:00:00.000Z'),
   tipo: 'CONFLICTO_DETECTADO',
   idSesion: 24n,
-  datos: { tipo: 'CONFLICTO_DETECTADO', id_sesion: '24' } as never,
+  datos: filaAviso.datos,
 };
 
 function prismaSimulado() {
   const create = vi.fn();
   const findUnique = vi.fn();
-  const prisma = { avisoSesion: { create, findUnique } } as unknown as PrismaService;
-  return { prisma, create, findUnique };
+  const createMany = vi.fn();
+  const transaccion = { avisoSesion: { create }, notificacion: { createMany } };
+  const prisma = {
+    avisoSesion: { findUnique },
+    $transaction: (operacion: (cliente: typeof transaccion) => unknown) =>
+      operacion(transaccion),
+  } as unknown as PrismaService;
+  return { prisma, create, findUnique, createMany };
 }
 
 function errorUnicidad(): Prisma.PrismaClientKnownRequestError {
@@ -54,8 +68,8 @@ describe('PrismaAvisoSesionRepository', () => {
     vi.clearAllMocks();
   });
 
-  it('crea el aviso y lo devuelve como entidad de dominio', async () => {
-    const { prisma, create, findUnique } = prismaSimulado();
+  it('guarda el conflicto y notifica a los dos participantes', async () => {
+    const { prisma, create, findUnique, createMany } = prismaSimulado();
     create.mockResolvedValue(filaAviso);
 
     const repository = new PrismaAvisoSesionRepository(prisma);
@@ -69,8 +83,22 @@ describe('PrismaAvisoSesionRepository', () => {
         fechaAviso: new Date('2026-10-13T12:00:00.000Z'),
         tipo: 'CONFLICTO_DETECTADO',
         idSesion: 24n,
-        datos: { tipo: 'CONFLICTO_DETECTADO', id_sesion: '24' },
+        datos: filaAviso.datos,
       },
+    });
+    expect(createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          usuarioId: 42n,
+          tipo: 'CONFLICTO_DETECTADO',
+          mensaje: 'El cierre de tu tutoría #24 está en revisión.',
+        },
+        {
+          usuarioId: 99n,
+          tipo: 'CONFLICTO_DETECTADO',
+          mensaje: 'El cierre de tu tutoría #24 está en revisión.',
+        },
+      ],
     });
     expect(findUnique).not.toHaveBeenCalled();
     expect(resultado.duplicado).toBe(false);
@@ -78,7 +106,7 @@ describe('PrismaAvisoSesionRepository', () => {
   });
 
   it('devuelve el aviso existente ante una violación de unicidad', async () => {
-    const { prisma, create, findUnique } = prismaSimulado();
+    const { prisma, create, findUnique, createMany } = prismaSimulado();
     create.mockRejectedValue(errorUnicidad());
     findUnique.mockResolvedValue(filaAviso);
 
@@ -86,6 +114,7 @@ describe('PrismaAvisoSesionRepository', () => {
     const resultado = await repository.registrar(datosNuevos);
 
     expect(findUnique).toHaveBeenCalledWith({ where: { idAviso: '31' } });
+    expect(createMany).not.toHaveBeenCalled();
     expect(resultado).toEqual({ aviso: filaAviso, duplicado: true });
   });
 

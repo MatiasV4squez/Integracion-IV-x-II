@@ -37,3 +37,14 @@ model AvisoSesion {
   @@index([tipo, idSesion])
   @@map("aviso_sesion")
 }
+
+model Notificacion {
+  id        Int      @id @default(autoincrement())
+  usuarioId BigInt
+  tipo      String
+  mensaje   String
+  creadoEn  DateTime @default(now())
+
+  @@index([usuarioId, creadoEn, id])
+  @@map("notificacion")
+}

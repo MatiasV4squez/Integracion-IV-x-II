@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../compartido/prisma.module.js';
 import { IntegracionesModule } from '../integraciones/integraciones.module.js';
 import { ReportesController } from './infraestructura/http/reportes.controller.js';
+import { NotificacionesController } from './infraestructura/http/notificaciones.controller.js';
 import { ValidarSesionParaReporteGuard } from './infraestructura/http/guards/validar-sesion-para-reporte.guard.js';
 import { AdminJwtGuard } from './infraestructura/http/guards/admin-jwt.guard.js';
 import { UsuarioJwtGuard } from './infraestructura/http/guards/usuario-jwt.guard.js';
@@ -26,7 +27,7 @@ import { ConsultarReportesAdminUseCase } from './aplicacion/consultar-reportes-a
 
 @Module({
   imports: [PrismaModule, IntegracionesModule],
-  controllers: [ReportesController],
+  controllers: [ReportesController, NotificacionesController],
   providers: [
     {
       provide: REPORTE_REPOSITORY,

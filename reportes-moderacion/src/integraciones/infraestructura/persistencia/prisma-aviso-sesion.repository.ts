@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AvisoSesion as AvisoSesionPrisma } from '@prisma/client';
+import { TIPO_CONFLICTO_DETECTADO } from '../../dominio/aviso-sesion.js';
 import type {
   AvisoSesion,
   ContenidoAvisoSesion,
@@ -22,11 +23,26 @@ export class PrismaAvisoSesionRepository implements AvisoSesionRepository {
     const { datos: contenido, ...columnas } = datos;
 
     try {
-      const creado = await this.prisma.avisoSesion.create({
-        data: {
-          ...columnas,
-          datos: contenido as unknown as Prisma.InputJsonValue,
-        },
+      const creado = await this.prisma.$transaction(async (transaccion) => {
+        const aviso = await transaccion.avisoSesion.create({
+          data: {
+            ...columnas,
+            datos: contenido as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        if (contenido.tipo === TIPO_CONFLICTO_DETECTADO) {
+          const destinatarios = [...new Set([contenido.id_tutor, contenido.id_tutee])];
+          await transaccion.notificacion.createMany({
+            data: destinatarios.map((usuarioId) => ({
+              usuarioId: BigInt(usuarioId),
+              tipo: contenido.tipo,
+              mensaje: `El cierre de tu tutoría #${contenido.id_sesion} está en revisión.`,
+            })),
+          });
+        }
+
+        return aviso;
       });
       return { aviso: this.aDominio(creado), duplicado: false };
     } catch (error) {
